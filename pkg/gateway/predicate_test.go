@@ -10,7 +10,7 @@ type DummyPredicate struct {
 	Matches bool
 }
 
-func (d DummyPredicate) Test(request *http.Request) bool {
+func (d DummyPredicate) Test(_ *http.Request) bool {
 	return d.Matches
 }
 

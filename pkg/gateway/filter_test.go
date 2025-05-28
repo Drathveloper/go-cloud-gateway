@@ -13,11 +13,11 @@ type DummyFilter struct {
 	PostProcessErr error
 }
 
-func (d *DummyFilter) PreProcess(ctx *gateway.Context) error {
+func (d *DummyFilter) PreProcess(_ *gateway.Context) error {
 	return d.PreProcessErr
 }
 
-func (d *DummyFilter) PostProcess(ctx *gateway.Context) error {
+func (d *DummyFilter) PostProcess(_ *gateway.Context) error {
 	return d.PostProcessErr
 }
 
