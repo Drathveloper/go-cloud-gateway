@@ -68,3 +68,6 @@ view-cover: test-html
 clean:
 	@rm -rf $(COVERAGE_DIR)
 	@echo "✔ Coverage dir cleaned"
+
+build:
+	$(shell $(GO_BIN) build ./...)
