@@ -3,7 +3,6 @@ package gateway
 import (
 	"context"
 	"log/slog"
-	"time"
 )
 
 type Context struct {
@@ -18,9 +17,8 @@ type Context struct {
 func NewGatewayContext(
 	route *Route,
 	req *Request,
-	logger *slog.Logger,
-	timeout time.Duration) (*Context, context.CancelFunc) {
-	ctx, cancelFunc := context.WithTimeout(context.Background(), timeout)
+	logger *slog.Logger) (*Context, context.CancelFunc) {
+	ctx, cancelFunc := context.WithTimeout(context.Background(), route.Timeout)
 	return &Context{
 		Request:    req,
 		Response:   nil,

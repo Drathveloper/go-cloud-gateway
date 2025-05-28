@@ -64,7 +64,7 @@ func TestFilters_PreProcessAll(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx, _ := gateway.NewGatewayContext(nil, nil, nil, 0)
+			ctx, _ := gateway.NewGatewayContext(&gateway.Route{}, nil, nil)
 			f := gateway.Filters(tt.filters)
 
 			err := f.PreProcessAll(ctx)
@@ -117,7 +117,7 @@ func TestFilters_PostProcessAll(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx, _ := gateway.NewGatewayContext(nil, nil, nil, 0)
+			ctx, _ := gateway.NewGatewayContext(&gateway.Route{}, nil, nil)
 			f := gateway.Filters(tt.filters)
 
 			err := f.PostProcessAll(ctx)

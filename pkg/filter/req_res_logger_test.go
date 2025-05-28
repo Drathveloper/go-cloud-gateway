@@ -92,7 +92,7 @@ func TestRequestResponseLogger_PreProcess(t *testing.T) {
 			req, _ := http.NewRequest(tt.method, "https://example.org/"+tt.path, bytes.NewBuffer(tt.body))
 			req.Header = tt.headers
 			gwReq, _ := gateway.NewGatewayRequest(req)
-			ctx, _ := gateway.NewGatewayContext(nil, gwReq, logger, 0)
+			ctx, _ := gateway.NewGatewayContext(&gateway.Route{}, gwReq, logger)
 
 			f := filter.NewRequestResponseLoggerFilter()
 			_ = f.PreProcess(ctx)
@@ -148,7 +148,7 @@ func TestRequestResponseLogger_PostProcess(t *testing.T) {
 				Body:       bodyBytes,
 			}
 			gwRes, _ := gateway.NewGatewayResponse(res)
-			ctx, _ := gateway.NewGatewayContext(nil, nil, logger, 0)
+			ctx, _ := gateway.NewGatewayContext(&gateway.Route{}, nil, logger)
 			ctx.Response = gwRes
 
 			f := filter.NewRequestResponseLoggerFilter()

@@ -22,9 +22,7 @@ type Gateway struct {
 	httpClient    HTTPClient
 }
 
-func NewGateway(
-	globalFilters Filters,
-	client HTTPClient) *Gateway {
+func NewGateway(globalFilters Filters, client HTTPClient) *Gateway {
 	return &Gateway{
 		globalFilters: globalFilters,
 		httpClient:    client,
@@ -32,8 +30,8 @@ func NewGateway(
 }
 
 func (g *Gateway) Do(ctx *Context) error {
-	ctx.Logger.With().Info("started routing request", "routeId", ctx.Route.ID)
-	defer ctx.Logger.Info("finished routing request", "routeId", ctx.Route.ID)
+	ctx.Logger.Info("started routing request")
+	defer ctx.Logger.Info("finished routing request")
 	allFilters := ctx.Route.CombineGlobalFilters(g.globalFilters...)
 	if err := allFilters.PreProcessAll(ctx); err != nil {
 		return fmt.Errorf(gatewayErrMsg, ctx.Route.ID, err)

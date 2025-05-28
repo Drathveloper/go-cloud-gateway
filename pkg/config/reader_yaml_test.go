@@ -44,7 +44,7 @@ func TestReaderYAML_Read(t *testing.T) {
 									},
 								},
 							},
-							Timeout: 0,
+							Timeout: config.Duration{},
 						},
 					},
 				},

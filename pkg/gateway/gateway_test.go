@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"reflect"
 	"testing"
-	"time"
 
 	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 )
@@ -242,7 +241,7 @@ func TestGateway_Do(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			gw := gateway.NewGateway(tt.globalFilters, tt.httpClient)
-			ctx, _ := gateway.NewGatewayContext(tt.route, tt.request, tt.logger, 30*time.Second)
+			ctx, _ := gateway.NewGatewayContext(tt.route, tt.request, tt.logger)
 
 			err := gw.Do(ctx)
 
