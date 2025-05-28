@@ -1,6 +1,7 @@
 GO_BIN=$(shell which go)
 
-GOLANGCI_LINT := $(shell command -v golangci-lint 2>/dev/null)
+TOOLS_DIR := ./tools
+GOLANGCI_LINT := $(TOOLS_DIR)/golangci-lint
 LINT_FLAGS ?= --timeout 5m
 GOLANGCI_LINT_CONFIG ?= .golangci.yml
 
@@ -16,12 +17,14 @@ endif
 .PHONY: test test-unit test-cover test-html view-cover clean
 
 setup:
-	@GOPATH=$(shell $(GO_BIN) env GOPATH)
-	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b $(GOPATH)/bin v2.1.6
+		@mkdir -p ./tools && \
+    	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b ./tools v2.1.6
 
 lint-check:
 ifndef GOLANGCI_LINT
 	$(error "golangci-lint is not installed. Run 'make setup' to get all project dependencies")
+else
+	$(MAKE) setup
 endif
 
 lint: lint-check
@@ -66,8 +69,9 @@ view-cover: test-html
 	fi
 
 clean:
+	@rm -rf $(TOOLS_DIR)
 	@rm -rf $(COVERAGE_DIR)
-	@echo "✔ Coverage dir cleaned"
+	@echo "✔ Directories cleaned"
 
 build:
 	$(shell $(GO_BIN) build ./...)
