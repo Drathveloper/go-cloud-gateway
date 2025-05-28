@@ -1,6 +1,6 @@
 package filter
 
-import "gateway/pkg/gateway"
+import "github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 
 var BuilderRegistry gateway.FilterBuilderRegistry = map[string]gateway.FilterBuilder{
 	AddRequestHeaderFilterName:      NewAddRequestHeaderBuilder(),

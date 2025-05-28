@@ -2,7 +2,7 @@ package predicate
 
 import (
 	"fmt"
-	"gateway/pkg/gateway"
+	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 )
 
 type Factory struct {

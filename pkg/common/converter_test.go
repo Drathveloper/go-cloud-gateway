@@ -3,7 +3,7 @@ package common_test
 import (
 	"errors"
 	"fmt"
-	"gateway/pkg/common"
+	"github.com/drathveloper/go-cloud-gateway/pkg/common"
 	"reflect"
 	"slices"
 	"testing"

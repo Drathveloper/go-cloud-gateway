@@ -1,4 +1,4 @@
-module gateway
+module github.com/drathveloper/go-cloud-gateway
 
 go 1.24
 

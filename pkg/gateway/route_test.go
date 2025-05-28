@@ -1,7 +1,7 @@
 package gateway_test
 
 import (
-	"gateway/pkg/gateway"
+	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 	"net/http"
 	"net/url"
 	"slices"

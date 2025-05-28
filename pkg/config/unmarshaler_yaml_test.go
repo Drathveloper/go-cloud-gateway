@@ -8,7 +8,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"gateway/pkg/config"
+	"github.com/drathveloper/go-cloud-gateway/pkg/config"
 )
 
 type DummyYAML struct {

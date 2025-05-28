@@ -9,7 +9,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"gateway/pkg/gateway"
+	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 )
 
 var ErrRouteNotFound = errors.New("route not found")

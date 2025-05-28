@@ -2,7 +2,7 @@ package gateway_test
 
 import (
 	"errors"
-	"gateway/pkg/gateway"
+	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 	"io"
 	"testing"
 )

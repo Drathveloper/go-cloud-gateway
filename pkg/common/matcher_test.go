@@ -1,7 +1,7 @@
 package common_test
 
 import (
-	"gateway/pkg/common"
+	"github.com/drathveloper/go-cloud-gateway/pkg/common"
 	"testing"
 )
 

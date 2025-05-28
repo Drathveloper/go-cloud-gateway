@@ -3,7 +3,7 @@ package gateway_test
 import (
 	"bytes"
 	"errors"
-	"gateway/pkg/gateway"
+	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 	"io"
 	"net/http"
 	"net/url"

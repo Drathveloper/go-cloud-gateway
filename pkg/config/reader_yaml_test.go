@@ -8,7 +8,7 @@ import (
 
 	"github.com/go-playground/validator/v10"
 
-	"gateway/pkg/config"
+	"github.com/drathveloper/go-cloud-gateway/pkg/config"
 )
 
 func TestReaderYAML_Read(t *testing.T) {

@@ -1,7 +1,7 @@
 package filter
 
 import (
-	"gateway/pkg/gateway"
+	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 )
 
 const RequestResponseLoggerFilterName = "RequestResponseLogger"

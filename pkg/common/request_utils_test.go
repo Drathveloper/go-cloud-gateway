@@ -3,7 +3,7 @@ package common_test
 import (
 	"bytes"
 	"errors"
-	"gateway/pkg/common"
+	"github.com/drathveloper/go-cloud-gateway/pkg/common"
 	"io"
 	"testing"
 )

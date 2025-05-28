@@ -2,9 +2,9 @@ package config
 
 import (
 	"fmt"
-	"gateway/pkg/filter"
-	"gateway/pkg/gateway"
-	"gateway/pkg/predicate"
+	"github.com/drathveloper/go-cloud-gateway/pkg/filter"
+	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
+	"github.com/drathveloper/go-cloud-gateway/pkg/predicate"
 	"net"
 	"net/http"
 	"time"

@@ -3,7 +3,7 @@ package predicate_test
 import (
 	"errors"
 	"fmt"
-	"gateway/pkg/predicate"
+	"github.com/drathveloper/go-cloud-gateway/pkg/predicate"
 	"net/http"
 	"testing"
 	"time"

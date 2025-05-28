@@ -2,8 +2,8 @@ package filter
 
 import (
 	"fmt"
-	"gateway/pkg/common"
-	"gateway/pkg/gateway"
+	"github.com/drathveloper/go-cloud-gateway/pkg/common"
+	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 )
 
 const (

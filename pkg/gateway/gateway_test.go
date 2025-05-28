@@ -3,7 +3,7 @@ package gateway_test
 import (
 	"context"
 	"errors"
-	"gateway/pkg/gateway"
+	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 	"io"
 	"log/slog"
 	"net/http"

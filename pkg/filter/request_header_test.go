@@ -3,8 +3,8 @@ package filter_test
 import (
 	"errors"
 	"fmt"
-	"gateway/pkg/filter"
-	"gateway/pkg/gateway"
+	"github.com/drathveloper/go-cloud-gateway/pkg/filter"
+	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 	"net/http"
 	"slices"
 	"testing"

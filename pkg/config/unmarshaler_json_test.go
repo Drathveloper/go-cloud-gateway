@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"gateway/pkg/config"
+	"github.com/drathveloper/go-cloud-gateway/pkg/config"
 	"testing"
 	"time"
 )

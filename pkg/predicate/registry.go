@@ -1,6 +1,6 @@
 package predicate
 
-import "gateway/pkg/gateway"
+import "github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 
 var BuilderRegistry gateway.PredicateBuilderRegistry = map[string]gateway.PredicateBuilder{
 	MethodPredicateName:  NewMethodPredicateBuilder(),
