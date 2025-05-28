@@ -1,11 +1,12 @@
 package gateway_test
 
 import (
-	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 	"net/http"
 	"net/url"
 	"slices"
 	"testing"
+
+	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 )
 
 func TestRoute_CombineGlobalFilters(t *testing.T) {

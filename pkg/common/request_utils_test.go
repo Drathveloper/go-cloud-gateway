@@ -3,9 +3,10 @@ package common_test
 import (
 	"bytes"
 	"errors"
-	"github.com/drathveloper/go-cloud-gateway/pkg/common"
 	"io"
 	"testing"
+
+	"github.com/drathveloper/go-cloud-gateway/pkg/common"
 )
 
 func TestReadBody(t *testing.T) {

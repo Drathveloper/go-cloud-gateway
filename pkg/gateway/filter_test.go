@@ -2,9 +2,10 @@ package gateway_test
 
 import (
 	"errors"
-	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 	"io"
 	"testing"
+
+	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 )
 
 type DummyFilter struct {

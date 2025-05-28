@@ -3,10 +3,11 @@ package gateway
 import (
 	"bytes"
 	"fmt"
-	"github.com/drathveloper/go-cloud-gateway/pkg/common"
 	"io"
 	"net/http"
 	"net/url"
+
+	"github.com/drathveloper/go-cloud-gateway/pkg/common"
 )
 
 type Request struct {

@@ -2,10 +2,11 @@ package predicate
 
 import (
 	"fmt"
-	"github.com/drathveloper/go-cloud-gateway/pkg/common"
-	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 	"net/http"
 	"regexp"
+
+	"github.com/drathveloper/go-cloud-gateway/pkg/common"
+	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 )
 
 const QueryPredicateName = "Query"

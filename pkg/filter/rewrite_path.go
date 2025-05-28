@@ -2,11 +2,12 @@ package filter
 
 import (
 	"fmt"
-	"github.com/drathveloper/go-cloud-gateway/pkg/common"
-	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 	"net/url"
 	"regexp"
 	"strings"
+
+	"github.com/drathveloper/go-cloud-gateway/pkg/common"
+	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 )
 
 const RewritePathFilterName = "RewritePath"

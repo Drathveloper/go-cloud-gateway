@@ -3,13 +3,14 @@ package config_test
 import (
 	"errors"
 	"fmt"
+	"reflect"
+	"testing"
+	"time"
+
 	"github.com/drathveloper/go-cloud-gateway/pkg/config"
 	"github.com/drathveloper/go-cloud-gateway/pkg/filter"
 	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 	"github.com/drathveloper/go-cloud-gateway/pkg/predicate"
-	"reflect"
-	"testing"
-	"time"
 )
 
 func TestNewRoutes(t *testing.T) {

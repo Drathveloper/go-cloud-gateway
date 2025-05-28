@@ -2,9 +2,10 @@ package predicate
 
 import (
 	"fmt"
+	"net/http"
+
 	"github.com/drathveloper/go-cloud-gateway/pkg/common"
 	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
-	"net/http"
 )
 
 const HostPredicateName = "Host"

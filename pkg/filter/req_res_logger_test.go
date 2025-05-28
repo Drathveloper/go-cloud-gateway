@@ -3,13 +3,14 @@ package filter_test
 import (
 	"bytes"
 	"fmt"
-	"github.com/drathveloper/go-cloud-gateway/pkg/filter"
-	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 	"io"
 	"log/slog"
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/drathveloper/go-cloud-gateway/pkg/filter"
+	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 )
 
 func TestNewRequestResponseLoggerFilterBuilder(t *testing.T) {

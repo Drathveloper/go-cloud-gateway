@@ -3,9 +3,10 @@ package filter_test
 import (
 	"errors"
 	"fmt"
-	"github.com/drathveloper/go-cloud-gateway/pkg/filter"
 	"reflect"
 	"testing"
+
+	"github.com/drathveloper/go-cloud-gateway/pkg/filter"
 )
 
 func TestFactory_Build(t *testing.T) {

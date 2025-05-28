@@ -1,8 +1,9 @@
 package common_test
 
 import (
-	"github.com/drathveloper/go-cloud-gateway/pkg/common"
 	"testing"
+
+	"github.com/drathveloper/go-cloud-gateway/pkg/common"
 )
 
 func TestPathMatcher(t *testing.T) {

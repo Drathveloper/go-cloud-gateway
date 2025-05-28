@@ -3,11 +3,12 @@ package filter_test
 import (
 	"errors"
 	"fmt"
-	"github.com/drathveloper/go-cloud-gateway/pkg/filter"
-	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 	"net/http"
 	"slices"
 	"testing"
+
+	"github.com/drathveloper/go-cloud-gateway/pkg/filter"
+	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 )
 
 func TestNewAddRequestHeaderBuilder(t *testing.T) {

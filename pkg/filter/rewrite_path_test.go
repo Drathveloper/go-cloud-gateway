@@ -3,10 +3,11 @@ package filter_test
 import (
 	"errors"
 	"fmt"
-	"github.com/drathveloper/go-cloud-gateway/pkg/filter"
-	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 	"net/http"
 	"testing"
+
+	"github.com/drathveloper/go-cloud-gateway/pkg/filter"
+	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 )
 
 func TestNewRewritePathBuilder(t *testing.T) {

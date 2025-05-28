@@ -1,9 +1,10 @@
 package gateway_test
 
 import (
-	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 	"net/http"
 	"testing"
+
+	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 )
 
 type DummyPredicate struct {

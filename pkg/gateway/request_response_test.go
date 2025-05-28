@@ -3,12 +3,13 @@ package gateway_test
 import (
 	"bytes"
 	"errors"
-	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 	"io"
 	"net/http"
 	"net/url"
 	"reflect"
 	"testing"
+
+	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 )
 
 func TestNewGatewayRequest(t *testing.T) {

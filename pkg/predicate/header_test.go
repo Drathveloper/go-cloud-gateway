@@ -3,9 +3,10 @@ package predicate_test
 import (
 	"errors"
 	"fmt"
-	"github.com/drathveloper/go-cloud-gateway/pkg/predicate"
 	"net/http"
 	"testing"
+
+	"github.com/drathveloper/go-cloud-gateway/pkg/predicate"
 )
 
 func TestNewHeaderPredicateBuilder(t *testing.T) {

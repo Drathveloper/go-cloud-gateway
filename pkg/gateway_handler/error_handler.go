@@ -3,9 +3,10 @@ package gateway_handler
 import (
 	"context"
 	"errors"
-	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 	"log/slog"
 	"net/http"
+
+	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 )
 
 type ErrorHandler interface {

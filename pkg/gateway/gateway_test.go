@@ -3,7 +3,6 @@ package gateway_test
 import (
 	"context"
 	"errors"
-	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 	"io"
 	"log/slog"
 	"net/http"
@@ -11,6 +10,8 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 )
 
 type MockHTTPClient struct {

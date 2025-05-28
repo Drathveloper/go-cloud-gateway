@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
-	"github.com/drathveloper/go-cloud-gateway/pkg/gateway_handler"
 	"io"
 	"log/slog"
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
+	"github.com/drathveloper/go-cloud-gateway/pkg/gateway_handler"
 )
 
 type DummyWriter struct {

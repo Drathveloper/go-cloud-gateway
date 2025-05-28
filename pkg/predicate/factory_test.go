@@ -3,10 +3,11 @@ package predicate_test
 import (
 	"errors"
 	"fmt"
-	"github.com/drathveloper/go-cloud-gateway/pkg/predicate"
 	"net/http"
 	"reflect"
 	"testing"
+
+	"github.com/drathveloper/go-cloud-gateway/pkg/predicate"
 )
 
 func TestFactory_Build(t *testing.T) {

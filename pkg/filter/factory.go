@@ -2,6 +2,7 @@ package filter
 
 import (
 	"fmt"
+
 	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 )
 

@@ -3,10 +3,11 @@ package predicate_test
 import (
 	"errors"
 	"fmt"
-	"github.com/drathveloper/go-cloud-gateway/pkg/predicate"
 	"net/http"
 	"testing"
 	"time"
+
+	"github.com/drathveloper/go-cloud-gateway/pkg/predicate"
 )
 
 type DummyTime struct {

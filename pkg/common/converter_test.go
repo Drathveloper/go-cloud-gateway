@@ -3,11 +3,12 @@ package common_test
 import (
 	"errors"
 	"fmt"
-	"github.com/drathveloper/go-cloud-gateway/pkg/common"
 	"reflect"
 	"slices"
 	"testing"
 	"time"
+
+	"github.com/drathveloper/go-cloud-gateway/pkg/common"
 )
 
 func TestConvertToString(t *testing.T) {

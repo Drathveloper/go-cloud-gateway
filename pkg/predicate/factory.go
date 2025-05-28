@@ -2,6 +2,7 @@ package predicate
 
 import (
 	"fmt"
+
 	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 )
 

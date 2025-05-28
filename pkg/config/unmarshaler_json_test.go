@@ -4,9 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/drathveloper/go-cloud-gateway/pkg/config"
 	"testing"
 	"time"
+
+	"github.com/drathveloper/go-cloud-gateway/pkg/config"
 )
 
 type DummyJSON struct {
