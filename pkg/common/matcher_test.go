@@ -61,6 +61,36 @@ func TestPathMatcher(t *testing.T) {
 			path:    "/any/route",
 			match:   true,
 		},
+		{
+			name:    "segment doesn't match",
+			pattern: "/user/profile",
+			path:    "/user/settings",
+			match:   false,
+		},
+		{
+			name:    "pattern longest than path",
+			pattern: "/user/profile/details",
+			path:    "/user/profile",
+			match:   false,
+		},
+		{
+			name:    "pattern with double asterisk but next doesn't match",
+			pattern: "/user/**/details",
+			path:    "/user/profile",
+			match:   false,
+		},
+		{
+			name:    "longest pattern than path after double asterisk",
+			pattern: "/user/**/details/extra",
+			path:    "/user/profile/details",
+			match:   false,
+		},
+		{
+			name:    "? matcher should match",
+			pattern: "/user/?/extra",
+			path:    "/user//extra",
+			match:   false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
