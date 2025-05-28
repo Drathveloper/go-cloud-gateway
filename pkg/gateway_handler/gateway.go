@@ -2,12 +2,14 @@ package gateway_handler
 
 import (
 	"errors"
-	"gateway/pkg/gateway"
-	"github.com/google/uuid"
 	"log/slog"
 	"maps"
 	"net/http"
 	"time"
+
+	"github.com/google/uuid"
+
+	"gateway/pkg/gateway"
 )
 
 var ErrRouteNotFound = errors.New("route not found")

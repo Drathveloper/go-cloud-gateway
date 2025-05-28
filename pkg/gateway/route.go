@@ -15,14 +15,14 @@ type Route struct {
 }
 
 func NewRoute(
-	ID,
-	URI string,
+	id,
+	uri string,
 	predicates Predicates,
 	filters Filters,
 	timeout time.Duration) *Route {
 	return &Route{
-		ID:         ID,
-		URI:        URI,
+		ID:         id,
+		URI:        uri,
 		Predicates: predicates,
 		Filters:    filters,
 		Timeout:    timeout,

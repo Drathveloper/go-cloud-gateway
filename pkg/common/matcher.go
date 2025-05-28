@@ -86,7 +86,7 @@ func convertPatternToRegex(pattern string) string {
 		regex = "^" + regex
 	}
 	if !strings.HasSuffix(regex, "$") {
-		regex = regex + "$"
+		regex += "$"
 	}
 	return regex
 }

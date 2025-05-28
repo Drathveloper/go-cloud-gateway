@@ -30,7 +30,7 @@ func BaseErrorHandler() ErrorHandlerFunc {
 		case errors.Is(err, context.DeadlineExceeded):
 			logger.Error("request timeout", "error", err)
 			http.Error(w, "", http.StatusBadGateway)
-		case errors.Is(err, gateway.HTTPErr):
+		case errors.Is(err, gateway.ErrHTTP):
 			logger.Error("http request failed", "error", err)
 			http.Error(w, "", http.StatusBadGateway)
 		default:

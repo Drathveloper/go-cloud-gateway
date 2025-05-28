@@ -60,7 +60,7 @@ func TestBaseErrorHandler(t *testing.T) {
 		{
 			name:               "test base error handler should succeed when error is generic http error",
 			expectedStatusCode: http.StatusBadGateway,
-			err:                gateway.HTTPErr,
+			err:                gateway.ErrHTTP,
 			expectedErrMsg:     "level=ERROR msg=\"http request failed\" error=\"gateway http request to backend failed\"",
 		},
 		{

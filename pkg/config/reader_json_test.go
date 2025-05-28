@@ -3,10 +3,12 @@ package config_test
 import (
 	"errors"
 	"fmt"
-	"gateway/pkg/config"
-	"github.com/go-playground/validator/v10"
 	"reflect"
 	"testing"
+
+	"github.com/go-playground/validator/v10"
+
+	"gateway/pkg/config"
 )
 
 func TestReaderJSON_Read(t *testing.T) {

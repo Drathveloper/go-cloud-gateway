@@ -3,10 +3,12 @@ package config_test
 import (
 	"errors"
 	"fmt"
-	"gateway/pkg/config"
-	"gopkg.in/yaml.v3"
 	"testing"
 	"time"
+
+	"gopkg.in/yaml.v3"
+
+	"gateway/pkg/config"
 )
 
 type DummyYAML struct {

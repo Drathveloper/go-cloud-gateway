@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+
 	"github.com/go-playground/validator/v10"
 	"gopkg.in/yaml.v3"
 )

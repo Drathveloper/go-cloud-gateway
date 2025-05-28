@@ -197,7 +197,7 @@ func TestGateway_Do(t *testing.T) {
 			},
 			logger:           slog.Default(),
 			expectedResponse: nil,
-			expectedErr:      gateway.HTTPErr,
+			expectedErr:      gateway.ErrHTTP,
 			expectedErrMsg:   "gateway request for route r1 failed: gateway http request to backend failed: someErr",
 		},
 		{

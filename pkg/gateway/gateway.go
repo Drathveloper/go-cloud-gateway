@@ -9,7 +9,7 @@ import (
 	"net/http"
 )
 
-var HTTPErr = errors.New("gateway http request to backend failed")
+var ErrHTTP = errors.New("gateway http request to backend failed")
 
 type HTTPClient interface {
 	Do(r *http.Request) (*http.Response, error)
@@ -48,7 +48,7 @@ func (g *Gateway) Do(ctx *Context) error {
 		case errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled):
 			return fmt.Errorf(gatewayErrMsg, ctx.Route.ID, context.DeadlineExceeded)
 		default:
-			return fmt.Errorf(gatewayErrMsg, ctx.Route.ID, fmt.Errorf("%w: %s", HTTPErr, err))
+			return fmt.Errorf(gatewayErrMsg, ctx.Route.ID, fmt.Errorf("%w: %s", ErrHTTP, err))
 		}
 	}
 	gwRes, err := NewGatewayResponse(backendRes)
