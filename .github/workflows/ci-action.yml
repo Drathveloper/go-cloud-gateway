@@ -38,6 +38,9 @@ jobs:
     - name: Install dependencies
       run: sudo apt-get update && sudo apt-get install -y make
 
+    - name: Setup Tools
+      run: make setup
+
     - name: Build project
       run: make build
 
