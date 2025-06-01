@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"time"
 
+	"golang.org/x/net/http2"
+
 	"github.com/drathveloper/go-cloud-gateway/pkg/filter"
 	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 	"github.com/drathveloper/go-cloud-gateway/pkg/predicate"
@@ -32,7 +34,7 @@ func NewHTTPClient(cfg *Config) (*http.Client, error) {
 		return nil, fmt.Errorf("failed to build TLS config: %w", err)
 	}
 	if cfg != nil && cfg.Gateway.HTTPClient != nil && cfg.Gateway.HTTPClient.Pool != nil {
-		return buildConfiguredHTTPClient(cfg, tlsConfig), nil
+		return buildConfiguredHTTPClient(cfg, tlsConfig)
 	}
 	return buildDefaultHTTPClient(tlsConfig), nil
 }
@@ -81,8 +83,9 @@ func isInsecureSkipVerify(cfg *Config) bool {
 	return false
 }
 
-func buildConfiguredHTTPClient(config *Config, tlsConfig *tls.Config) *http.Client {
+func buildConfiguredHTTPClient(config *Config, tlsConfig *tls.Config) (*http.Client, error) {
 	transport := &http.Transport{
+		Proxy:           http.ProxyFromEnvironment,
 		TLSClientConfig: tlsConfig,
 		DialContext: (&net.Dialer{
 			Timeout:   config.Gateway.HTTPClient.Pool.ConnectTimeout.Duration,
@@ -94,14 +97,20 @@ func buildConfiguredHTTPClient(config *Config, tlsConfig *tls.Config) *http.Clie
 		IdleConnTimeout:     config.Gateway.HTTPClient.Pool.IdleConnTimeout.Duration,
 		TLSHandshakeTimeout: config.Gateway.HTTPClient.Pool.TLSHandshakeTimeout.Duration,
 	}
+	if config.Gateway.HTTPClient.EnableHTTP2 {
+		if err := http2.ConfigureTransport(transport); err != nil {
+			return nil, fmt.Errorf("failed to configure http2 transport: %w", err)
+		}
+	}
 	return &http.Client{
 		Transport: transport,
 		Timeout:   config.Gateway.HTTPClient.Pool.ConnectTimeout.Duration,
-	}
+	}, nil
 }
 
 func buildDefaultHTTPClient(tlsConfig *tls.Config) *http.Client {
 	transport := &http.Transport{
+		Proxy:           http.ProxyFromEnvironment,
 		TLSClientConfig: tlsConfig,
 		DialContext: (&net.Dialer{
 			Timeout: DefaultTimeout,

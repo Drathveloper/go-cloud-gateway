@@ -30,6 +30,7 @@ type HTTPClient struct {
 	MTLS              *MTLS `json:"mtls"                yaml:"mtls"`
 	Pool              *Pool `json:"pool"                yaml:"pool"`
 	InsecureTLSVerify bool  `json:"insecure-tls-verify" yaml:"insecure-tls-verify"`
+	EnableHTTP2       bool  `json:"enable-http2"        yaml:"enable-http2"`
 }
 
 type Pool struct {
