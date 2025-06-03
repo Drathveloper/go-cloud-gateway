@@ -74,4 +74,4 @@ clean:
 	@echo "✔ Directories cleaned"
 
 build:
-	$(shell $(GO_BIN) build ./...)
+	@$(shell $(GO_BIN) build ./...)
