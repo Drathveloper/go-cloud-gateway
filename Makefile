@@ -7,7 +7,7 @@ GOLANGCI_LINT_CONFIG ?= .golangci.yml
 
 TEST_PKGS := $(shell go list ./... | grep -v /vendor/)
 COVERAGE_DIR := coverage
-COVERAGE_FILE := $(COVERAGE_DIR)/coverage.out
+COVERAGE_FILE := $(COVERAGE_DIR)/coverage.txt
 COVERAGE_HTML := $(COVERAGE_DIR)/coverage.html
 
 ifeq ($(GO_BIN),)

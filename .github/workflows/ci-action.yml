@@ -64,8 +64,8 @@ jobs:
           ${{ env.COVERAGE_HTML }}
 
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v5
       with:
-        file: ${{ env.COVERAGE_FILE }}
+        token: ${{ secrets.CODECOV_TOKEN }}
         flags: unittests
         name: codecov-umbrella
