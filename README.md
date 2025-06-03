@@ -1,4 +1,5 @@
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/Drathveloper/go-cloud-gateway)
+[![codecov](https://codecov.io/gh/Drathveloper/go-cloud-gateway/branch/master/graph/badge.svg?token=IKVZK1594Y)](https://codecov.io/gh/Drathveloper/go-cloud-gateway)
 
 # Overview
 
