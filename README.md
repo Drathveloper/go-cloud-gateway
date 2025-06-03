@@ -65,19 +65,20 @@ The gateway can be configured using either YAML or JSON files. A basic YAML conf
 gateway:
   routes:
     - id: example-route
+      uri: http://localhost:8080
       predicates:
-        - path: /api/v1/*
+        - name: Path
+          args:
+            patterns:
+              - /api/v1/*
       filters:
-        - addRequestHeader:
+        - name: AddRequestHeader
+          args:
             name: X-Request-ID
             value: uuid
-      backend:
-        url: http://localhost:8080
-  globalFilters:
-    - logging:
-        level: info
-  settings:
-    timeout: 30s
+  global-filters:
+    - name: RequestResponseLogger
+  global-timeout: 30s
 ```
 
 * **Routes**: Define individual routes with associated predicates and filters.
