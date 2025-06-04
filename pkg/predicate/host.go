@@ -3,6 +3,7 @@ package predicate
 import (
 	"fmt"
 	"net/http"
+	"regexp"
 
 	"github.com/drathveloper/go-cloud-gateway/pkg/common"
 	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
@@ -11,11 +12,28 @@ import (
 const HostPredicateName = "Host"
 
 type HostPredicate struct {
-	Patterns []string
+	Patterns      []string
+	compiledRegex []*regexp.Regexp
 }
 
-func NewHostPredicate(patterns ...string) *HostPredicate {
-	return &HostPredicate{Patterns: patterns}
+func NewHostPredicate(patterns ...string) (*HostPredicate, error) {
+	compiled := make([]*regexp.Regexp, 0, len(patterns))
+	for _, p := range patterns {
+		if p == "**" {
+			compiled = append(compiled, nil)
+			continue
+		}
+		r := common.ConvertPatternToRegex(p)
+		re, err := regexp.Compile(r)
+		if err != nil {
+			return nil, fmt.Errorf("invalid host pattern %q: %w", p, err)
+		}
+		compiled = append(compiled, re)
+	}
+	return &HostPredicate{
+		Patterns:      patterns,
+		compiledRegex: compiled,
+	}, nil
 }
 
 func NewHostPredicateBuilder() gateway.PredicateBuilder {
@@ -24,14 +42,13 @@ func NewHostPredicateBuilder() gateway.PredicateBuilder {
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert 'patterns' attribute: %w", err)
 		}
-		return NewHostPredicate(patterns...), nil
+		return NewHostPredicate(patterns...)
 	})
 }
 
 func (p *HostPredicate) Test(request *http.Request) bool {
-	host := request.Host
-	for _, pattern := range p.Patterns {
-		if common.HostMatcher(pattern, host) {
+	for _, pattern := range p.compiledRegex {
+		if common.HostMatcher(pattern, request.Host) {
 			return true
 		}
 	}

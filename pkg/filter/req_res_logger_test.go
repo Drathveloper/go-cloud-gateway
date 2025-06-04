@@ -24,6 +24,41 @@ func TestNewRequestResponseLoggerFilterBuilder(t *testing.T) {
 			args:        map[string]any{},
 			expectedErr: nil,
 		},
+		{
+			name: "build should succeed when level is present and is debug",
+			args: map[string]any{
+				"level": "DEBUG",
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "build should succeed when level is present and is info",
+			args: map[string]any{
+				"level": "INFO",
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "build should succeed when level is present and is warn",
+			args: map[string]any{
+				"level": "WARN",
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "build should succeed when level is present and is error",
+			args: map[string]any{
+				"level": "ERROR",
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "build should succeed when level is present and is not valid",
+			args: map[string]any{
+				"level": "OTHER",
+			},
+			expectedErr: nil,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -42,7 +77,7 @@ func TestNewRequestResponseLoggerFilterBuilder(t *testing.T) {
 func TestRequestResponseLogger_Name(t *testing.T) {
 	expected := "RequestResponseLogger"
 
-	f := filter.NewRequestResponseLoggerFilter()
+	f := filter.NewRequestResponseLoggerFilter(slog.LevelInfo)
 
 	actual := f.Name()
 
@@ -94,7 +129,7 @@ func TestRequestResponseLogger_PreProcess(t *testing.T) {
 			gwReq, _ := gateway.NewGatewayRequest(req)
 			ctx, _ := gateway.NewGatewayContext(&gateway.Route{}, gwReq, logger)
 
-			f := filter.NewRequestResponseLoggerFilter()
+			f := filter.NewRequestResponseLoggerFilter(slog.LevelInfo)
 			_ = f.PreProcess(ctx)
 
 			if !strings.Contains(buf.String(), tt.expected) {
@@ -151,7 +186,7 @@ func TestRequestResponseLogger_PostProcess(t *testing.T) {
 			ctx, _ := gateway.NewGatewayContext(&gateway.Route{}, nil, logger)
 			ctx.Response = gwRes
 
-			f := filter.NewRequestResponseLoggerFilter()
+			f := filter.NewRequestResponseLoggerFilter(slog.LevelInfo)
 			_ = f.PostProcess(ctx)
 
 			if !strings.Contains(buf.String(), tt.expected) {

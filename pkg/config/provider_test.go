@@ -222,8 +222,6 @@ func TestNewGlobalFilters(t *testing.T) {
 }
 
 func TestNewHTTPClient(t *testing.T) {
-	// Mock valid certificate data for successful mTLS tests
-	// In a real project, use proper test certificates
 	mockValidCert := `-----BEGIN CERTIFICATE-----
 MIIE+DCCAuCgAwIBAgIUSMcgR98H2yE7GimsKnfxslDXABAwDQYJKoZIhvcNAQEL
 BQAwEjEQMA4GA1UEAwwHVGVzdCBDQTAeFw0yNTA1MjgxODQxMDZaFw0yNjA1Mjgx

@@ -1,12 +1,12 @@
 package gateway_handler
 
 import (
+	"bytes"
 	"errors"
+	"github.com/drathveloper/go-cloud-gateway/pkg/common"
+	"io"
 	"log/slog"
-	"maps"
 	"net/http"
-
-	"github.com/google/uuid"
 
 	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 )
@@ -20,43 +20,46 @@ type Gateway interface {
 type GatewayHandler struct {
 	gateway    Gateway
 	routes     gateway.Routes
-	logger     *slog.Logger
 	errHandler ErrorHandler
 }
 
 func NewGatewayHandler(
 	gateway Gateway,
 	routes gateway.Routes,
-	logger *slog.Logger,
 	errHandler ErrorHandler) *GatewayHandler {
 	return &GatewayHandler{
 		gateway:    gateway,
 		routes:     routes,
-		logger:     logger,
 		errHandler: errHandler,
 	}
 }
 
 func (h *GatewayHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	logger := h.logger.With("requestId", uuid.New().String())
+	logger := slog.Default()
 	route := h.routes.FindMatching(r)
 	if route == nil {
 		h.errHandler.Handle(logger, ErrRouteNotFound, w)
 		return
 	}
-	logger = h.logger.With("routeId", route.ID)
+	logger = logger.With("routeId", route.ID)
 	gwRequest, err := gateway.NewGatewayRequest(r)
 	if err != nil {
 		h.errHandler.Handle(logger, err, w)
 		return
 	}
+	r = nil
 	ctx, cancel := gateway.NewGatewayContext(route, gwRequest, logger)
 	defer cancel()
 	if err = h.gateway.Do(ctx); err != nil {
 		h.errHandler.Handle(ctx.Logger, err, w)
 		return
 	}
-	maps.Copy(w.Header(), ctx.Response.Headers)
+	for k, vv := range ctx.Response.Headers {
+		for _, v := range vv {
+			w.Header().Add(k, v)
+		}
+	}
+	common.WriteHeader(w, ctx.Response.Headers)
 	w.WriteHeader(ctx.Response.Status)
-	_, _ = w.Write(ctx.Response.Body)
+	_, _ = io.Copy(w, bytes.NewReader(ctx.Response.Body))
 }

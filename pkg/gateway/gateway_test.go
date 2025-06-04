@@ -66,7 +66,7 @@ func TestGateway_Do(t *testing.T) {
 			logger: slog.Default(),
 			expectedResponse: &gateway.Response{
 				Status: http.StatusOK,
-				Body:   []byte{},
+				Body:   nil,
 			},
 			expectedErr: nil,
 		},
@@ -232,7 +232,7 @@ func TestGateway_Do(t *testing.T) {
 			logger: slog.Default(),
 			expectedResponse: &gateway.Response{
 				Status: http.StatusOK,
-				Body:   []byte{},
+				Body:   nil,
 			},
 			expectedErr:    io.EOF,
 			expectedErrMsg: "gateway request for route r1 failed: post-process filters failed with filter F1: EOF",

@@ -70,7 +70,7 @@ func TestHostPredicate_Test(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p := predicate.NewHostPredicate(tt.patterns...)
+			p, _ := predicate.NewHostPredicate(tt.patterns...)
 			req, _ := http.NewRequest(http.MethodPost, "/server/test", nil)
 			req.Host = tt.host
 

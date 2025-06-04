@@ -1,20 +1,46 @@
 package common
 
 import (
+	"bytes"
 	"io"
+	"net/http"
+	"sync"
+)
+
+const (
+	initialBufferSize = 64 * 1024
+)
+
+var (
+	bufPool = sync.Pool{
+		New: func() any {
+			return bytes.NewBuffer(make([]byte, 0, initialBufferSize))
+		},
+	}
 )
 
 func ReadBody(readCloser io.ReadCloser) ([]byte, error) {
-	if readCloser != nil {
-		var err error
-		content, err := io.ReadAll(readCloser)
-		if err != nil {
-			return nil, err
-		}
-		if err = readCloser.Close(); err != nil {
-			return nil, err
-		}
-		return content, err
+	if readCloser == nil {
+		return nil, nil
 	}
-	return make([]byte, 0), nil
+	defer readCloser.Close()
+
+	buf := bufPool.Get().(*bytes.Buffer)
+	buf.Reset()
+	defer bufPool.Put(buf)
+
+	if _, err := buf.ReadFrom(readCloser); err != nil {
+		return nil, err
+	}
+
+	b := buf.Bytes()
+	result := append([]byte(nil), b...)
+	return result, nil
+}
+
+func WriteHeader(w http.ResponseWriter, header http.Header) {
+	dst := w.Header()
+	for k, values := range header {
+		dst[k] = append(dst[k][:0], values...)
+	}
 }

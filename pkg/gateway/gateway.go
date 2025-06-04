@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"maps"
 	"net/http"
 )
 
@@ -30,8 +29,6 @@ func NewGateway(globalFilters Filters, client HTTPClient) *Gateway {
 }
 
 func (g *Gateway) Do(ctx *Context) error {
-	ctx.Logger.Info("started routing request")
-	defer ctx.Logger.Info("finished routing request")
 	allFilters := ctx.Route.CombineGlobalFilters(g.globalFilters...)
 	if err := allFilters.PreProcessAll(ctx); err != nil {
 		return fmt.Errorf(gatewayErrMsg, ctx.Route.ID, err)
@@ -49,11 +46,11 @@ func (g *Gateway) Do(ctx *Context) error {
 			return fmt.Errorf(gatewayErrMsg, ctx.Route.ID, fmt.Errorf("%w: %s", ErrHTTP, err))
 		}
 	}
-	gwRes, err := NewGatewayResponse(backendRes)
+	ctx.Response, err = NewGatewayResponse(backendRes)
 	if err != nil {
 		return fmt.Errorf(gatewayErrMsg, ctx.Route.ID, err)
 	}
-	ctx.Response = gwRes
+	backendRes = nil
 	if err = allFilters.PostProcessAll(ctx); err != nil {
 		return fmt.Errorf(gatewayErrMsg, ctx.Route.ID, err)
 	}
@@ -63,10 +60,10 @@ func (g *Gateway) Do(ctx *Context) error {
 func (g *Gateway) buildProxyRequest(ctx *Context) (*http.Request, error) {
 	backendURL := ctx.Route.GetDestinationURLStr(ctx.Request.URL)
 	req, err := http.NewRequestWithContext(
-		ctx, ctx.Request.Method, backendURL, bytes.NewBuffer(ctx.Request.Body))
+		ctx, ctx.Request.Method, backendURL, bytes.NewReader(ctx.Request.Body))
 	if err != nil {
 		return nil, err
 	}
-	maps.Copy(req.Header, ctx.Request.Headers)
+	req.Header = ctx.Request.Headers
 	return req, nil
 }
