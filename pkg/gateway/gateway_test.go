@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"io"
-	"log/slog"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -29,7 +28,6 @@ func TestGateway_Do(t *testing.T) {
 		httpClient       gateway.HTTPClient
 		route            *gateway.Route
 		request          *gateway.Request
-		logger           *slog.Logger
 		expectedResponse *gateway.Response
 		expectedErr      error
 		expectedErrMsg   string
@@ -63,7 +61,6 @@ func TestGateway_Do(t *testing.T) {
 				Headers: http.Header{},
 				Body:    []byte("someBody"),
 			},
-			logger: slog.Default(),
 			expectedResponse: &gateway.Response{
 				Status: http.StatusOK,
 				Body:   nil,
@@ -99,7 +96,6 @@ func TestGateway_Do(t *testing.T) {
 				Headers: http.Header{},
 				Body:    []byte("someBody"),
 			},
-			logger:           slog.Default(),
 			expectedResponse: nil,
 			expectedErr:      io.EOF,
 			expectedErrMsg:   "gateway request for route r1 failed: pre-process filters failed with filter F1: EOF",
@@ -131,7 +127,6 @@ func TestGateway_Do(t *testing.T) {
 				Headers: http.Header{},
 				Body:    []byte("someBody"),
 			},
-			logger:           slog.Default(),
 			expectedResponse: nil,
 			expectedErr:      context.DeadlineExceeded,
 			expectedErrMsg:   "gateway request for route r1 failed: context deadline exceeded",
@@ -163,7 +158,6 @@ func TestGateway_Do(t *testing.T) {
 				Headers: http.Header{},
 				Body:    []byte("someBody"),
 			},
-			logger:           slog.Default(),
 			expectedResponse: nil,
 			expectedErr:      context.DeadlineExceeded,
 			expectedErrMsg:   "gateway request for route r1 failed: context deadline exceeded",
@@ -195,7 +189,6 @@ func TestGateway_Do(t *testing.T) {
 				Headers: http.Header{},
 				Body:    []byte("someBody"),
 			},
-			logger:           slog.Default(),
 			expectedResponse: nil,
 			expectedErr:      gateway.ErrHTTP,
 			expectedErrMsg:   "gateway request for route r1 failed: gateway http request to backend failed: someErr",
@@ -229,7 +222,6 @@ func TestGateway_Do(t *testing.T) {
 				Headers: http.Header{},
 				Body:    []byte("someBody"),
 			},
-			logger: slog.Default(),
 			expectedResponse: &gateway.Response{
 				Status: http.StatusOK,
 				Body:   nil,
@@ -241,7 +233,7 @@ func TestGateway_Do(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			gw := gateway.NewGateway(tt.globalFilters, tt.httpClient)
-			ctx, _ := gateway.NewGatewayContext(tt.route, tt.request, tt.logger)
+			ctx, _ := gateway.NewGatewayContext(tt.route, tt.request)
 
 			err := gw.Do(ctx)
 

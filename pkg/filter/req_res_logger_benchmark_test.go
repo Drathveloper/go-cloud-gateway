@@ -3,11 +3,12 @@ package filter_test
 import (
 	"bytes"
 	"context"
-	"github.com/drathveloper/go-cloud-gateway/pkg/filter"
-	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 	"log/slog"
 	"net/url"
 	"testing"
+
+	"github.com/drathveloper/go-cloud-gateway/pkg/filter"
+	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 )
 
 type silentHandler struct{}

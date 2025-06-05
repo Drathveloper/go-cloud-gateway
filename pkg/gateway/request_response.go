@@ -18,16 +18,13 @@ type Request struct {
 func NewGatewayRequest(request *http.Request) (*Request, error) {
 	bodyBytes, err := common.ReadBody(request.Body)
 	if err != nil {
-		return nil, fmt.Errorf("build gateway response failed: %w", err)
-	}
-	if request.Body != nil {
-		_ = request.Body.Close()
+		return nil, fmt.Errorf("build gateway request failed: %w", err)
 	}
 	return &Request{
 		URL:     request.URL,
 		Method:  request.Method,
 		Headers: request.Header,
-		Body:    bodyBytes,
+		Body:    append([]byte(nil), bodyBytes...),
 	}, nil
 }
 
@@ -42,12 +39,9 @@ func NewGatewayResponse(response *http.Response) (*Response, error) {
 	if err != nil {
 		return nil, fmt.Errorf("build gateway response failed: %w", err)
 	}
-	if response.Body != nil {
-		_ = response.Body.Close()
-	}
 	return &Response{
 		Status:  response.StatusCode,
 		Headers: response.Header,
-		Body:    bodyBytes,
+		Body:    append([]byte(nil), bodyBytes...),
 	}, nil
 }

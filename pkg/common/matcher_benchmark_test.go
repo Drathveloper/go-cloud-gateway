@@ -1,9 +1,10 @@
 package common_test
 
 import (
-	"github.com/drathveloper/go-cloud-gateway/pkg/common"
 	"regexp"
 	"testing"
+
+	"github.com/drathveloper/go-cloud-gateway/pkg/common"
 )
 
 func BenchmarkPathMatcher(b *testing.B) {

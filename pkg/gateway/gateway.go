@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sync"
 )
 
 var ErrHTTP = errors.New("gateway http request to backend failed")
@@ -15,6 +16,10 @@ type HTTPClient interface {
 }
 
 const gatewayErrMsg = "gateway request for route %s failed: %w"
+
+var readerPool = sync.Pool{
+	New: func() any { return new(bytes.Reader) },
+}
 
 type Gateway struct {
 	globalFilters Filters
@@ -33,11 +38,14 @@ func (g *Gateway) Do(ctx *Context) error {
 	if err := allFilters.PreProcessAll(ctx); err != nil {
 		return fmt.Errorf(gatewayErrMsg, ctx.Route.ID, err)
 	}
-	backendReq, err := g.buildProxyRequest(ctx)
+	backendReq, reader, err := g.buildProxyRequest(ctx)
 	if err != nil {
 		return fmt.Errorf(gatewayErrMsg, ctx.Route.ID, err)
 	}
 	backendRes, err := g.httpClient.Do(backendReq)
+
+	readerPool.Put(reader)
+
 	if err != nil {
 		switch {
 		case errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled):
@@ -50,20 +58,24 @@ func (g *Gateway) Do(ctx *Context) error {
 	if err != nil {
 		return fmt.Errorf(gatewayErrMsg, ctx.Route.ID, err)
 	}
-	backendRes = nil
 	if err = allFilters.PostProcessAll(ctx); err != nil {
 		return fmt.Errorf(gatewayErrMsg, ctx.Route.ID, err)
 	}
 	return nil
 }
 
-func (g *Gateway) buildProxyRequest(ctx *Context) (*http.Request, error) {
-	backendURL := ctx.Route.GetDestinationURLStr(ctx.Request.URL)
+func (g *Gateway) buildProxyRequest(ctx *Context) (*http.Request, *bytes.Reader, error) {
+	backendURL := ctx.Route.GetDestinationURL(ctx.Request.URL)
+
+	reader := readerPool.Get().(*bytes.Reader)
+	reader.Reset(ctx.Request.Body)
+
 	req, err := http.NewRequestWithContext(
-		ctx, ctx.Request.Method, backendURL, bytes.NewReader(ctx.Request.Body))
+		ctx, ctx.Request.Method, backendURL, reader)
 	if err != nil {
-		return nil, err
+		readerPool.Put(reader)
+		return nil, nil, err
 	}
 	req.Header = ctx.Request.Headers
-	return req, nil
+	return req, reader, nil
 }

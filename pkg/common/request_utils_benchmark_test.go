@@ -2,12 +2,13 @@ package common_test
 
 import (
 	"bytes"
-	"github.com/drathveloper/go-cloud-gateway/pkg/common"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/drathveloper/go-cloud-gateway/pkg/common"
 )
 
 func BenchmarkReadBody(b *testing.B) {

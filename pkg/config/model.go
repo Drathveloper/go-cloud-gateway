@@ -34,7 +34,8 @@ type HTTPClient struct {
 }
 
 type Pool struct {
-	ConnectTimeout      *Duration `validate:"required" json:"connect-timeout"         yaml:"connect-timeout"`
+	Timeout             *Duration `validate:"required" json:"timeout"                 yaml:"timeout"`
+	KeepAlive           *Duration `validate:"required" json:"keep-alive"              yaml:"keep-alive"`
 	MaxIdleConns        int       `validate:"required" json:"max-idle-conns"          yaml:"max-idle-conns"`
 	MaxIdleConnsPerHost int       `validate:"required" json:"max-idle-conns-per-host" yaml:"max-idle-conns-per-host"`
 	MaxConnsPerHost     int       `validate:"required" json:"max-conns-per-host"      yaml:"max-conns-per-host"`

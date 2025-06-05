@@ -31,7 +31,8 @@ type Filters []Filter
 func (f Filters) PreProcessAll(ctx *Context) error {
 	for _, filter := range f {
 		if err := filter.PreProcess(ctx); err != nil {
-			return fmt.Errorf("pre-process filters failed with filter %s: %w", filter.Name(), err)
+			name := filter.Name()
+			return fmt.Errorf("pre-process filters failed with filter %s: %w", name, err)
 		}
 	}
 	return nil
@@ -40,7 +41,8 @@ func (f Filters) PreProcessAll(ctx *Context) error {
 func (f Filters) PostProcessAll(ctx *Context) error {
 	for i := len(f) - 1; i >= 0; i-- {
 		if err := f[i].PostProcess(ctx); err != nil {
-			return fmt.Errorf("post-process filters failed with filter %s: %w", f[i].Name(), err)
+			name := f[i].Name()
+			return fmt.Errorf("post-process filters failed with filter %s: %w", name, err)
 		}
 	}
 	return nil

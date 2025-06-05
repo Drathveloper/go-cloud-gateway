@@ -50,18 +50,19 @@ func simpleMatch(pattern, str string) bool {
 	pIdx, sIdx := 0, 0
 	starIdx, match := -1, 0
 	for sIdx < len(str) {
-		if pIdx < len(pattern) && (pattern[pIdx] == str[sIdx] || pattern[pIdx] == '?') {
+		switch {
+		case pIdx < len(pattern) && (pattern[pIdx] == str[sIdx] || pattern[pIdx] == '?'):
 			pIdx++
 			sIdx++
-		} else if pIdx < len(pattern) && pattern[pIdx] == '*' {
+		case pIdx < len(pattern) && pattern[pIdx] == '*':
 			starIdx = pIdx
 			match = sIdx
 			pIdx++
-		} else if starIdx != -1 {
+		case starIdx != -1:
 			pIdx = starIdx + 1
 			match++
 			sIdx = match
-		} else {
+		default:
 			return false
 		}
 	}

@@ -3,6 +3,7 @@ package config_test
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"reflect"
 	"testing"
@@ -15,6 +16,7 @@ import (
 )
 
 func TestNewRoutes(t *testing.T) {
+	logger := slog.Default()
 	tests := []struct {
 		name        string
 		config      *config.Config
@@ -62,6 +64,7 @@ func TestNewRoutes(t *testing.T) {
 						filter.NewAddRequestHeaderFilter("X-Test", "True"),
 					},
 					Timeout: 10 * time.Second,
+					Logger:  logger,
 				},
 			},
 			expectedErr: nil,
@@ -141,7 +144,8 @@ func TestNewRoutes(t *testing.T) {
 			routes, err := config.NewRoutes(
 				tt.config,
 				predicate.NewFactory(predicate.BuilderRegistry),
-				filter.NewFactory(filter.BuilderRegistry))
+				filter.NewFactory(filter.BuilderRegistry),
+				logger)
 
 			if !reflect.DeepEqual(tt.expected, routes) {
 				t.Errorf("expected %v actual %v", tt.expected, routes)
@@ -367,12 +371,13 @@ F0WydPKUjl3tmQRxYd9C8zDt6yB/fQbIoM/uGgZ0ZoZ+E5hvLVe+rYk=
 				Gateway: config.Gateway{
 					HTTPClient: &config.HTTPClient{
 						Pool: &config.Pool{
-							ConnectTimeout:      &config.Duration{Duration: 30 * time.Second},
+							Timeout:             &config.Duration{Duration: 30 * time.Second},
 							MaxIdleConns:        100,
 							MaxIdleConnsPerHost: 20,
 							MaxConnsPerHost:     50,
 							IdleConnTimeout:     &config.Duration{Duration: 90 * time.Second},
 							TLSHandshakeTimeout: &config.Duration{Duration: 15 * time.Second},
+							KeepAlive:           &config.Duration{Duration: 30 * time.Second},
 						},
 					},
 				},

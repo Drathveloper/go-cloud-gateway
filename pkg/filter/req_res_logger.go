@@ -1,10 +1,11 @@
 package filter
 
 import (
-	"github.com/drathveloper/go-cloud-gateway/pkg/common"
-	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 	"log/slog"
 	"strings"
+
+	"github.com/drathveloper/go-cloud-gateway/pkg/common"
+	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 )
 
 const RequestResponseLoggerFilterName = "RequestResponseLogger"
