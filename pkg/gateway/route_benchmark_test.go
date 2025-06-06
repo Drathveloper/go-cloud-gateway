@@ -7,9 +7,12 @@ import (
 	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 )
 
-func BenchmarkGetDestinationURLStr_Optimized(b *testing.B) {
+func BenchmarkGetDestinationURL_Optimized(b *testing.B) {
 	r := &gateway.Route{
-		URI: "https://backend.local/api",
+		URI: &url.URL{
+			Scheme: "https",
+			Host:   "backend.local",
+		},
 	}
 	u := &url.URL{
 		Path:     "/users",

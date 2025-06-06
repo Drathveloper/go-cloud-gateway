@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -32,10 +33,11 @@ func (m *mockErrorHandler) Handle(logger *slog.Logger, err error, w http.Respons
 }
 
 func BenchmarkServeHTTP_HappyPath(b *testing.B) {
+	uri, _ := url.Parse("http://localhost")
 	pred := predicate.NewPathPredicate("/test")
 	route := gateway.Route{
 		ID:  "test",
-		URI: "http://localhost", // no se usa realmente en el benchmark
+		URI: uri,
 		Predicates: []gateway.Predicate{
 			pred,
 		},
@@ -70,10 +72,11 @@ func BenchmarkServeHTTP_HappyPath(b *testing.B) {
 }
 
 func BenchmarkServeHTTP_RouteNotFound(b *testing.B) {
+	uri, _ := url.Parse("http://localhost")
 	pred := predicate.NewPathPredicate("/test")
 	route := gateway.Route{
 		ID:  "test",
-		URI: "http://localhost", // no se usa realmente en el benchmark
+		URI: uri,
 		Predicates: []gateway.Predicate{
 			pred,
 		},
@@ -94,10 +97,11 @@ func BenchmarkServeHTTP_RouteNotFound(b *testing.B) {
 }
 
 func BenchmarkServeHTTP_BackendError(b *testing.B) {
+	uri, _ := url.Parse("http://localhost")
 	pred := predicate.NewPathPredicate("/test")
 	route := gateway.Route{
 		ID:  "test",
-		URI: "http://localhost", // no se usa realmente en el benchmark
+		URI: uri,
 		Predicates: []gateway.Predicate{
 			pred,
 		},
@@ -123,9 +127,10 @@ func BenchmarkServeHTTP_BackendError(b *testing.B) {
 }
 
 func BenchmarkServeHTTP_LargeBody(b *testing.B) {
+	uri, _ := url.Parse("http://localhost:8080")
 	route := gateway.Route{
 		ID:  "route-large",
-		URI: "http://localhost:8080",
+		URI: uri,
 	}
 	largeBody := strings.Repeat("a", 1024*1024) // 1MB
 

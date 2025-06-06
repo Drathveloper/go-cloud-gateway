@@ -44,8 +44,11 @@ func TestGateway_Do(t *testing.T) {
 				Err: nil,
 			},
 			route: &gateway.Route{
-				ID:  "r1",
-				URI: "/test",
+				ID: "r1",
+				URI: &url.URL{
+					Scheme: "https",
+					Host:   "example.org",
+				},
 				Filters: []gateway.Filter{
 					&DummyFilter{"F1", nil, nil},
 				},
@@ -79,8 +82,11 @@ func TestGateway_Do(t *testing.T) {
 				Err: nil,
 			},
 			route: &gateway.Route{
-				ID:  "r1",
-				URI: "/test",
+				ID: "r1",
+				URI: &url.URL{
+					Scheme: "https",
+					Host:   "example.org",
+				},
 				Filters: []gateway.Filter{
 					&DummyFilter{"F1", io.EOF, nil},
 				},
@@ -110,8 +116,11 @@ func TestGateway_Do(t *testing.T) {
 				Err:      context.DeadlineExceeded,
 			},
 			route: &gateway.Route{
-				ID:  "r1",
-				URI: "/test",
+				ID: "r1",
+				URI: &url.URL{
+					Scheme: "https",
+					Host:   "example.org",
+				},
 				Filters: []gateway.Filter{
 					&DummyFilter{"F1", nil, nil},
 				},
@@ -141,8 +150,11 @@ func TestGateway_Do(t *testing.T) {
 				Err:      context.Canceled,
 			},
 			route: &gateway.Route{
-				ID:  "r1",
-				URI: "/test",
+				ID: "r1",
+				URI: &url.URL{
+					Scheme: "https",
+					Host:   "example.org",
+				},
 				Filters: []gateway.Filter{
 					&DummyFilter{"F1", nil, nil},
 				},
@@ -172,8 +184,11 @@ func TestGateway_Do(t *testing.T) {
 				Err:      errors.New("someErr"),
 			},
 			route: &gateway.Route{
-				ID:  "r1",
-				URI: "/test",
+				ID: "r1",
+				URI: &url.URL{
+					Scheme: "https",
+					Host:   "example.org",
+				},
 				Filters: []gateway.Filter{
 					&DummyFilter{"F1", nil, nil},
 				},
@@ -205,8 +220,11 @@ func TestGateway_Do(t *testing.T) {
 				Err: nil,
 			},
 			route: &gateway.Route{
-				ID:  "r1",
-				URI: "/test",
+				ID: "r1",
+				URI: &url.URL{
+					Scheme: "https",
+					Host:   "example.org",
+				},
 				Filters: []gateway.Filter{
 					&DummyFilter{"F1", nil, io.EOF},
 				},

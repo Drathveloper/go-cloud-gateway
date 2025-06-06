@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"reflect"
 	"testing"
 	"time"
@@ -30,7 +31,7 @@ func TestNewRoutes(t *testing.T) {
 					Routes: []config.Route{
 						{
 							ID:  "r1",
-							URI: "someUri",
+							URI: "https://example.com",
 							Predicates: []config.ParameterizedItem{
 								{
 									Name: "Method",
@@ -55,8 +56,11 @@ func TestNewRoutes(t *testing.T) {
 			},
 			expected: gateway.Routes{
 				{
-					ID:  "r1",
-					URI: "someUri",
+					ID: "r1",
+					URI: &url.URL{
+						Scheme: "https",
+						Host:   "example.com",
+					},
 					Predicates: gateway.Predicates{
 						predicate.NewMethodPredicate("GET", "POST"),
 					},
@@ -76,7 +80,7 @@ func TestNewRoutes(t *testing.T) {
 					Routes: []config.Route{
 						{
 							ID:  "r1",
-							URI: "someUri",
+							URI: "https://example.com",
 							Predicates: []config.ParameterizedItem{
 								{
 									Name: "Other",

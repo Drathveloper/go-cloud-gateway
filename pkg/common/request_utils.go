@@ -41,6 +41,6 @@ func ReadBody(readCloser io.ReadCloser) ([]byte, error) {
 func WriteHeader(w http.ResponseWriter, header http.Header) {
 	dst := w.Header()
 	for k, values := range header {
-		dst[k] = append(dst[k][:0], values...)
+		dst[k] = values
 	}
 }

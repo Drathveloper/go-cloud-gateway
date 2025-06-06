@@ -39,18 +39,22 @@ func NewRequestResponseLoggerBuilder() gateway.FilterBuilder {
 }
 
 func (f *RequestResponseLogger) PreProcess(ctx *gateway.Context) error {
-	ctx.Logger.Info("Received request",
-		"url", ctx.Request.Method+" "+ctx.Request.URL.String(),
-		"headers", ctx.Request.Headers,
-		"body", ctx.Request.Body)
+	if ctx.Logger.Enabled(ctx, f.level) {
+		ctx.Logger.Log(ctx, f.level, "Received request",
+			"url", ctx.Request.Method+" "+ctx.Request.URL.String(),
+			"headers", ctx.Request.Headers,
+			"body", ctx.Request.Body)
+	}
 	return nil
 }
 
 func (f *RequestResponseLogger) PostProcess(ctx *gateway.Context) error {
-	ctx.Logger.Info("Returned response",
-		"status", ctx.Response.Status,
-		"headers", ctx.Response.Headers,
-		"body", ctx.Response.Body)
+	if ctx.Logger.Enabled(ctx, f.level) {
+		ctx.Logger.Log(ctx, f.level, "Returned response",
+			"status", ctx.Response.Status,
+			"headers", ctx.Response.Headers,
+			"body", ctx.Response.Body)
+	}
 	return nil
 }
 

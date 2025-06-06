@@ -32,10 +32,11 @@ func newDummyContext() *gateway.Context {
 		Headers: make(http.Header),
 		Body:    []byte("payload"),
 	}
+	routeURL, _ := url.Parse("https://example.com/test")
 	route := &gateway.Route{
 		ID:      "route-1",
 		Timeout: 1000000000, // 1s
-		URI:     "https://example.com/test",
+		URI:     routeURL,
 	}
 	ctx, _ := gateway.NewGatewayContext(route, req)
 	return ctx

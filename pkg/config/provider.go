@@ -148,7 +148,11 @@ func mapRoutesFromConfigToGateway(
 			return nil, fmt.Errorf("map routes from config to gateway failed: %w", err)
 		}
 		timeout := calculateTimeout(route.Timeout, gw.GlobalTimeout)
-		out = append(out, *gateway.NewRoute(route.ID, route.URI, predicates, filters, timeout, logger))
+		buildRoute, err := gateway.NewRoute(route.ID, route.URI, predicates, filters, timeout, logger)
+		if err != nil {
+			return nil, fmt.Errorf("map routes from config to gateway failed: %w", err)
+		}
+		out = append(out, *buildRoute)
 	}
 	return out, nil
 }

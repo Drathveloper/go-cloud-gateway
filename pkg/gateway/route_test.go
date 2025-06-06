@@ -48,7 +48,7 @@ func TestRoute_CombineGlobalFilters(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			route := gateway.NewRoute("id", "/test", nil, tt.filters, 0, nil)
+			route, _ := gateway.NewRoute("id", "/test", nil, tt.filters, 0, nil)
 
 			allFilters := route.CombineGlobalFilters(tt.globalFilters...)
 
@@ -64,7 +64,7 @@ func TestRoute_CombineGlobalFilters(t *testing.T) {
 	}
 }
 
-func TestRoute_GetDestinationURLStr(t *testing.T) {
+func TestRoute_GetDestinationURL(t *testing.T) {
 	tests := []struct {
 		name        string
 		routeURL    string
@@ -86,12 +86,13 @@ func TestRoute_GetDestinationURLStr(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			route := gateway.NewRoute("someRoute", tt.routeURL, nil, nil, 0, nil)
+			route, _ := gateway.NewRoute("someRoute", tt.routeURL, nil, nil, 0, nil)
+
 			reqURL, _ := url.Parse(tt.reqURL)
 
 			actual := route.GetDestinationURL(reqURL)
 
-			if tt.expectedURL != actual {
+			if tt.expectedURL != actual.String() {
 				t.Errorf("expected url %s actual %s", tt.expectedURL, actual)
 			}
 		})
@@ -101,6 +102,12 @@ func TestRoute_GetDestinationURLStr(t *testing.T) {
 func TestRoutes_FindMatching(t *testing.T) {
 	matchedPredicate := DummyPredicate{true}
 	unMatchedPredicate := DummyPredicate{false}
+
+	unmatchedRoute1, _ := gateway.NewRoute("R1", "/test1", []gateway.Predicate{unMatchedPredicate}, nil, 0, nil)
+	matchedRoute1, _ := gateway.NewRoute("R1", "/test1", []gateway.Predicate{matchedPredicate}, nil, 0, nil)
+	unmatchedRoute2, _ := gateway.NewRoute("R2", "/test1", []gateway.Predicate{unMatchedPredicate}, nil, 0, nil)
+	matchedRoute2, _ := gateway.NewRoute("R2", "/test1", []gateway.Predicate{matchedPredicate}, nil, 0, nil)
+
 	tests := []struct {
 		name          string
 		routes        []gateway.Route
@@ -109,24 +116,24 @@ func TestRoutes_FindMatching(t *testing.T) {
 		{
 			name: "find matching should succeed when one route matched predicate",
 			routes: []gateway.Route{
-				*gateway.NewRoute("R1", "/test1", []gateway.Predicate{unMatchedPredicate}, nil, 0, nil),
-				*gateway.NewRoute("R2", "/test2", []gateway.Predicate{matchedPredicate}, nil, 0, nil),
+				*unmatchedRoute1,
+				*matchedRoute2,
 			},
 			expectedRoute: "R2",
 		},
 		{
 			name: "find matching should succeed when no route matched predicate",
 			routes: []gateway.Route{
-				*gateway.NewRoute("R1", "/test1", []gateway.Predicate{unMatchedPredicate}, nil, 0, nil),
-				*gateway.NewRoute("R2", "/test2", []gateway.Predicate{unMatchedPredicate}, nil, 0, nil),
+				*unmatchedRoute1,
+				*unmatchedRoute2,
 			},
 			expectedRoute: "",
 		},
 		{
 			name: "find matching should succeed and match first route when multiple routes matches",
 			routes: []gateway.Route{
-				*gateway.NewRoute("R1", "/test1", []gateway.Predicate{matchedPredicate}, nil, 0, nil),
-				*gateway.NewRoute("R2", "/test2", []gateway.Predicate{matchedPredicate}, nil, 0, nil),
+				*matchedRoute1,
+				*matchedRoute2,
 			},
 			expectedRoute: "R1",
 		},

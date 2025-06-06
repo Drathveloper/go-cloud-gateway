@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"sync"
 )
@@ -44,7 +45,9 @@ func (g *Gateway) Do(ctx *Context) error {
 	}
 	backendRes, err := g.httpClient.Do(backendReq)
 
-	readerPool.Put(reader)
+	if reader != nil {
+		readerPool.Put(reader)
+	}
 
 	if err != nil {
 		switch {
@@ -65,17 +68,32 @@ func (g *Gateway) Do(ctx *Context) error {
 }
 
 func (g *Gateway) buildProxyRequest(ctx *Context) (*http.Request, *bytes.Reader, error) {
-	backendURL := ctx.Route.GetDestinationURL(ctx.Request.URL)
+	if len(ctx.Request.Body) == 0 {
+		return g.buildNoBodyProxyRequest(ctx), nil, nil
+	}
+	return g.buildBodyProxyRequest(ctx)
+}
 
+func (g *Gateway) buildBodyProxyRequest(ctx *Context) (*http.Request, *bytes.Reader, error) {
 	reader := readerPool.Get().(*bytes.Reader)
 	reader.Reset(ctx.Request.Body)
-
-	req, err := http.NewRequestWithContext(
-		ctx, ctx.Request.Method, backendURL, reader)
-	if err != nil {
-		readerPool.Put(reader)
-		return nil, nil, err
+	req := &http.Request{
+		ContentLength: int64(len(ctx.Request.Body)),
+		Method:        ctx.Request.Method,
+		URL:           ctx.Route.GetDestinationURL(ctx.Request.URL),
+		Header:        ctx.Request.Headers,
+		Body:          io.NopCloser(reader),
 	}
-	req.Header = ctx.Request.Headers
-	return req, reader, nil
+	return req.WithContext(ctx), reader, nil
+}
+
+func (g *Gateway) buildNoBodyProxyRequest(ctx *Context) *http.Request {
+	req := &http.Request{
+		ContentLength: 0,
+		Method:        ctx.Request.Method,
+		URL:           ctx.Route.GetDestinationURL(ctx.Request.URL),
+		Header:        ctx.Request.Headers,
+		Body:          http.NoBody,
+	}
+	return req.WithContext(ctx)
 }

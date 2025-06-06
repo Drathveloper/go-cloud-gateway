@@ -1,16 +1,16 @@
 package gateway
 
 import (
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/url"
-	"strings"
 	"time"
 )
 
 type Route struct {
 	ID         string
-	URI        string
+	URI        *url.URL
 	Predicates Predicates
 	Filters    Filters
 	Timeout    time.Duration
@@ -23,15 +23,19 @@ func NewRoute(
 	predicates Predicates,
 	filters Filters,
 	timeout time.Duration,
-	logger *slog.Logger) *Route {
+	logger *slog.Logger) (*Route, error) {
+	routeURI, err := url.Parse(uri)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse route uri: %w", err)
+	}
 	return &Route{
 		ID:         id,
-		URI:        uri,
+		URI:        routeURI,
 		Predicates: predicates,
 		Filters:    filters,
 		Timeout:    timeout,
 		Logger:     logger,
-	}
+	}, nil
 }
 
 func (r *Route) CombineGlobalFilters(globalFilters ...Filter) Filters {
@@ -39,29 +43,15 @@ func (r *Route) CombineGlobalFilters(globalFilters ...Filter) Filters {
 	return append(allFilters, r.Filters...)
 }
 
-func (r *Route) GetDestinationURL(reqURL *url.URL) string {
-	var b strings.Builder
-
-	b.Grow(len(r.URI) + len(reqURL.Path) + len(reqURL.RawQuery) + 1)
-
-	// Unión segura de URI base + path
-	switch {
-	case strings.HasSuffix(r.URI, "/") && strings.HasPrefix(reqURL.Path, "/"):
-		b.WriteString(r.URI[:len(r.URI)-1]) // remove trailing slash
-	case !strings.HasSuffix(r.URI, "/") && !strings.HasPrefix(reqURL.Path, "/"):
-		b.WriteString(r.URI)
-		b.WriteByte('/')
-	default:
-		b.WriteString(r.URI)
+func (r *Route) GetDestinationURL(reqURL *url.URL) *url.URL {
+	newURL := &url.URL{
+		Scheme:   r.URI.Scheme,
+		Host:     r.URI.Host,
+		Path:     reqURL.Path,
+		RawPath:  reqURL.RawPath,
+		RawQuery: reqURL.RawQuery,
 	}
-	b.WriteString(reqURL.Path)
-
-	if reqURL.RawQuery != "" {
-		b.WriteByte('?')
-		b.WriteString(reqURL.RawQuery)
-	}
-
-	return b.String()
+	return newURL
 }
 
 type Routes []Route
