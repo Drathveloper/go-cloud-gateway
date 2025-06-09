@@ -51,10 +51,7 @@ func (p *QueryPredicate) Test(request *http.Request) bool {
 		return false
 	}
 	if p.Pattern != nil {
-		if p.Pattern.MatchString(value) {
-			return true
-		}
-		return false
+		return p.Pattern.MatchString(value)
 	}
 	return true
 }
