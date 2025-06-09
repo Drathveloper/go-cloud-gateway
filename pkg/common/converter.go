@@ -1,30 +1,35 @@
 package common
 
 import (
+	"errors"
 	"fmt"
 	"time"
 )
 
+var ErrRequiredValue = errors.New("value is required")
+var ErrRequiredStringValue = errors.New("value is required to be a valid string")
+var ErrRequiredSliceValue = errors.New("value is required to be a valid slice")
+
 func ConvertToString(val any) (string, error) {
 	if val == nil {
-		return "", fmt.Errorf("value is required")
+		return "", ErrRequiredValue
 	}
 	valStr, ok := val.(string)
 	if !ok {
-		return "", fmt.Errorf("value is required to be a valid string")
+		return "", ErrRequiredStringValue
 	}
 	return valStr, nil
 }
 
 func ConvertToStringSlice(val any) ([]string, error) {
 	if val == nil {
-		return nil, fmt.Errorf("value is required")
+		return nil, ErrRequiredValue
 	}
 	valAnySlice, ok := val.([]any)
 	if !ok {
 		valStrSlice, okStrSlice := val.([]string)
 		if !okStrSlice {
-			return nil, fmt.Errorf("value is required to be a valid slice")
+			return nil, ErrRequiredSliceValue
 		}
 		return valStrSlice, nil
 	}
@@ -40,7 +45,7 @@ func ConvertSlice[T any](sliceAny []any) ([]T, error) {
 	for i, item := range sliceAny {
 		val, ok := item.(T)
 		if !ok {
-			return nil, fmt.Errorf("element at index %d is not of expected type", i)
+			return nil, fmt.Errorf("%w: element at index %d is not of expected type", ErrRequiredSliceValue, i)
 		}
 		result = append(result, val)
 	}
@@ -49,13 +54,13 @@ func ConvertSlice[T any](sliceAny []any) ([]T, error) {
 
 func ConvertToDateTime(val any) (time.Time, error) {
 	if val == nil {
-		return time.Time{}, fmt.Errorf("value is required")
+		return time.Time{}, ErrRequiredValue
 	}
 	valStr, ok := val.(string)
 	if !ok {
 		valTime, isOkTime := val.(time.Time)
 		if !isOkTime {
-			return time.Time{}, fmt.Errorf("value is required to be a valid string")
+			return time.Time{}, ErrRequiredStringValue
 		}
 		return valTime, nil
 	}

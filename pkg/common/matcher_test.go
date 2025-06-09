@@ -1,6 +1,7 @@
 package common_test
 
 import (
+	"regexp"
 	"testing"
 
 	"github.com/drathveloper/go-cloud-gateway/pkg/common"
@@ -152,16 +153,22 @@ func TestHostMatcher(t *testing.T) {
 			expected: true,
 		},
 		{
-			name:     "host matcher should return false when pattern compilation failed",
-			pattern:  "[",
+			name:     "host matcher should return true when pattern is nil",
+			pattern:  "**",
 			host:     "any.com",
-			expected: false,
+			expected: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := common.HostMatcher(tt.pattern, tt.host)
+			var pattern *regexp.Regexp
+			if tt.pattern == "**" {
+				pattern = nil
+			} else {
+				pattern = regexp.MustCompile(common.ConvertPatternToRegex(tt.pattern))
+			}
+			result := common.HostMatcher(pattern, tt.host)
 			if tt.expected != result {
 				t.Errorf("expected %t actual %t", tt.expected, result)
 			}

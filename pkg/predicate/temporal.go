@@ -34,14 +34,14 @@ func NewAfterPredicateTest(
 	}
 }
 
-func NewAfterPredicateBuilder() gateway.PredicateBuilder {
-	return gateway.PredicateBuilderFunc(func(args map[string]any) (gateway.Predicate, error) {
+func NewAfterPredicateBuilder() gateway.PredicateBuilderFunc {
+	return func(args map[string]any) (gateway.Predicate, error) {
 		dateTime, err := common.ConvertToDateTime(args["datetime"])
 		if err != nil {
 			return nil, fmt.Errorf("arg 'datetime' is required to be a valid datetime: %w", err)
 		}
 		return NewAfterPredicate(dateTime), nil
-	})
+	}
 }
 
 func (p *AfterPredicate) Test(_ *http.Request) bool {
@@ -69,14 +69,14 @@ func NewBeforePredicateTest(
 	}
 }
 
-func NewBeforePredicateBuilder() gateway.PredicateBuilder {
-	return gateway.PredicateBuilderFunc(func(args map[string]any) (gateway.Predicate, error) {
+func NewBeforePredicateBuilder() gateway.PredicateBuilderFunc {
+	return func(args map[string]any) (gateway.Predicate, error) {
 		dateTime, err := common.ConvertToDateTime(args["datetime"])
 		if err != nil {
 			return nil, fmt.Errorf("arg 'datetime' is required to be a valid datetime: %w", err)
 		}
 		return NewBeforePredicate(dateTime), nil
-	})
+	}
 }
 
 func (p *BeforePredicate) Test(_ *http.Request) bool {
@@ -108,8 +108,8 @@ func NewBetweenPredicateTest(
 	}
 }
 
-func NewBetweenPredicateBuilder() gateway.PredicateBuilder {
-	return gateway.PredicateBuilderFunc(func(args map[string]any) (gateway.Predicate, error) {
+func NewBetweenPredicateBuilder() gateway.PredicateBuilderFunc {
+	return func(args map[string]any) (gateway.Predicate, error) {
 		startDateTime, err := common.ConvertToDateTime(args["start"])
 		if err != nil {
 			return nil, fmt.Errorf("arg 'start' is required to be a valid datetime: %w", err)
@@ -119,7 +119,7 @@ func NewBetweenPredicateBuilder() gateway.PredicateBuilder {
 			return nil, fmt.Errorf("arg 'end' is required to be a valid datetime: %w", err)
 		}
 		return NewBetweenPredicate(startDateTime, endDateTime), nil
-	})
+	}
 }
 
 func (p *BetweenPredicate) Test(_ *http.Request) bool {

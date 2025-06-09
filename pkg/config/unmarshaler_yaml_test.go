@@ -12,7 +12,7 @@ import (
 )
 
 type DummyYAML struct {
-	Value config.Duration `json:"value"`
+	Value config.Duration `json:"value" yaml:"value"`
 }
 
 func TestDuration_UnmarshalYAML(t *testing.T) {
@@ -38,13 +38,13 @@ func TestDuration_UnmarshalYAML(t *testing.T) {
 			name:        "unmarshal yaml should return error when duration is invalid string",
 			input:       "value: hey",
 			expected:    config.Duration{},
-			expectedErr: errors.New("time: invalid duration \"hey\""),
+			expectedErr: errors.New("unmarshal duration failed: time: invalid duration \"hey\""),
 		},
 		{
 			name:        "unmarshal yaml should return error when duration is invalid type",
 			input:       "value: false",
 			expected:    config.Duration{},
-			expectedErr: errors.New("invalid duration: false"),
+			expectedErr: errors.New("unmarshal duration failed: invalid duration: false"),
 		},
 	}
 	for _, tt := range tests {

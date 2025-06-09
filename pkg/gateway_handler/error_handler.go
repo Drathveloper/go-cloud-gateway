@@ -20,23 +20,23 @@ func (f ErrorHandlerFunc) Handle(logger *slog.Logger, err error, w http.Response
 }
 
 func BaseErrorHandler() ErrorHandlerFunc {
-	return func(logger *slog.Logger, err error, w http.ResponseWriter) {
+	return func(logger *slog.Logger, err error, writer http.ResponseWriter) {
 		if err == nil {
 			return
 		}
 		switch {
 		case errors.Is(err, ErrRouteNotFound):
 			logger.Info("route not found")
-			http.Error(w, "404 Route Not Found", http.StatusNotFound)
+			http.Error(writer, "404 Route Not Found", http.StatusNotFound)
 		case errors.Is(err, context.DeadlineExceeded):
 			logger.Error("request timeout", "error", err)
-			http.Error(w, "", http.StatusBadGateway)
+			http.Error(writer, "", http.StatusBadGateway)
 		case errors.Is(err, gateway.ErrHTTP):
 			logger.Error("http request failed", "error", err)
-			http.Error(w, "", http.StatusBadGateway)
+			http.Error(writer, "", http.StatusBadGateway)
 		default:
 			logger.Error("unexpected error", "error", err)
-			http.Error(w, "", http.StatusInternalServerError)
+			http.Error(writer, "", http.StatusInternalServerError)
 		}
 	}
 }

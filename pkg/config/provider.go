@@ -3,7 +3,9 @@ package config
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"time"
@@ -15,11 +17,14 @@ import (
 	"github.com/drathveloper/go-cloud-gateway/pkg/predicate"
 )
 
+var ErrInitializeMTLS = errors.New("failed to initialize mTLS")
+
 func NewRoutes(
 	cfg *Config,
 	predicateFactory *predicate.Factory,
-	filterFactory *filter.Factory) (gateway.Routes, error) {
-	return mapRoutesFromConfigToGateway(cfg.Gateway, predicateFactory, filterFactory)
+	filterFactory *filter.Factory,
+	logger *slog.Logger) (gateway.Routes, error) {
+	return mapRoutesFromConfigToGateway(cfg.Gateway, predicateFactory, filterFactory, logger)
 }
 
 func NewGlobalFilters(
@@ -56,14 +61,14 @@ func buildTLSConfig(cfg *Config) (*tls.Config, error) {
 func buildMTLSConfig(cfg *Config) (*tls.Config, error) {
 	keyPair, err := tls.X509KeyPair([]byte(cfg.Gateway.HTTPClient.MTLS.Cert), []byte(cfg.Gateway.HTTPClient.MTLS.Key))
 	if err != nil {
-		return nil, fmt.Errorf("failed to load mTLS cert/key pair: %w", err)
+		return nil, fmt.Errorf("%w failed to load mTLS cert/key pair: %s", ErrInitializeMTLS, err.Error())
 	}
 	caCertPool := x509.NewCertPool()
 	if !caCertPool.AppendCertsFromPEM([]byte(cfg.Gateway.HTTPClient.MTLS.CA)) {
-		return nil, fmt.Errorf("failed to load mTLS CA cert")
+		return nil, ErrInitializeMTLS
 	}
 	return &tls.Config{
-		InsecureSkipVerify: isInsecureSkipVerify(cfg), // nolint:gosec
+		InsecureSkipVerify: isInsecureSkipVerify(cfg), //nolint:gosec
 		Certificates:       []tls.Certificate{keyPair},
 		RootCAs:            caCertPool,
 		MinVersion:         tls.VersionTLS12,
@@ -72,7 +77,7 @@ func buildMTLSConfig(cfg *Config) (*tls.Config, error) {
 
 func buildDefaultTLSConfig(cfg *Config) *tls.Config {
 	return &tls.Config{
-		InsecureSkipVerify: isInsecureSkipVerify(cfg), // nolint:gosec
+		InsecureSkipVerify: isInsecureSkipVerify(cfg), //nolint:gosec
 	}
 }
 
@@ -88,14 +93,15 @@ func buildConfiguredHTTPClient(config *Config, tlsConfig *tls.Config) (*http.Cli
 		Proxy:           http.ProxyFromEnvironment,
 		TLSClientConfig: tlsConfig,
 		DialContext: (&net.Dialer{
-			Timeout:   config.Gateway.HTTPClient.Pool.ConnectTimeout.Duration,
-			KeepAlive: 30 * time.Second,
+			Timeout:   config.Gateway.HTTPClient.Pool.Timeout.Duration,
+			KeepAlive: config.Gateway.HTTPClient.Pool.KeepAlive.Duration,
 		}).DialContext,
-		MaxIdleConns:        config.Gateway.HTTPClient.Pool.MaxIdleConns,
-		MaxIdleConnsPerHost: config.Gateway.HTTPClient.Pool.MaxIdleConnsPerHost,
-		MaxConnsPerHost:     config.Gateway.HTTPClient.Pool.MaxConnsPerHost,
-		IdleConnTimeout:     config.Gateway.HTTPClient.Pool.IdleConnTimeout.Duration,
-		TLSHandshakeTimeout: config.Gateway.HTTPClient.Pool.TLSHandshakeTimeout.Duration,
+		MaxIdleConns:          config.Gateway.HTTPClient.Pool.MaxIdleConns,
+		MaxIdleConnsPerHost:   config.Gateway.HTTPClient.Pool.MaxIdleConnsPerHost,
+		MaxConnsPerHost:       config.Gateway.HTTPClient.Pool.MaxConnsPerHost,
+		IdleConnTimeout:       config.Gateway.HTTPClient.Pool.IdleConnTimeout.Duration,
+		TLSHandshakeTimeout:   config.Gateway.HTTPClient.Pool.TLSHandshakeTimeout.Duration,
+		ExpectContinueTimeout: ContinueDefaultTimeout,
 	}
 	if config.Gateway.HTTPClient.EnableHTTP2 {
 		if err := http2.ConfigureTransport(transport); err != nil {
@@ -104,7 +110,7 @@ func buildConfiguredHTTPClient(config *Config, tlsConfig *tls.Config) (*http.Cli
 	}
 	return &http.Client{
 		Transport: transport,
-		Timeout:   config.Gateway.HTTPClient.Pool.ConnectTimeout.Duration,
+		Timeout:   config.Gateway.HTTPClient.Pool.Timeout.Duration,
 	}, nil
 }
 
@@ -113,13 +119,15 @@ func buildDefaultHTTPClient(tlsConfig *tls.Config) *http.Client {
 		Proxy:           http.ProxyFromEnvironment,
 		TLSClientConfig: tlsConfig,
 		DialContext: (&net.Dialer{
-			Timeout: DefaultTimeout,
+			Timeout:   DefaultTimeout,
+			KeepAlive: DefaultKeepAlive,
 		}).DialContext,
-		MaxIdleConns:        0,
-		MaxIdleConnsPerHost: 0,
-		MaxConnsPerHost:     0,
-		IdleConnTimeout:     0,
-		TLSHandshakeTimeout: DefaultTimeout,
+		MaxIdleConns:          DefaultConns,
+		MaxIdleConnsPerHost:   DefaultConns,
+		MaxConnsPerHost:       DefaultConns,
+		IdleConnTimeout:       DefaultIdleConnTimeout,
+		TLSHandshakeTimeout:   DefaultTimeout,
+		ExpectContinueTimeout: ContinueDefaultTimeout,
 	}
 	return &http.Client{
 		Transport: transport,
@@ -128,11 +136,12 @@ func buildDefaultHTTPClient(tlsConfig *tls.Config) *http.Client {
 }
 
 func mapRoutesFromConfigToGateway(
-	gw Gateway,
+	gwConfig Gateway,
 	predicateFactory *predicate.Factory,
-	filterFactory *filter.Factory) (gateway.Routes, error) {
+	filterFactory *filter.Factory,
+	logger *slog.Logger) (gateway.Routes, error) {
 	out := make(gateway.Routes, 0)
-	for _, route := range gw.Routes {
+	for _, route := range gwConfig.Routes {
 		predicates, err := mapPredicatesFromConfigToGateway(route.Predicates, predicateFactory)
 		if err != nil {
 			return nil, fmt.Errorf("map routes from config to gateway failed: %w", err)
@@ -141,8 +150,12 @@ func mapRoutesFromConfigToGateway(
 		if err != nil {
 			return nil, fmt.Errorf("map routes from config to gateway failed: %w", err)
 		}
-		timeout := calculateTimeout(route.Timeout, gw.GlobalTimeout)
-		out = append(out, *gateway.NewRoute(route.ID, route.URI, predicates, filters, timeout))
+		timeout := calculateTimeout(route.Timeout, gwConfig.GlobalTimeout)
+		buildRoute, err := gateway.NewRoute(route.ID, route.URI, predicates, filters, timeout, logger)
+		if err != nil {
+			return nil, fmt.Errorf("map routes from config to gateway failed: %w", err)
+		}
+		out = append(out, *buildRoute)
 	}
 	return out, nil
 }

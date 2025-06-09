@@ -5,6 +5,7 @@ import (
 	"strings"
 )
 
+//nolint:cyclop
 func PathMatcher(pattern, path string) bool {
 	if pattern == "" {
 		return path == ""
@@ -37,48 +38,54 @@ func PathMatcher(pattern, path string) bool {
 		if !simpleMatch(currentPattern, currentPath) {
 			return false
 		}
-
 		patternIdx++
 		pathIdx++
 	}
 	if patternIdx < len(patternSegments) && patternSegments[patternIdx] == "**" {
 		return true
 	}
-
 	return patternIdx == len(patternSegments) && pathIdx == len(pathSegments)
 }
 
-func simpleMatch(pattern, path string) bool {
-	for i := 0; i < len(pattern); i++ {
-		switch pattern[i] {
-		case '*':
-			return true
-		case '?':
-			if len(path) == 0 {
-				return false
-			}
+//nolint:cyclop
+func simpleMatch(pattern, str string) bool {
+	pIdx, sIdx := 0, 0
+	starIdx, match := -1, 0
+	for sIdx < len(str) {
+		switch {
+		case pIdx < len(pattern) && (pattern[pIdx] == str[sIdx] || pattern[pIdx] == '?'):
+			pIdx++
+			sIdx++
+		case pIdx < len(pattern) && pattern[pIdx] == '*':
+			starIdx = pIdx
+			match = sIdx
+			pIdx++
+		case starIdx != -1:
+			pIdx = starIdx + 1
+			match++
+			sIdx = match
 		default:
-			if i >= len(path) || pattern[i] != path[i] {
-				return false
-			}
+			return false
 		}
 	}
-	return len(pattern) == len(path)
+	for pIdx < len(pattern) && pattern[pIdx] == '*' {
+		pIdx++
+	}
+
+	return pIdx == len(pattern)
 }
 
-func HostMatcher(pattern, host string) bool {
-	if pattern == "**" {
+func HostMatcher(pattern *regexp.Regexp, host string) bool {
+	if pattern == nil {
 		return true
 	}
-	regexPattern := convertPatternToRegex(pattern)
-	matched, err := regexp.MatchString(regexPattern, host)
-	if err != nil {
-		return false
+	if pattern.MatchString(host) {
+		return true
 	}
-	return matched
+	return false
 }
 
-func convertPatternToRegex(pattern string) string {
+func ConvertPatternToRegex(pattern string) string {
 	regex := strings.ReplaceAll(pattern, ".", "\\.")
 	regex = strings.ReplaceAll(regex, "*", "[^.]+")
 	regex = strings.ReplaceAll(regex, "[^.]+[^.]+", ".+")

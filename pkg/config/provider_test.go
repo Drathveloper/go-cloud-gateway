@@ -3,7 +3,9 @@ package config_test
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
+	"net/url"
 	"reflect"
 	"testing"
 	"time"
@@ -15,6 +17,7 @@ import (
 )
 
 func TestNewRoutes(t *testing.T) {
+	logger := slog.Default()
 	tests := []struct {
 		name        string
 		config      *config.Config
@@ -28,7 +31,7 @@ func TestNewRoutes(t *testing.T) {
 					Routes: []config.Route{
 						{
 							ID:  "r1",
-							URI: "someUri",
+							URI: "https://example.com",
 							Predicates: []config.ParameterizedItem{
 								{
 									Name: "Method",
@@ -53,8 +56,11 @@ func TestNewRoutes(t *testing.T) {
 			},
 			expected: gateway.Routes{
 				{
-					ID:  "r1",
-					URI: "someUri",
+					ID: "r1",
+					URI: &url.URL{
+						Scheme: "https",
+						Host:   "example.com",
+					},
 					Predicates: gateway.Predicates{
 						predicate.NewMethodPredicate("GET", "POST"),
 					},
@@ -62,6 +68,7 @@ func TestNewRoutes(t *testing.T) {
 						filter.NewAddRequestHeaderFilter("X-Test", "True"),
 					},
 					Timeout: 10 * time.Second,
+					Logger:  logger,
 				},
 			},
 			expectedErr: nil,
@@ -73,7 +80,7 @@ func TestNewRoutes(t *testing.T) {
 					Routes: []config.Route{
 						{
 							ID:  "r1",
-							URI: "someUri",
+							URI: "https://example.com",
 							Predicates: []config.ParameterizedItem{
 								{
 									Name: "Other",
@@ -94,7 +101,7 @@ func TestNewRoutes(t *testing.T) {
 				},
 			},
 			expected:    nil,
-			expectedErr: errors.New("map routes from config to gateway failed: parse predicates failed: predicate builder not found for predicate Other"),
+			expectedErr: errors.New("map routes from config to gateway failed: parse predicates failed: invalid predicate args: name: Other"),
 		},
 		{
 			name: "new routes should return error when filter is not valid",
@@ -123,7 +130,7 @@ func TestNewRoutes(t *testing.T) {
 				},
 			},
 			expected:    nil,
-			expectedErr: errors.New("map routes from config to gateway failed: parse filters failed: filter builder not found for filter Invent"),
+			expectedErr: errors.New("map routes from config to gateway failed: parse filters failed: filter builder failed: filter builder not found for filter Invent"),
 		},
 		{
 			name: "new routes should return empty when predicate is not valid",
@@ -141,7 +148,8 @@ func TestNewRoutes(t *testing.T) {
 			routes, err := config.NewRoutes(
 				tt.config,
 				predicate.NewFactory(predicate.BuilderRegistry),
-				filter.NewFactory(filter.BuilderRegistry))
+				filter.NewFactory(filter.BuilderRegistry),
+				logger)
 
 			if !reflect.DeepEqual(tt.expected, routes) {
 				t.Errorf("expected %v actual %v", tt.expected, routes)
@@ -192,7 +200,7 @@ func TestNewGlobalFilters(t *testing.T) {
 				},
 			},
 			expected:    nil,
-			expectedErr: errors.New("parse filters failed: filter builder not found for filter Invent"),
+			expectedErr: errors.New("parse filters failed: filter builder failed: filter builder not found for filter Invent"),
 		},
 		{
 			name: "new global filters should return empty when no global filters are defined",
@@ -222,8 +230,6 @@ func TestNewGlobalFilters(t *testing.T) {
 }
 
 func TestNewHTTPClient(t *testing.T) {
-	// Mock valid certificate data for successful mTLS tests
-	// In a real project, use proper test certificates
 	mockValidCert := `-----BEGIN CERTIFICATE-----
 MIIE+DCCAuCgAwIBAgIUSMcgR98H2yE7GimsKnfxslDXABAwDQYJKoZIhvcNAQEL
 BQAwEjEQMA4GA1UEAwwHVGVzdCBDQTAeFw0yNTA1MjgxODQxMDZaFw0yNjA1Mjgx
@@ -369,12 +375,13 @@ F0WydPKUjl3tmQRxYd9C8zDt6yB/fQbIoM/uGgZ0ZoZ+E5hvLVe+rYk=
 				Gateway: config.Gateway{
 					HTTPClient: &config.HTTPClient{
 						Pool: &config.Pool{
-							ConnectTimeout:      &config.Duration{Duration: 30 * time.Second},
+							Timeout:             &config.Duration{Duration: 30 * time.Second},
 							MaxIdleConns:        100,
 							MaxIdleConnsPerHost: 20,
 							MaxConnsPerHost:     50,
 							IdleConnTimeout:     &config.Duration{Duration: 90 * time.Second},
 							TLSHandshakeTimeout: &config.Duration{Duration: 15 * time.Second},
+							KeepAlive:           &config.Duration{Duration: 30 * time.Second},
 						},
 					},
 				},

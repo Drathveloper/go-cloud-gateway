@@ -23,7 +23,7 @@ func NewRewritePathFilter(regexpStr, replacement string) (*RewritePath, error) {
 	normalizedReplacement := strings.ReplaceAll(replacement, "$\\", "$")
 	pattern, err := regexp.Compile(regexpStr)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to build rewrite path filter: %w", err)
 	}
 	return &RewritePath{
 		Regexp:      regexpStr,
@@ -49,7 +49,13 @@ func NewRewritePathBuilder() gateway.FilterBuilder {
 func (f *RewritePath) PreProcess(ctx *gateway.Context) error {
 	ctx.Attributes[GatewayOriginalRequestAttr] = ctx.Request.URL
 	currentPath := ctx.Request.URL.Path
+	if !f.pattern.MatchString(currentPath) {
+		return nil
+	}
 	newPath := f.pattern.ReplaceAllString(currentPath, f.Replacement)
+	if currentPath == newPath {
+		return nil
+	}
 	newURL := &url.URL{
 		Scheme:   ctx.Request.URL.Scheme,
 		Host:     ctx.Request.URL.Host,

@@ -3,11 +3,9 @@ package gateway_handler
 import (
 	"errors"
 	"log/slog"
-	"maps"
 	"net/http"
 
-	"github.com/google/uuid"
-
+	"github.com/drathveloper/go-cloud-gateway/pkg/common"
 	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 )
 
@@ -20,43 +18,42 @@ type Gateway interface {
 type GatewayHandler struct {
 	gateway    Gateway
 	routes     gateway.Routes
-	logger     *slog.Logger
 	errHandler ErrorHandler
 }
 
 func NewGatewayHandler(
 	gateway Gateway,
 	routes gateway.Routes,
-	logger *slog.Logger,
 	errHandler ErrorHandler) *GatewayHandler {
 	return &GatewayHandler{
 		gateway:    gateway,
 		routes:     routes,
-		logger:     logger,
 		errHandler: errHandler,
 	}
 }
 
-func (h *GatewayHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	logger := h.logger.With("requestId", uuid.New().String())
-	route := h.routes.FindMatching(r)
+func (h *GatewayHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+	logger := slog.Default()
+	route := h.routes.FindMatching(request)
 	if route == nil {
-		h.errHandler.Handle(logger, ErrRouteNotFound, w)
+		h.errHandler.Handle(logger, ErrRouteNotFound, writer)
 		return
 	}
-	logger = h.logger.With("routeId", route.ID)
-	gwRequest, err := gateway.NewGatewayRequest(r)
+	gwRequest, err := gateway.NewGatewayRequest(request)
 	if err != nil {
-		h.errHandler.Handle(logger, err, w)
+		h.errHandler.Handle(logger, err, writer)
 		return
 	}
-	ctx, cancel := gateway.NewGatewayContext(route, gwRequest, logger)
+	ctx, cancel := gateway.NewGatewayContext(route, gwRequest)
 	defer cancel()
 	if err = h.gateway.Do(ctx); err != nil {
-		h.errHandler.Handle(ctx.Logger, err, w)
+		h.errHandler.Handle(ctx.Logger, err, writer)
 		return
 	}
-	maps.Copy(w.Header(), ctx.Response.Headers)
-	w.WriteHeader(ctx.Response.Status)
-	_, _ = w.Write(ctx.Response.Body)
+	common.WriteHeader(writer, ctx.Response.Headers)
+	writer.WriteHeader(ctx.Response.Status)
+	if len(ctx.Response.Body) > 0 {
+		_, _ = writer.Write(ctx.Response.Body)
+	}
+	gateway.ReleaseGatewayContext(ctx)
 }

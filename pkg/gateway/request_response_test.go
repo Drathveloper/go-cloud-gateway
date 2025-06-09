@@ -75,7 +75,7 @@ func TestNewGatewayRequest(t *testing.T) {
 				Headers: map[string][]string{
 					"h1": {"value1"},
 				},
-				Body: []byte{},
+				Body: nil,
 			},
 			expectedErr: nil,
 		},
@@ -132,7 +132,7 @@ func TestNewGatewayResponse(t *testing.T) {
 				Headers: map[string][]string{
 					"h1": {"value1"},
 				},
-				Body: []byte{},
+				Body: nil,
 			},
 			expectedErr: nil,
 		},

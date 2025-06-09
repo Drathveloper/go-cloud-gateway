@@ -37,13 +37,13 @@ func TestDuration_UnmarshalJSON(t *testing.T) {
 			name:        "unmarshal json should return error when duration is invalid string",
 			input:       "{\"value\":\"hey\"}",
 			expected:    config.Duration{},
-			expectedErr: errors.New("time: invalid duration \"hey\""),
+			expectedErr: errors.New("unmarshal duration failed: time: invalid duration \"hey\""),
 		},
 		{
 			name:        "unmarshal json should return error when duration is invalid type",
 			input:       "{\"value\":false}",
 			expected:    config.Duration{},
-			expectedErr: errors.New("invalid duration: false"),
+			expectedErr: errors.New("unmarshal duration failed: invalid duration: false"),
 		},
 	}
 	for _, tt := range tests {

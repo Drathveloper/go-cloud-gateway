@@ -34,14 +34,14 @@ func TestFactory_Build(t *testing.T) {
 				"name": "X-Test",
 			},
 			expected:    nil,
-			expectedErr: errors.New("filter builder failed for filter AddRequestHeader and args map[name:X-Test]"),
+			expectedErr: errors.New("filter builder failed: filter AddRequestHeader and args map[name:X-Test]"),
 		},
 		{
 			name:        "build should return error when builder is not registered",
 			builderName: "Invent",
 			builderArgs: map[string]any{},
 			expected:    nil,
-			expectedErr: errors.New("filter builder not found for filter Invent"),
+			expectedErr: errors.New("filter builder failed: filter builder not found for filter Invent"),
 		},
 	}
 	for _, tt := range tests {

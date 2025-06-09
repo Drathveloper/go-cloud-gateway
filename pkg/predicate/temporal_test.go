@@ -41,7 +41,7 @@ func TestBeforePredicate_Test(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			p := predicate.NewBeforePredicateTest(tt.before, &DummyTime{tt.now})
-			req, _ := http.NewRequest(http.MethodPost, "/server/test", nil)
+			req, _ := http.NewRequestWithContext(t.Context(), http.MethodPost, "/server/test", nil)
 
 			actual := p.Test(req)
 			if tt.expected != actual {
@@ -108,7 +108,7 @@ func TestAfterPredicate_Test(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			p := predicate.NewAfterPredicateTest(tt.before, &DummyTime{tt.now})
-			req, _ := http.NewRequest(http.MethodPost, "/server/test", nil)
+			req, _ := http.NewRequestWithContext(t.Context(), http.MethodPost, "/server/test", nil)
 
 			actual := p.Test(req)
 			if tt.expected != actual {
@@ -230,7 +230,7 @@ func TestBetweenPredicate_Test(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			p := predicate.NewBetweenPredicateTest(tt.before, tt.after, &DummyTime{tt.now})
-			req, _ := http.NewRequest(http.MethodPost, "/server/test", nil)
+			req, _ := http.NewRequestWithContext(t.Context(), http.MethodPost, "/server/test", nil)
 
 			actual := p.Test(req)
 			if tt.expected != actual {

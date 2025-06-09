@@ -1,6 +1,8 @@
 package gateway
 
 import (
+	"fmt"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"time"
@@ -8,25 +10,32 @@ import (
 
 type Route struct {
 	ID         string
-	URI        string
+	URI        *url.URL
 	Predicates Predicates
 	Filters    Filters
 	Timeout    time.Duration
+	Logger     *slog.Logger
 }
 
 func NewRoute(
-	id,
+	routeID string,
 	uri string,
 	predicates Predicates,
 	filters Filters,
-	timeout time.Duration) *Route {
+	timeout time.Duration,
+	logger *slog.Logger) (*Route, error) {
+	routeURI, err := url.Parse(uri)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse route uri: %w", err)
+	}
 	return &Route{
-		ID:         id,
-		URI:        uri,
+		ID:         routeID,
+		URI:        routeURI,
 		Predicates: predicates,
 		Filters:    filters,
 		Timeout:    timeout,
-	}
+		Logger:     logger,
+	}, nil
 }
 
 func (r *Route) CombineGlobalFilters(globalFilters ...Filter) Filters {
@@ -34,12 +43,15 @@ func (r *Route) CombineGlobalFilters(globalFilters ...Filter) Filters {
 	return append(allFilters, r.Filters...)
 }
 
-func (r *Route) GetDestinationURLStr(reqURL *url.URL) string {
-	destURL := r.URI + reqURL.Path
-	if reqURL.RawQuery != "" {
-		destURL += "?" + reqURL.RawQuery
+func (r *Route) GetDestinationURL(reqURL *url.URL) *url.URL {
+	newURL := &url.URL{
+		Scheme:   r.URI.Scheme,
+		Host:     r.URI.Host,
+		Path:     reqURL.Path,
+		RawPath:  reqURL.RawPath,
+		RawQuery: reqURL.RawQuery,
 	}
-	return destURL
+	return newURL
 }
 
 type Routes []Route

@@ -1,16 +1,19 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"time"
 )
 
+var ErrUnmarshalDuration = errors.New("unmarshal duration failed")
+
 func (d *Duration) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	var v interface{}
-	if err := unmarshal(&v); err != nil {
-		return err
+	var val interface{}
+	if err := unmarshal(&val); err != nil {
+		return ErrUnmarshalDuration
 	}
-	switch value := v.(type) {
+	switch value := val.(type) {
 	case int:
 		d.Duration = time.Duration(value)
 		return nil
@@ -18,10 +21,10 @@ func (d *Duration) UnmarshalYAML(unmarshal func(interface{}) error) error {
 		var err error
 		d.Duration, err = time.ParseDuration(value)
 		if err != nil {
-			return err
+			return fmt.Errorf("%w: %v", ErrUnmarshalDuration, err.Error())
 		}
 		return nil
 	default:
-		return fmt.Errorf("invalid duration: %v", v)
+		return fmt.Errorf("%w: invalid duration: %v", ErrUnmarshalDuration, val)
 	}
 }

@@ -92,7 +92,7 @@ func TestQueryPredicate_Test(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			p, _ := predicate.NewQueryPredicate(tt.queryParam, tt.regex)
-			req, _ := http.NewRequest(http.MethodPost, "/server/test?"+tt.query, nil)
+			req, _ := http.NewRequestWithContext(t.Context(), http.MethodPost, "/server/test?"+tt.query, nil)
 
 			actual := p.Test(req)
 

@@ -3,6 +3,7 @@ package predicate
 import (
 	"fmt"
 	"net/http"
+	"regexp"
 
 	"github.com/drathveloper/go-cloud-gateway/pkg/common"
 	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
@@ -11,27 +12,43 @@ import (
 const HostPredicateName = "Host"
 
 type HostPredicate struct {
-	Patterns []string
+	Patterns      []string
+	compiledRegex []*regexp.Regexp
 }
 
-func NewHostPredicate(patterns ...string) *HostPredicate {
-	return &HostPredicate{Patterns: patterns}
+func NewHostPredicate(patterns ...string) (*HostPredicate, error) {
+	compiled := make([]*regexp.Regexp, 0, len(patterns))
+	for _, pattern := range patterns {
+		if pattern == "**" {
+			compiled = append(compiled, nil)
+			continue
+		}
+		r := common.ConvertPatternToRegex(pattern)
+		re, err := regexp.Compile(r)
+		if err != nil {
+			return nil, fmt.Errorf("invalid host pattern %q: %w", pattern, err)
+		}
+		compiled = append(compiled, re)
+	}
+	return &HostPredicate{
+		Patterns:      patterns,
+		compiledRegex: compiled,
+	}, nil
 }
 
-func NewHostPredicateBuilder() gateway.PredicateBuilder {
-	return gateway.PredicateBuilderFunc(func(args map[string]any) (gateway.Predicate, error) {
+func NewHostPredicateBuilder() gateway.PredicateBuilderFunc {
+	return func(args map[string]any) (gateway.Predicate, error) {
 		patterns, err := common.ConvertToStringSlice(args["patterns"])
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert 'patterns' attribute: %w", err)
 		}
-		return NewHostPredicate(patterns...), nil
-	})
+		return NewHostPredicate(patterns...)
+	}
 }
 
 func (p *HostPredicate) Test(request *http.Request) bool {
-	host := request.Host
-	for _, pattern := range p.Patterns {
-		if common.HostMatcher(pattern, host) {
+	for _, pattern := range p.compiledRegex {
+		if common.HostMatcher(pattern, request.Host) {
 			return true
 		}
 	}

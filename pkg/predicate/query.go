@@ -22,7 +22,7 @@ func NewQueryPredicate(name, regexpStr string) (*QueryPredicate, error) {
 	if regexpStr != "" {
 		pattern, err = regexp.Compile(regexpStr)
 		if err != nil {
-			return nil, fmt.Errorf("invalid regexp: %v", err)
+			return nil, fmt.Errorf("invalid regexp: %w", err)
 		}
 	}
 	return &QueryPredicate{
@@ -31,8 +31,8 @@ func NewQueryPredicate(name, regexpStr string) (*QueryPredicate, error) {
 	}, nil
 }
 
-func NewQueryPredicateBuilder() gateway.PredicateBuilder {
-	return gateway.PredicateBuilderFunc(func(args map[string]any) (gateway.Predicate, error) {
+func NewQueryPredicateBuilder() gateway.PredicateBuilderFunc {
+	return func(args map[string]any) (gateway.Predicate, error) {
 		name, err := common.ConvertToString(args["name"])
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert 'name' attribute: %w", err)
@@ -42,21 +42,16 @@ func NewQueryPredicateBuilder() gateway.PredicateBuilder {
 			return nil, fmt.Errorf("failed to convert 'regexp' attribute: %w", err)
 		}
 		return NewQueryPredicate(name, regex)
-	})
+	}
 }
 
 func (p *QueryPredicate) Test(request *http.Request) bool {
-	values := request.URL.Query()[p.Name]
-	if len(values) == 0 {
+	value := request.URL.Query().Get(p.Name)
+	if value == "" {
 		return false
 	}
 	if p.Pattern != nil {
-		for _, value := range values {
-			if p.Pattern.MatchString(value) {
-				return true
-			}
-		}
-		return false
+		return p.Pattern.MatchString(value)
 	}
 	return true
 }

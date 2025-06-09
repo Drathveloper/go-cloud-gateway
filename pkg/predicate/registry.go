@@ -2,6 +2,7 @@ package predicate
 
 import "github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 
+//nolint:gochecknoglobals
 var BuilderRegistry gateway.PredicateBuilderRegistry = map[string]gateway.PredicateBuilder{
 	MethodPredicateName:  NewMethodPredicateBuilder(),
 	HostPredicateName:    NewHostPredicateBuilder(),

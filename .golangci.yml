@@ -1,23 +1,53 @@
 version: "2"
 linters:
-  default: none
-  enable:
-    - gocritic
-    - gocyclo
-    - gosec
-    - govet
-    - ineffassign
-    - misspell
-    - promlinter
-    #- revive
-    - staticcheck
-    - unconvert
-    - unused
+  settings:
+    depguard:
+      rules:
+        main:
+          allow:
+            - bytes
+            - context
+            - crypto
+            - encoding
+            - errors
+            - fmt
+            - log
+            - net
+            - github.com/drathveloper/go-cloud-gateway
+            - github.com/go-playground/validator/v10
+            - golang.org/x/net/http2
+            - gopkg.in/yaml.v3
+            - io
+            - reflect
+            - regexp
+            - slices
+            - strconv
+            - strings
+            - sync
+            - testing
+            - time
+  default: all
+  disable:
+    - revive
+    - wsl
+    - tagliatelle
+    - tagalign
+    - nlreturn
+    - exhaustruct
+    - ireturn
   exclusions:
     generated: lax
     rules:
       - linters:
-          - promlinter
+          - varnamelen
+          - paralleltest
+          - mirror
+          - lll
+          - funlen
+          - forcetypeassert
+          - gochecknoglobals
+          - err113
+          - dupl
         path: _test\.go
       - linters:
           - gosec

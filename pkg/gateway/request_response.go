@@ -1,9 +1,7 @@
 package gateway
 
 import (
-	"bytes"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 
@@ -20,14 +18,13 @@ type Request struct {
 func NewGatewayRequest(request *http.Request) (*Request, error) {
 	bodyBytes, err := common.ReadBody(request.Body)
 	if err != nil {
-		return nil, fmt.Errorf("build gateway response failed: %w", err)
+		return nil, fmt.Errorf("build gateway request failed: %w", err)
 	}
-	request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 	return &Request{
 		URL:     request.URL,
 		Method:  request.Method,
 		Headers: request.Header,
-		Body:    bodyBytes,
+		Body:    append([]byte(nil), bodyBytes...),
 	}, nil
 }
 
@@ -45,6 +42,6 @@ func NewGatewayResponse(response *http.Response) (*Response, error) {
 	return &Response{
 		Status:  response.StatusCode,
 		Headers: response.Header,
-		Body:    bodyBytes,
+		Body:    append([]byte(nil), bodyBytes...),
 	}, nil
 }
