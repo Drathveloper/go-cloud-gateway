@@ -71,7 +71,7 @@ func TestMethod_Test(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
 			pred := predicate.NewMethodPredicate(tt.PredicateMethods...)
-			req, _ := http.NewRequest(tt.ReqMethod, "/", nil)
+			req, _ := http.NewRequestWithContext(t.Context(), tt.ReqMethod, "/", nil)
 			actual := pred.Test(req)
 			if tt.Expected != actual {
 				t.Errorf("expected %t actual %t", tt.Expected, actual)

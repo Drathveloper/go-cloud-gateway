@@ -18,7 +18,7 @@ func (c *dummyHTTPClient) Do(_ *http.Request) (*http.Response, error) {
 		return nil, errors.New("http client error")
 	}
 	return &http.Response{
-		StatusCode: 200,
+		StatusCode: http.StatusOK,
 		Header:     make(http.Header),
 		Body:       http.NoBody,
 	}, nil
@@ -45,7 +45,7 @@ func newDummyContext() *gateway.Context {
 func BenchmarkGatewayDo_Success(b *testing.B) {
 	g := gateway.NewGateway([]gateway.Filter{&DummyFilter{}}, &dummyHTTPClient{})
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		ctx := newDummyContext()
 		_ = g.Do(ctx)
 		gateway.ReleaseGatewayContext(ctx)
@@ -55,7 +55,7 @@ func BenchmarkGatewayDo_Success(b *testing.B) {
 func BenchmarkGatewayDo_HTTPError(b *testing.B) {
 	g := gateway.NewGateway(nil, &dummyHTTPClient{fail: true})
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		ctx := newDummyContext()
 		_ = g.Do(ctx)
 		gateway.ReleaseGatewayContext(ctx)
@@ -65,7 +65,7 @@ func BenchmarkGatewayDo_HTTPError(b *testing.B) {
 func BenchmarkGatewayDo_PreFilterError(b *testing.B) {
 	g := gateway.NewGateway([]gateway.Filter{&DummyFilter{PreProcessErr: errors.New("someErr")}}, &dummyHTTPClient{})
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		ctx := newDummyContext()
 		_ = g.Do(ctx)
 		gateway.ReleaseGatewayContext(ctx)
@@ -75,7 +75,7 @@ func BenchmarkGatewayDo_PreFilterError(b *testing.B) {
 func BenchmarkGatewayDo_PostFilterError(b *testing.B) {
 	g := gateway.NewGateway([]gateway.Filter{&DummyFilter{PostProcessErr: errors.New("someErr")}}, &dummyHTTPClient{})
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		ctx := newDummyContext()
 		_ = g.Do(ctx)
 		gateway.ReleaseGatewayContext(ctx)

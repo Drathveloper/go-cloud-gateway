@@ -13,9 +13,9 @@ import (
 func BenchmarkNewGatewayRequest(b *testing.B) {
 	body := []byte(`{"message":"hello world"}`)
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		req := &http.Request{
-			Method: "POST",
+			Method: http.MethodPost,
 			URL:    &url.URL{Scheme: "http", Host: "localhost", Path: "/api"},
 			Header: http.Header{"Content-Type": {"application/json"}},
 			Body:   io.NopCloser(bytes.NewReader(body)),
@@ -30,9 +30,9 @@ func BenchmarkNewGatewayRequest(b *testing.B) {
 func BenchmarkNewGatewayRequest_LargeBody(b *testing.B) {
 	largeBody := bytes.Repeat([]byte("x"), 10_000) // 10KB
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		req := &http.Request{
-			Method: "POST",
+			Method: http.MethodPost,
 			URL:    &url.URL{Scheme: "http", Host: "localhost", Path: "/api"},
 			Header: http.Header{"Content-Type": {"application/json"}},
 			Body:   io.NopCloser(bytes.NewReader(largeBody)),
@@ -48,9 +48,9 @@ func BenchmarkNewGatewayResponse(b *testing.B) {
 	body := []byte(`{"message":"hello world"}`)
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		res := &http.Response{
-			StatusCode: 200,
+			StatusCode: http.StatusOK,
 			Header:     http.Header{"Content-Type": {"application/json"}},
 			Body:       io.NopCloser(bytes.NewReader(body)),
 		}
@@ -66,9 +66,9 @@ func BenchmarkNewGatewayResponse_LargeBody(b *testing.B) {
 	body := bytes.Repeat([]byte("A"), bodySize)
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		res := &http.Response{
-			StatusCode: 200,
+			StatusCode: http.StatusOK,
 			Header:     http.Header{"Content-Type": {"application/json"}},
 			Body:       io.NopCloser(bytes.NewReader(body)),
 		}

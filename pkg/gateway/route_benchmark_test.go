@@ -19,7 +19,7 @@ func BenchmarkGetDestinationURL_Optimized(b *testing.B) {
 		RawQuery: "id=123&active=true",
 	}
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		_ = r.GetDestinationURL(u)
 	}
 }

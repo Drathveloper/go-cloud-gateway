@@ -32,14 +32,14 @@ func TestFactory_Build(t *testing.T) {
 			builderName: "Method",
 			builderArgs: map[string]any{},
 			expected:    nil,
-			expectedErr: errors.New("predicate builder failed for predicate Method and args map[]"),
+			expectedErr: errors.New("invalid predicate args: name Method and args map[]"),
 		},
 		{
 			name:        "build should return error when builder is not registered",
 			builderName: "Invent",
 			builderArgs: map[string]any{},
 			expected:    nil,
-			expectedErr: errors.New("predicate builder not found for predicate Invent"),
+			expectedErr: errors.New("invalid predicate args: name: Invent"),
 		},
 	}
 	for _, tt := range tests {

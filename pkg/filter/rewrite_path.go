@@ -23,7 +23,7 @@ func NewRewritePathFilter(regexpStr, replacement string) (*RewritePath, error) {
 	normalizedReplacement := strings.ReplaceAll(replacement, "$\\", "$")
 	pattern, err := regexp.Compile(regexpStr)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to build rewrite path filter: %w", err)
 	}
 	return &RewritePath{
 		Regexp:      regexpStr,

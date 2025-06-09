@@ -29,7 +29,7 @@ func BenchmarkReadBody(b *testing.B) {
 			readCloser := io.NopCloser(bytes.NewReader([]byte(tc.input)))
 
 			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
+			for range b.N {
 				if _, err = common.ReadBody(readCloser); err != nil {
 					b.Fatalf("ReadBody failed: %v", err)
 				}
@@ -39,7 +39,7 @@ func BenchmarkReadBody(b *testing.B) {
 }
 
 func BenchmarkReadBody_Nil(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		_, err := common.ReadBody(nil)
 		if err != nil {
 			b.Fatalf("ReadBody failed: %v", err)
@@ -62,7 +62,7 @@ func BenchmarkWriteHeader(b *testing.B) {
 	}
 
 	b.Run("SimpleHeader", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for range b.N {
 			rec := httptest.NewRecorder()
 
 			b.ResetTimer()
@@ -71,7 +71,7 @@ func BenchmarkWriteHeader(b *testing.B) {
 	})
 
 	b.Run("MultiValueHeader", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for range b.N {
 			rec := httptest.NewRecorder()
 
 			b.ResetTimer()

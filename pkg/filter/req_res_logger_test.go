@@ -124,7 +124,7 @@ func TestRequestResponseLogger_PreProcess(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var buf bytes.Buffer
 			logger := slog.New(slog.NewTextHandler(&buf, nil))
-			req, _ := http.NewRequest(tt.method, "https://example.org/"+tt.path, bytes.NewBuffer(tt.body))
+			req, _ := http.NewRequestWithContext(t.Context(), tt.method, "https://example.org/"+tt.path, bytes.NewBuffer(tt.body))
 			req.Header = tt.headers
 			gwReq, _ := gateway.NewGatewayRequest(req)
 			ctx, _ := gateway.NewGatewayContext(&gateway.Route{}, gwReq)

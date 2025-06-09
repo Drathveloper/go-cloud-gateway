@@ -91,7 +91,7 @@ func TestAddRequestHeaderFilter_PreProcess(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req, _ := http.NewRequest(http.MethodGet, "/", nil)
+			req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 			req.Header = tt.currentHeaders
 			gwReq, _ := gateway.NewGatewayRequest(req)
 			ctx, _ := gateway.NewGatewayContext(&gateway.Route{}, gwReq)
@@ -196,7 +196,7 @@ func TestSetRequestHeaderFilter_PreProcess(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req, _ := http.NewRequest(http.MethodGet, "/", nil)
+			req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 			req.Header = tt.currentHeaders
 			gwReq, _ := gateway.NewGatewayRequest(req)
 			ctx, _ := gateway.NewGatewayContext(&gateway.Route{}, gwReq)
@@ -288,7 +288,7 @@ func TestRemoveRequestHeaderFilter_PreProcess(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req, _ := http.NewRequest(http.MethodGet, "/", nil)
+			req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 			req.Header = tt.currentHeaders
 			gwReq, _ := gateway.NewGatewayRequest(req)
 			ctx, _ := gateway.NewGatewayContext(&gateway.Route{}, gwReq)

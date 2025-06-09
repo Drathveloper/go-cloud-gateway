@@ -1,10 +1,13 @@
 package predicate
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 )
+
+var ErrInvalidPredicate = errors.New("invalid predicate args")
 
 type Factory struct {
 	registry map[string]gateway.PredicateBuilder
@@ -20,9 +23,9 @@ func (f *Factory) Build(name string, args map[string]any) (gateway.Predicate, er
 	if f.registry[name] != nil {
 		fi, err := f.registry[name].Build(args)
 		if err != nil {
-			return nil, fmt.Errorf("predicate builder failed for predicate %s and args %v", name, args)
+			return nil, fmt.Errorf("%w: name %s and args %v", ErrInvalidPredicate, name, args)
 		}
 		return fi, nil
 	}
-	return nil, fmt.Errorf("predicate builder not found for predicate %s", name)
+	return nil, fmt.Errorf("%w: name: %s", ErrInvalidPredicate, name)
 }

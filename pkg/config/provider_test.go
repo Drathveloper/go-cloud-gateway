@@ -101,7 +101,7 @@ func TestNewRoutes(t *testing.T) {
 				},
 			},
 			expected:    nil,
-			expectedErr: errors.New("map routes from config to gateway failed: parse predicates failed: predicate builder not found for predicate Other"),
+			expectedErr: errors.New("map routes from config to gateway failed: parse predicates failed: invalid predicate args: name: Other"),
 		},
 		{
 			name: "new routes should return error when filter is not valid",
@@ -130,7 +130,7 @@ func TestNewRoutes(t *testing.T) {
 				},
 			},
 			expected:    nil,
-			expectedErr: errors.New("map routes from config to gateway failed: parse filters failed: filter builder not found for filter Invent"),
+			expectedErr: errors.New("map routes from config to gateway failed: parse filters failed: filter builder failed: filter builder not found for filter Invent"),
 		},
 		{
 			name: "new routes should return empty when predicate is not valid",
@@ -200,7 +200,7 @@ func TestNewGlobalFilters(t *testing.T) {
 				},
 			},
 			expected:    nil,
-			expectedErr: errors.New("parse filters failed: filter builder not found for filter Invent"),
+			expectedErr: errors.New("parse filters failed: filter builder failed: filter builder not found for filter Invent"),
 		},
 		{
 			name: "new global filters should return empty when no global filters are defined",

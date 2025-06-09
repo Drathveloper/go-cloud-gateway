@@ -20,14 +20,14 @@ func NewMethodPredicate(methods ...string) *Method {
 	}
 }
 
-func NewMethodPredicateBuilder() gateway.PredicateBuilder {
-	return gateway.PredicateBuilderFunc(func(args map[string]any) (gateway.Predicate, error) {
+func NewMethodPredicateBuilder() gateway.PredicateBuilderFunc {
+	return func(args map[string]any) (gateway.Predicate, error) {
 		methods, err := common.ConvertToStringSlice(args["methods"])
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert 'methods' attribute: %w", err)
 		}
 		return NewMethodPredicate(methods...), nil
-	})
+	}
 }
 
 func (m *Method) Test(r *http.Request) bool {

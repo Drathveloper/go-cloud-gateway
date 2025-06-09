@@ -80,7 +80,7 @@ func TestConvertToStringSlice(t *testing.T) {
 			name:        "convert mixed slice to string slice should return error",
 			input:       []any{"any1", 123},
 			expected:    nil,
-			expectedErr: errors.New("value is expected to be a valid string slice: element at index 1 is not of expected type"),
+			expectedErr: errors.New("value is expected to be a valid string slice: value is required to be a valid slice: element at index 1 is not of expected type"),
 		},
 		{
 			name:        "convert other type to string should return error",

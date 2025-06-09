@@ -18,6 +18,7 @@ type HTTPClient interface {
 
 const gatewayErrMsg = "gateway request for route %s failed: %w"
 
+//nolint:gochecknoglobals
 var readerPool = sync.Pool{
 	New: func() any { return new(bytes.Reader) },
 }
@@ -43,18 +44,16 @@ func (g *Gateway) Do(ctx *Context) error {
 	if err != nil {
 		return fmt.Errorf(gatewayErrMsg, ctx.Route.ID, err)
 	}
-	backendRes, err := g.httpClient.Do(backendReq)
-
+	backendRes, err := g.httpClient.Do(backendReq) //nolint:bodyclose
 	if reader != nil {
 		readerPool.Put(reader)
 	}
-
 	if err != nil {
 		switch {
 		case errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled):
 			return fmt.Errorf(gatewayErrMsg, ctx.Route.ID, context.DeadlineExceeded)
 		default:
-			return fmt.Errorf(gatewayErrMsg, ctx.Route.ID, fmt.Errorf("%w: %s", ErrHTTP, err))
+			return fmt.Errorf(gatewayErrMsg, ctx.Route.ID, fmt.Errorf("%w: %s", ErrHTTP, err.Error()))
 		}
 	}
 	ctx.Response, err = NewGatewayResponse(backendRes)
@@ -75,7 +74,7 @@ func (g *Gateway) buildProxyRequest(ctx *Context) (*http.Request, *bytes.Reader,
 }
 
 func (g *Gateway) buildBodyProxyRequest(ctx *Context) (*http.Request, *bytes.Reader, error) {
-	reader := readerPool.Get().(*bytes.Reader)
+	reader := readerPool.Get().(*bytes.Reader) //nolint:forcetypeassert
 	reader.Reset(ctx.Request.Body)
 	req := &http.Request{
 		ContentLength: int64(len(ctx.Request.Body)),

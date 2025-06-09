@@ -58,8 +58,8 @@ func BenchmarkServeHTTP_HappyPath(b *testing.B) {
 	)
 
 	reqBody := []byte(`GET /test HTTP/1.1`)
-	for i := 0; i < b.N; i++ {
-		req := httptest.NewRequest("GET", "/test?x=1", bytes.NewReader(reqBody))
+	for range b.N {
+		req := httptest.NewRequest(http.MethodGet, "/test?x=1", bytes.NewReader(reqBody))
 		rec := httptest.NewRecorder()
 
 		handler.ServeHTTP(rec, req)
@@ -81,7 +81,7 @@ func BenchmarkServeHTTP_RouteNotFound(b *testing.B) {
 			pred,
 		},
 	}
-	h := gateway_handler.NewGatewayHandler(
+	gwHandler := gateway_handler.NewGatewayHandler(
 		&mockGateway{},
 		gateway.Routes{route},
 		&mockErrorHandler{handleFunc: func(_ *slog.Logger, _ error, _ http.ResponseWriter) {}},
@@ -90,9 +90,9 @@ func BenchmarkServeHTTP_RouteNotFound(b *testing.B) {
 	req := httptest.NewRequest(http.MethodGet, "/not-found", nil)
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		w := httptest.NewRecorder()
-		h.ServeHTTP(w, req.Clone(req.Context()))
+		gwHandler.ServeHTTP(w, req.Clone(req.Context()))
 	}
 }
 
@@ -107,7 +107,7 @@ func BenchmarkServeHTTP_BackendError(b *testing.B) {
 		},
 	}
 
-	h := gateway_handler.NewGatewayHandler(
+	gwHandler := gateway_handler.NewGatewayHandler(
 		&mockGateway{
 			doFunc: func(ctx *gateway.Context) error {
 				return errors.New("backend error")
@@ -120,9 +120,9 @@ func BenchmarkServeHTTP_BackendError(b *testing.B) {
 	req := httptest.NewRequest(http.MethodGet, "/fail", nil)
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		w := httptest.NewRecorder()
-		h.ServeHTTP(w, req.Clone(req.Context()))
+		gwHandler.ServeHTTP(w, req.Clone(req.Context()))
 	}
 }
 
@@ -134,7 +134,7 @@ func BenchmarkServeHTTP_LargeBody(b *testing.B) {
 	}
 	largeBody := strings.Repeat("a", 1024*1024) // 1MB
 
-	h := gateway_handler.NewGatewayHandler(
+	gwHandler := gateway_handler.NewGatewayHandler(
 		&mockGateway{
 			doFunc: func(ctx *gateway.Context) error {
 				ctx.Response = &gateway.Response{
@@ -150,9 +150,9 @@ func BenchmarkServeHTTP_LargeBody(b *testing.B) {
 	)
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		req := httptest.NewRequest(http.MethodPost, "/big", io.NopCloser(strings.NewReader(largeBody)))
 		w := httptest.NewRecorder()
-		h.ServeHTTP(w, req.Clone(req.Context()))
+		gwHandler.ServeHTTP(w, req.Clone(req.Context()))
 	}
 }

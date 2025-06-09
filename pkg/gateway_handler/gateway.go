@@ -32,31 +32,28 @@ func NewGatewayHandler(
 	}
 }
 
-func (h *GatewayHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *GatewayHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	logger := slog.Default()
-	route := h.routes.FindMatching(r)
+	route := h.routes.FindMatching(request)
 	if route == nil {
-		h.errHandler.Handle(logger, ErrRouteNotFound, w)
+		h.errHandler.Handle(logger, ErrRouteNotFound, writer)
 		return
 	}
-	gwRequest, err := gateway.NewGatewayRequest(r)
+	gwRequest, err := gateway.NewGatewayRequest(request)
 	if err != nil {
-		h.errHandler.Handle(logger, err, w)
+		h.errHandler.Handle(logger, err, writer)
 		return
 	}
 	ctx, cancel := gateway.NewGatewayContext(route, gwRequest)
 	defer cancel()
 	if err = h.gateway.Do(ctx); err != nil {
-		h.errHandler.Handle(ctx.Logger, err, w)
+		h.errHandler.Handle(ctx.Logger, err, writer)
 		return
 	}
-
-	common.WriteHeader(w, ctx.Response.Headers)
-
-	w.WriteHeader(ctx.Response.Status)
-
+	common.WriteHeader(writer, ctx.Response.Headers)
+	writer.WriteHeader(ctx.Response.Status)
 	if len(ctx.Response.Body) > 0 {
-		_, _ = w.Write(ctx.Response.Body)
+		_, _ = writer.Write(ctx.Response.Body)
 	}
 	gateway.ReleaseGatewayContext(ctx)
 }

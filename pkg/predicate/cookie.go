@@ -1,6 +1,7 @@
 package predicate
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -10,6 +11,8 @@ import (
 )
 
 const CookiePredicateName = "Cookie"
+
+var ErrInvalidRegexp = errors.New("invalid regexp")
 
 type CookiePredicate struct {
 	Name    string
@@ -22,7 +25,7 @@ func NewCookiePredicate(name, regexpStr string) (*CookiePredicate, error) {
 	if regexpStr != "" {
 		pattern, err = regexp.Compile(regexpStr)
 		if err != nil {
-			return nil, fmt.Errorf("invalid regexp: %v", err)
+			return nil, fmt.Errorf("%w: %v", ErrInvalidRegexp, err.Error())
 		}
 	}
 	return &CookiePredicate{
@@ -31,8 +34,8 @@ func NewCookiePredicate(name, regexpStr string) (*CookiePredicate, error) {
 	}, nil
 }
 
-func NewCookiePredicateBuilder() gateway.PredicateBuilder {
-	return gateway.PredicateBuilderFunc(func(args map[string]any) (gateway.Predicate, error) {
+func NewCookiePredicateBuilder() gateway.PredicateBuilderFunc {
+	return func(args map[string]any) (gateway.Predicate, error) {
 		name, err := common.ConvertToString(args["name"])
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert 'name' attribute: %w", err)
@@ -42,7 +45,7 @@ func NewCookiePredicateBuilder() gateway.PredicateBuilder {
 			return nil, fmt.Errorf("failed to convert 'regexp' attribute: %w", err)
 		}
 		return NewCookiePredicate(name, regex)
-	})
+	}
 }
 
 func (p *CookiePredicate) Test(request *http.Request) bool {

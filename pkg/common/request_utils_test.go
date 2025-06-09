@@ -18,7 +18,7 @@ type DummyReadCloser struct {
 	CloseErr error
 }
 
-func (d *DummyReadCloser) Read(_ []byte) (n int, err error) {
+func (d *DummyReadCloser) Read(_ []byte) (int, error) {
 	return 1, d.ReadErr
 }
 

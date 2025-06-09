@@ -102,7 +102,7 @@ func TestCookiePredicate_Test(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			p, _ := predicate.NewCookiePredicate(tt.cookieName, tt.cookieRegex)
-			req, _ := http.NewRequest(http.MethodPost, "/server/test", nil)
+			req, _ := http.NewRequestWithContext(t.Context(), http.MethodPost, "/server/test", nil)
 			req.AddCookie(tt.cookie)
 
 			actual := p.Test(req)

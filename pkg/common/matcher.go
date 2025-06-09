@@ -5,6 +5,7 @@ import (
 	"strings"
 )
 
+//nolint:cyclop
 func PathMatcher(pattern, path string) bool {
 	if pattern == "" {
 		return path == ""
@@ -46,6 +47,7 @@ func PathMatcher(pattern, path string) bool {
 	return patternIdx == len(patternSegments) && pathIdx == len(pathSegments)
 }
 
+//nolint:cyclop
 func simpleMatch(pattern, str string) bool {
 	pIdx, sIdx := 0, 0
 	starIdx, match := -1, 0

@@ -7,12 +7,12 @@ import (
 )
 
 func (d *Duration) UnmarshalJSON(b []byte) error {
-	var v interface{}
-	if err := json.Unmarshal(b, &v); err != nil {
-		return err
+	var val interface{}
+	if err := json.Unmarshal(b, &val); err != nil {
+		return fmt.Errorf("%w: %v", ErrUnmarshalDuration, err.Error())
 	}
 
-	switch value := v.(type) {
+	switch value := val.(type) {
 	case float64:
 		d.Duration = time.Duration(value)
 		return nil
@@ -20,10 +20,10 @@ func (d *Duration) UnmarshalJSON(b []byte) error {
 		var err error
 		d.Duration, err = time.ParseDuration(value)
 		if err != nil {
-			return err
+			return fmt.Errorf("%w: %v", ErrUnmarshalDuration, err.Error())
 		}
 		return nil
 	default:
-		return fmt.Errorf("invalid duration: %v", v)
+		return fmt.Errorf("%w: invalid duration: %v", ErrUnmarshalDuration, val)
 	}
 }

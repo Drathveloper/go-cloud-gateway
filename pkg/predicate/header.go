@@ -22,7 +22,7 @@ func NewHeaderPredicate(header, regexpStr string) (*HeaderPredicate, error) {
 	if regexpStr != "" {
 		pattern, err = regexp.Compile(regexpStr)
 		if err != nil {
-			return nil, fmt.Errorf("invalid regexp: %v", err)
+			return nil, fmt.Errorf("invalid regexp: %w", err)
 		}
 	}
 	return &HeaderPredicate{
@@ -31,8 +31,8 @@ func NewHeaderPredicate(header, regexpStr string) (*HeaderPredicate, error) {
 	}, nil
 }
 
-func NewHeaderPredicateBuilder() gateway.PredicateBuilder {
-	return gateway.PredicateBuilderFunc(func(args map[string]any) (gateway.Predicate, error) {
+func NewHeaderPredicateBuilder() gateway.PredicateBuilderFunc {
+	return func(args map[string]any) (gateway.Predicate, error) {
 		name, err := common.ConvertToString(args["name"])
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert 'name' attribute: %w", err)
@@ -42,19 +42,17 @@ func NewHeaderPredicateBuilder() gateway.PredicateBuilder {
 			return nil, fmt.Errorf("failed to convert 'regexp' attribute: %w", err)
 		}
 		return NewHeaderPredicate(name, regex)
-	})
+	}
 }
 
 func (p *HeaderPredicate) Test(request *http.Request) bool {
-	values := request.Header.Values(p.Name)
-	if len(values) == 0 {
+	value := request.Header.Get(p.Name)
+	if value == "" {
 		return false
 	}
 	if p.Pattern != nil {
-		for _, value := range values {
-			if p.Pattern.MatchString(value) {
-				return true
-			}
+		if p.Pattern.MatchString(value) {
+			return true
 		}
 		return false
 	}

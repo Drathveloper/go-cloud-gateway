@@ -69,7 +69,7 @@ func BenchmarkRewritePath_PreProcess(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 
-			for i := 0; i < b.N; i++ {
+			for range b.N {
 				_ = rewrite.PreProcess(ctx)
 			}
 		})
@@ -78,7 +78,7 @@ func BenchmarkRewritePath_PreProcess(b *testing.B) {
 
 func generateLongPath(segment string, repeat int) string {
 	full := ""
-	for i := 0; i < repeat; i++ {
+	for range repeat {
 		full += segment
 	}
 	return full

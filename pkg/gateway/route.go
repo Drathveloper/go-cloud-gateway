@@ -18,7 +18,7 @@ type Route struct {
 }
 
 func NewRoute(
-	id,
+	routeID string,
 	uri string,
 	predicates Predicates,
 	filters Filters,
@@ -29,7 +29,7 @@ func NewRoute(
 		return nil, fmt.Errorf("failed to parse route uri: %w", err)
 	}
 	return &Route{
-		ID:         id,
+		ID:         routeID,
 		URI:        routeURI,
 		Predicates: predicates,
 		Filters:    filters,
