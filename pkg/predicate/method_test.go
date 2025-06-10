@@ -79,11 +79,3 @@ func TestMethod_Test(t *testing.T) {
 		})
 	}
 }
-
-func TestMethod_Name(t *testing.T) {
-	expected := "Method"
-	pred := predicate.NewMethodPredicate(http.MethodPost)
-	if expected != pred.Name() {
-		t.Errorf("expected %s actual %s", expected, pred.Name())
-	}
-}

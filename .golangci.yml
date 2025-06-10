@@ -35,7 +35,6 @@ linters:
         - validate
   default: all
   disable:
-    - revive
     - wsl
     - tagliatelle
     - nlreturn

@@ -7,16 +7,19 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// ReaderYAML is a reader for yaml files.
 type ReaderYAML struct {
 	validate *validator.Validate
 }
 
+// NewReaderYAML creates a new reader for yaml files.
 func NewReaderYAML(validate *validator.Validate) *ReaderYAML {
 	return &ReaderYAML{
 		validate: validate,
 	}
 }
 
+// Read reads the given input and returns the config or error if config is invalid.
 func (r *ReaderYAML) Read(input []byte) (*Config, error) {
 	baseErr := "read yaml config failed"
 	var cfg Config

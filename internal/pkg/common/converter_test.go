@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/drathveloper/go-cloud-gateway/pkg/common"
+	"github.com/drathveloper/go-cloud-gateway/internal/pkg/common"
 )
 
 func TestConvertToString(t *testing.T) {

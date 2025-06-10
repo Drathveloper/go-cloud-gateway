@@ -10,7 +10,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/drathveloper/go-cloud-gateway/pkg/common"
+	"github.com/drathveloper/go-cloud-gateway/internal/pkg/common"
 )
 
 type DummyReadCloser struct {

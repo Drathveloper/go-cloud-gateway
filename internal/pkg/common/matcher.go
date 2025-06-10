@@ -5,6 +5,18 @@ import (
 	"strings"
 )
 
+// PathMatcher matches the path pattern with the path.
+//
+// The path pattern is a string that contains the path segments separated by '/'.
+//
+// The path is a string that contains the path segments separated by '/'.
+//
+// The path pattern can contain the following special characters:
+//
+// 1. '*' matches any number of characters.
+// 2. '**' matches any number of characters including the '/' character.
+// 3. '?' matches a single character.
+//
 //nolint:cyclop
 func PathMatcher(pattern, path string) bool {
 	if pattern == "" {
@@ -75,6 +87,17 @@ func simpleMatch(pattern, str string) bool {
 	return pIdx == len(pattern)
 }
 
+// HostMatcher matches the host pattern with the host.
+//
+// The host pattern is a string that contains the host segments separated by '.'.
+//
+// The host is a string that contains the host segments separated by '.'.
+//
+// The host pattern can contain the following special characters:
+//
+// 1. '*' matches any number of characters.
+// 2. '**' matches any number of characters including the '/' character.
+// 3. '?' matches a single character.
 func HostMatcher(pattern *regexp.Regexp, host string) bool {
 	if pattern == nil {
 		return true
@@ -85,6 +108,7 @@ func HostMatcher(pattern *regexp.Regexp, host string) bool {
 	return false
 }
 
+// ConvertPatternToRegex converts the given pattern to a regular expression.
 func ConvertPatternToRegex(pattern string) string {
 	regex := strings.ReplaceAll(pattern, ".", "\\.")
 	regex = strings.ReplaceAll(regex, "*", "[^.]+")

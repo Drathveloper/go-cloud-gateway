@@ -20,6 +20,7 @@ var contextPool = sync.Pool{
 	},
 }
 
+// Context represents the gateway context. It holds the relevant information for the gateway to process the request.
 type Context struct {
 	Request         *Request
 	Response        *Response
@@ -35,6 +36,7 @@ func clearMap(m map[string]any) {
 	}
 }
 
+// NewGatewayContext creates a new gateway context.
 func NewGatewayContext(route *Route, req *Request) (*Context, context.CancelFunc) {
 	ctx, cancelFunc := context.WithTimeout(baseContext, route.Timeout)
 
@@ -50,6 +52,7 @@ func NewGatewayContext(route *Route, req *Request) (*Context, context.CancelFunc
 	return gctx, cancelFunc
 }
 
+// ReleaseGatewayContext releases the gateway context. Must be called by the handler after the request is processed.
 func ReleaseGatewayContext(ctx *Context) {
 	contextPool.Put(ctx)
 }

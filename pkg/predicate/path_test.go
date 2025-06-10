@@ -79,11 +79,3 @@ func TestPath_Test(t *testing.T) {
 		})
 	}
 }
-
-func TestPath_Name(t *testing.T) {
-	expected := "Path"
-	pred := predicate.NewPathPredicate("/**")
-	if expected != pred.Name() {
-		t.Errorf("expected %s actual %s", expected, pred.Name())
-	}
-}

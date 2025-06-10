@@ -1,4 +1,4 @@
-package gateway_handler_test
+package gatewayhandler_test
 
 import (
 	"bytes"
@@ -11,7 +11,7 @@ import (
 	"testing"
 
 	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
-	"github.com/drathveloper/go-cloud-gateway/pkg/gateway_handler"
+	"github.com/drathveloper/go-cloud-gateway/pkg/gatewayhandler"
 )
 
 type DummyWriter struct {
@@ -49,7 +49,7 @@ func TestBaseErrorHandler(t *testing.T) {
 		{
 			name:               "test base error handler should succeed when error is route not found",
 			expectedStatusCode: http.StatusNotFound,
-			err:                gateway_handler.ErrRouteNotFound,
+			err:                gatewayhandler.ErrRouteNotFound,
 			expectedErrMsg:     "level=INFO msg=\"route not found\"",
 		},
 		{
@@ -81,7 +81,7 @@ func TestBaseErrorHandler(t *testing.T) {
 				WriteErr:           nil,
 			}
 
-			gateway_handler.BaseErrorHandler().Handle(logger, tt.err, writer)
+			gatewayhandler.BaseErrorHandler().Handle(logger, tt.err, writer)
 
 			if !strings.Contains(buf.String(), tt.expectedErrMsg) {
 				t.Errorf("expected error message: %s actual: %s", tt.expectedErrMsg, buf.String())
