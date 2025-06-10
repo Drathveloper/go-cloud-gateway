@@ -1,8 +1,9 @@
 package common_test
 
 import (
-	"github.com/drathveloper/go-cloud-gateway/internal/pkg/common"
 	"testing"
+
+	"github.com/drathveloper/go-cloud-gateway/internal/pkg/common"
 )
 
 func TestRealTime_Now(t *testing.T) {
