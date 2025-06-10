@@ -10,7 +10,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/drathveloper/go-cloud-gateway/pkg/common"
+	"github.com/drathveloper/go-cloud-gateway/internal/pkg/common"
 )
 
 type DummyReadCloser struct {
@@ -28,10 +28,10 @@ func (d *DummyReadCloser) Close() error {
 
 func TestReadBody(t *testing.T) {
 	tests := []struct {
-		name        string
 		readCloser  io.ReadCloser
-		expected    []byte
 		expectedErr error
+		name        string
+		expected    []byte
 	}{
 		{
 			name:        "read when reader is nil should return zero length byte array",
@@ -73,10 +73,10 @@ func TestReadBody(t *testing.T) {
 
 func TestWriteHeader(t *testing.T) {
 	tests := []struct {
-		name           string
 		initialHeaders http.Header
 		inputHeaders   http.Header
 		expected       http.Header
+		name           string
 	}{
 		{
 			name:           "copy new headers",

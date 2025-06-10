@@ -16,10 +16,10 @@ type DummyJSON struct {
 
 func TestDuration_UnmarshalJSON(t *testing.T) {
 	tests := []struct {
+		expectedErr error
 		name        string
 		input       string
 		expected    config.Duration
-		expectedErr error
 	}{
 		{
 			name:        "unmarshal json should succeed when duration is valid string",

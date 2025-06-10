@@ -20,6 +20,7 @@ var (
 	}
 )
 
+// ReadBody reads the body of a request or a response and returns the body as a byte slice.
 func ReadBody(readCloser io.ReadCloser) ([]byte, error) {
 	if readCloser == nil {
 		return nil, nil
@@ -39,6 +40,7 @@ func ReadBody(readCloser io.ReadCloser) ([]byte, error) {
 	return result, nil
 }
 
+// WriteHeader writes the header to the response.
 func WriteHeader(w http.ResponseWriter, header http.Header) {
 	dst := w.Header()
 	for k, values := range header {

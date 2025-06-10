@@ -6,8 +6,19 @@ import (
 	"time"
 )
 
+// ErrUnmarshalDuration is returned when the unmarshaler fails to unmarshal a duration.
 var ErrUnmarshalDuration = errors.New("unmarshal duration failed")
 
+// UnmarshalYAML implements the yaml.Unmarshaler interface for type Duration.
+//
+// The unmarshaler supports unmarshaling of float64 and string values.
+//
+// The unmarshaler supports unmarshaling of the following formats:
+//
+// 1. 30s
+// 2. 30
+// 3. 30.0
+// 4. 30.000000000.
 func (d *Duration) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	var val interface{}
 	if err := unmarshal(&val); err != nil {

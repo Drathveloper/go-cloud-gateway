@@ -11,9 +11,9 @@ import (
 
 func TestNewHeaderPredicateBuilder(t *testing.T) {
 	tests := []struct {
-		name        string
-		args        map[string]any
 		expectedErr error
+		args        map[string]any
+		name        string
 	}{
 		{
 			name: "build should succeed when args are present and are valid",
@@ -54,10 +54,10 @@ func TestNewHeaderPredicateBuilder(t *testing.T) {
 
 func TestHeaderPredicate_Test(t *testing.T) {
 	tests := []struct {
+		header      http.Header
 		name        string
 		headerName  string
 		headerValue string
-		header      http.Header
 		expected    bool
 	}{
 		{

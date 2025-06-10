@@ -18,10 +18,10 @@ func TestMTLS_ValidateJSON(t *testing.T) {
 	falseValue := false
 	trueValue := true
 	tests := []struct {
+		expectedErr error
+		expected    config.MTLS
 		name        string
 		input       string
-		expected    config.MTLS
-		expectedErr error
 	}{
 		{
 			name:  "unmarshal and validate should succeed when input is valid and enabled is false",
@@ -96,10 +96,10 @@ func TestMTLS_ValidateYAML(t *testing.T) {
 	falseValue := false
 	trueValue := true
 	tests := []struct {
+		expectedErr error
+		expected    config.MTLS
 		name        string
 		input       string
-		expected    config.MTLS
-		expectedErr error
 	}{
 		{
 			name:  "unmarshal and validate should succeed when input is valid and enabled is false",
@@ -172,10 +172,10 @@ func TestMTLS_ValidateYAML(t *testing.T) {
 
 func TestPool_ValidateJSON(t *testing.T) {
 	tests := []struct {
+		expectedErr error
 		name        string
 		input       string
 		expected    config.Pool
-		expectedErr error
 	}{
 		{
 			name:  "unmarshal and validate should succeed when input is valid",
@@ -291,10 +291,10 @@ func TestPool_ValidateJSON(t *testing.T) {
 
 func TestPool_ValidateYAML(t *testing.T) {
 	tests := []struct {
+		expectedErr error
 		name        string
 		input       string
 		expected    config.Pool
-		expectedErr error
 	}{
 		{
 			name:  "unmarshal and validate should succeed when input is valid",
@@ -410,10 +410,10 @@ func TestPool_ValidateYAML(t *testing.T) {
 
 func TestParameterizedItem_ValidateJSON(t *testing.T) {
 	tests := []struct {
-		name        string
-		input       string
 		expected    config.ParameterizedItem
 		expectedErr error
+		name        string
+		input       string
 	}{
 		{
 			name:  "unmarshal and validate should succeed when input is valid",
@@ -462,10 +462,10 @@ func TestParameterizedItem_ValidateJSON(t *testing.T) {
 
 func TestParameterizedItem_ValidateYAML(t *testing.T) {
 	tests := []struct {
-		name        string
-		input       string
 		expected    config.ParameterizedItem
 		expectedErr error
+		name        string
+		input       string
 	}{
 		{
 			name:  "unmarshal and validate should succeed when input is valid",
@@ -514,10 +514,10 @@ func TestParameterizedItem_ValidateYAML(t *testing.T) {
 
 func TestRoute_ValidateJSON(t *testing.T) {
 	tests := []struct {
+		expectedErr error
 		name        string
 		input       string
 		expected    config.Route
-		expectedErr error
 	}{
 		{
 			name:  "unmarshal and validate should succeed when input is valid",
@@ -649,10 +649,10 @@ func TestRoute_ValidateJSON(t *testing.T) {
 
 func TestRoute_ValidateYAML(t *testing.T) {
 	tests := []struct {
+		expectedErr error
 		name        string
 		input       string
 		expected    config.Route
-		expectedErr error
 	}{
 		{
 			name:  "unmarshal and validate should succeed when input is valid",
@@ -784,10 +784,10 @@ func TestRoute_ValidateYAML(t *testing.T) {
 
 func TestGateway_ValidateJSON(t *testing.T) {
 	tests := []struct {
+		expectedErr error
 		name        string
 		input       string
 		expected    config.Gateway
-		expectedErr error
 	}{
 		{
 			name:  "unmarshal and validate should succeed",
@@ -938,10 +938,10 @@ func TestGateway_ValidateJSON(t *testing.T) {
 
 func TestGateway_ValidateYAML(t *testing.T) {
 	tests := []struct {
+		expectedErr error
 		name        string
 		input       string
 		expected    config.Gateway
-		expectedErr error
 	}{
 		{
 			name:  "unmarshal and validate should succeed",

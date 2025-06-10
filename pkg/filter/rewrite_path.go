@@ -6,19 +6,24 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/drathveloper/go-cloud-gateway/pkg/common"
+	"github.com/drathveloper/go-cloud-gateway/internal/pkg/common"
 	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 )
 
+// RewritePathFilterName is the name of the filter.
 const RewritePathFilterName = "RewritePath"
+
+// GatewayOriginalRequestAttr is the name of the attribute that contains the original request URL.
 const GatewayOriginalRequestAttr = "GATEWAY_ORIGINAL_REQUEST_URL"
 
+// RewritePath is a filter that rewrites the path of the request.
 type RewritePath struct {
+	pattern     *regexp.Regexp
 	Regexp      string
 	Replacement string
-	pattern     *regexp.Regexp
 }
 
+// NewRewritePathFilter creates a new RewritePathFilter.
 func NewRewritePathFilter(regexpStr, replacement string) (*RewritePath, error) {
 	normalizedReplacement := strings.ReplaceAll(replacement, "$\\", "$")
 	pattern, err := regexp.Compile(regexpStr)
@@ -32,6 +37,7 @@ func NewRewritePathFilter(regexpStr, replacement string) (*RewritePath, error) {
 	}, nil
 }
 
+// NewRewritePathBuilder creates a new RewritePathBuilder.
 func NewRewritePathBuilder() gateway.FilterBuilder {
 	return gateway.FilterBuilderFunc(func(args map[string]any) (gateway.Filter, error) {
 		regex, err := common.ConvertToString(args["regexp"])
@@ -46,6 +52,10 @@ func NewRewritePathBuilder() gateway.FilterBuilder {
 	})
 }
 
+// PreProcess rewrites the path of the request.
+// If the path does not match the regexp, the filter will do nothing.
+// If the path matches the regexp, the filter will rewrite the path.
+// The original request URL is stored in the context as an attribute with the name GatewayOriginalRequestAttr.
 func (f *RewritePath) PreProcess(ctx *gateway.Context) error {
 	ctx.Attributes[GatewayOriginalRequestAttr] = ctx.Request.URL
 	currentPath := ctx.Request.URL.Path
@@ -67,10 +77,12 @@ func (f *RewritePath) PreProcess(ctx *gateway.Context) error {
 	return nil
 }
 
+// PostProcess does nothing.
 func (f *RewritePath) PostProcess(_ *gateway.Context) error {
 	return nil
 }
 
+// Name returns the name of the filter.
 func (f *RewritePath) Name() string {
 	return RewritePathFilterName
 }

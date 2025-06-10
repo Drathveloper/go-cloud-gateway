@@ -8,15 +8,17 @@ import (
 	"time"
 )
 
+// Route represents a gateway route.
 type Route struct {
-	ID         string
 	URI        *url.URL
+	Logger     *slog.Logger
+	ID         string
 	Predicates Predicates
 	Filters    Filters
 	Timeout    time.Duration
-	Logger     *slog.Logger
 }
 
+// NewRoute creates a new route.
 func NewRoute(
 	routeID string,
 	uri string,
@@ -38,11 +40,17 @@ func NewRoute(
 	}, nil
 }
 
+// CombineGlobalFilters combines the global filters with the route filters.
 func (r *Route) CombineGlobalFilters(globalFilters ...Filter) Filters {
 	allFilters := globalFilters
 	return append(allFilters, r.Filters...)
 }
 
+// GetDestinationURL returns the destination url for the given request url combining scheme and host from the route
+// uri and the rest of elements from the request url.
+//
+// For example, if the route uri is http://example.org:8080 and the request url is http://localhost:8080/api/v1/users,
+// the destination url is http://example.org:8080/api/v1/users.
 func (r *Route) GetDestinationURL(reqURL *url.URL) *url.URL {
 	newURL := &url.URL{
 		Scheme:   r.URI.Scheme,
@@ -54,8 +62,16 @@ func (r *Route) GetDestinationURL(reqURL *url.URL) *url.URL {
 	return newURL
 }
 
+// Routes represent a list of routes.
 type Routes []Route
 
+// FindMatching finds the first matching route for the given request.
+//
+// If no matching route is found, nil is returned.
+//
+// If multiple matching routes are found, the first one is returned.
+//
+// The order of the routes in the list is important.
 func (r Routes) FindMatching(req *http.Request) *Route {
 	for _, route := range r {
 		if route.Predicates.TestAll(req) {

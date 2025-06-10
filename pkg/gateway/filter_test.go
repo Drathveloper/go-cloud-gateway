@@ -9,9 +9,9 @@ import (
 )
 
 type DummyFilter struct {
-	ID             string
 	PreProcessErr  error
 	PostProcessErr error
+	ID             string
 }
 
 func (d *DummyFilter) PreProcess(_ *gateway.Context) error {
@@ -28,16 +28,24 @@ func (d *DummyFilter) Name() string {
 
 func TestFilters_PreProcessAll(t *testing.T) {
 	tests := []struct {
-		name           string
-		filters        []gateway.Filter
 		expectedErr    error
+		name           string
 		expectedErrMsg string
+		filters        []gateway.Filter
 	}{
 		{
 			name: "pre process should succeed when all filters succeed",
 			filters: []gateway.Filter{
-				&DummyFilter{"DF1", nil, nil},
-				&DummyFilter{"DF2", nil, nil},
+				&DummyFilter{
+					PreProcessErr:  nil,
+					PostProcessErr: nil,
+					ID:             "DF1",
+				},
+				&DummyFilter{
+					PreProcessErr:  nil,
+					PostProcessErr: nil,
+					ID:             "DF2",
+				},
 			},
 			expectedErr:    nil,
 			expectedErrMsg: "",
@@ -45,8 +53,16 @@ func TestFilters_PreProcessAll(t *testing.T) {
 		{
 			name: "pre process should fail when first filter fail",
 			filters: []gateway.Filter{
-				&DummyFilter{"DF1", io.EOF, nil},
-				&DummyFilter{"DF2", nil, nil},
+				&DummyFilter{
+					PreProcessErr:  io.EOF,
+					PostProcessErr: nil,
+					ID:             "DF1",
+				},
+				&DummyFilter{
+					PreProcessErr:  nil,
+					PostProcessErr: nil,
+					ID:             "DF2",
+				},
 			},
 			expectedErr:    io.EOF,
 			expectedErrMsg: "pre-process filters failed with filter DF1: EOF",
@@ -54,9 +70,21 @@ func TestFilters_PreProcessAll(t *testing.T) {
 		{
 			name: "pre process should fail when last filter fail",
 			filters: []gateway.Filter{
-				&DummyFilter{"DF1", nil, nil},
-				&DummyFilter{"DF2", nil, nil},
-				&DummyFilter{"DF3", io.EOF, nil},
+				&DummyFilter{
+					PreProcessErr:  nil,
+					PostProcessErr: nil,
+					ID:             "DF1",
+				},
+				&DummyFilter{
+					PreProcessErr:  nil,
+					PostProcessErr: nil,
+					ID:             "DF2",
+				},
+				&DummyFilter{
+					PreProcessErr:  io.EOF,
+					PostProcessErr: nil,
+					ID:             "DF3",
+				},
 			},
 			expectedErr:    io.EOF,
 			expectedErrMsg: "pre-process filters failed with filter DF3: EOF",
@@ -81,16 +109,24 @@ func TestFilters_PreProcessAll(t *testing.T) {
 
 func TestFilters_PostProcessAll(t *testing.T) {
 	tests := []struct {
-		name           string
-		filters        []gateway.Filter
 		expectedErr    error
+		name           string
 		expectedErrMsg string
+		filters        []gateway.Filter
 	}{
 		{
 			name: "post process should succeed when all filters succeed",
 			filters: []gateway.Filter{
-				&DummyFilter{"DF1", nil, nil},
-				&DummyFilter{"DF2", nil, nil},
+				&DummyFilter{
+					PreProcessErr:  nil,
+					PostProcessErr: nil,
+					ID:             "DF1",
+				},
+				&DummyFilter{
+					PreProcessErr:  nil,
+					PostProcessErr: nil,
+					ID:             "DF2",
+				},
 			},
 			expectedErr:    nil,
 			expectedErrMsg: "",
@@ -98,8 +134,16 @@ func TestFilters_PostProcessAll(t *testing.T) {
 		{
 			name: "post process should fail when last filter fail",
 			filters: []gateway.Filter{
-				&DummyFilter{"DF1", nil, nil},
-				&DummyFilter{"DF2", nil, io.EOF},
+				&DummyFilter{
+					PreProcessErr:  nil,
+					PostProcessErr: nil,
+					ID:             "DF1",
+				},
+				&DummyFilter{
+					PreProcessErr:  nil,
+					PostProcessErr: io.EOF,
+					ID:             "DF2",
+				},
 			},
 			expectedErr:    io.EOF,
 			expectedErrMsg: "post-process filters failed with filter DF2: EOF",
@@ -107,9 +151,21 @@ func TestFilters_PostProcessAll(t *testing.T) {
 		{
 			name: "post process should fail when first filter fail",
 			filters: []gateway.Filter{
-				&DummyFilter{"DF1", nil, io.EOF},
-				&DummyFilter{"DF2", nil, nil},
-				&DummyFilter{"DF3", nil, nil},
+				&DummyFilter{
+					PreProcessErr:  nil,
+					PostProcessErr: io.EOF,
+					ID:             "DF1",
+				},
+				&DummyFilter{
+					PreProcessErr:  nil,
+					PostProcessErr: nil,
+					ID:             "DF2",
+				},
+				&DummyFilter{
+					PreProcessErr:  nil,
+					PostProcessErr: nil,
+					ID:             "DF3",
+				},
 			},
 			expectedErr:    io.EOF,
 			expectedErrMsg: "post-process filters failed with filter DF1: EOF",

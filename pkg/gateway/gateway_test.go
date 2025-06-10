@@ -23,19 +23,23 @@ func (c *MockHTTPClient) Do(_ *http.Request) (*http.Response, error) {
 
 func TestGateway_Do(t *testing.T) {
 	tests := []struct {
-		name             string
-		globalFilters    gateway.Filters
 		httpClient       gateway.HTTPClient
+		expectedErr      error
 		route            *gateway.Route
 		request          *gateway.Request
 		expectedResponse *gateway.Response
-		expectedErr      error
+		name             string
 		expectedErrMsg   string
+		globalFilters    gateway.Filters
 	}{
 		{
 			name: "Do gateway should succeed",
 			globalFilters: gateway.Filters{
-				&DummyFilter{"GF1", nil, nil},
+				&DummyFilter{
+					PreProcessErr:  nil,
+					PostProcessErr: nil,
+					ID:             "GF1",
+				},
 			},
 			httpClient: &MockHTTPClient{
 				Response: &http.Response{
@@ -50,7 +54,11 @@ func TestGateway_Do(t *testing.T) {
 					Host:   "example.org",
 				},
 				Filters: []gateway.Filter{
-					&DummyFilter{"F1", nil, nil},
+					&DummyFilter{
+						PreProcessErr:  nil,
+						PostProcessErr: nil,
+						ID:             "F1",
+					},
 				},
 			},
 			request: &gateway.Request{
@@ -73,7 +81,11 @@ func TestGateway_Do(t *testing.T) {
 		{
 			name: "Do gateway should return error when preprocess filter failed",
 			globalFilters: gateway.Filters{
-				&DummyFilter{"GF1", nil, nil},
+				&DummyFilter{
+					PreProcessErr:  nil,
+					PostProcessErr: nil,
+					ID:             "GF1",
+				},
 			},
 			httpClient: &MockHTTPClient{
 				Response: &http.Response{
@@ -88,7 +100,11 @@ func TestGateway_Do(t *testing.T) {
 					Host:   "example.org",
 				},
 				Filters: []gateway.Filter{
-					&DummyFilter{"F1", io.EOF, nil},
+					&DummyFilter{
+						PreProcessErr:  io.EOF,
+						PostProcessErr: nil,
+						ID:             "F1",
+					},
 				},
 			},
 			request: &gateway.Request{
@@ -109,7 +125,11 @@ func TestGateway_Do(t *testing.T) {
 		{
 			name: "Do gateway should return error when deadline exceeded",
 			globalFilters: gateway.Filters{
-				&DummyFilter{"GF1", nil, nil},
+				&DummyFilter{
+					PreProcessErr:  nil,
+					PostProcessErr: nil,
+					ID:             "GF1",
+				},
 			},
 			httpClient: &MockHTTPClient{
 				Response: nil,
@@ -122,7 +142,11 @@ func TestGateway_Do(t *testing.T) {
 					Host:   "example.org",
 				},
 				Filters: []gateway.Filter{
-					&DummyFilter{"F1", nil, nil},
+					&DummyFilter{
+						PreProcessErr:  nil,
+						PostProcessErr: nil,
+						ID:             "F1",
+					},
 				},
 			},
 			request: &gateway.Request{
@@ -143,7 +167,11 @@ func TestGateway_Do(t *testing.T) {
 		{
 			name: "Do gateway should return error when context cancelled",
 			globalFilters: gateway.Filters{
-				&DummyFilter{"GF1", nil, nil},
+				&DummyFilter{
+					PreProcessErr:  nil,
+					PostProcessErr: nil,
+					ID:             "GF1",
+				},
 			},
 			httpClient: &MockHTTPClient{
 				Response: nil,
@@ -156,7 +184,11 @@ func TestGateway_Do(t *testing.T) {
 					Host:   "example.org",
 				},
 				Filters: []gateway.Filter{
-					&DummyFilter{"F1", nil, nil},
+					&DummyFilter{
+						PreProcessErr:  nil,
+						PostProcessErr: nil,
+						ID:             "F1",
+					},
 				},
 			},
 			request: &gateway.Request{
@@ -177,7 +209,11 @@ func TestGateway_Do(t *testing.T) {
 		{
 			name: "Do gateway should return error when generic http error",
 			globalFilters: gateway.Filters{
-				&DummyFilter{"GF1", nil, nil},
+				&DummyFilter{
+					PreProcessErr:  nil,
+					PostProcessErr: nil,
+					ID:             "GF1",
+				},
 			},
 			httpClient: &MockHTTPClient{
 				Response: nil,
@@ -190,7 +226,11 @@ func TestGateway_Do(t *testing.T) {
 					Host:   "example.org",
 				},
 				Filters: []gateway.Filter{
-					&DummyFilter{"F1", nil, nil},
+					&DummyFilter{
+						PreProcessErr:  nil,
+						PostProcessErr: nil,
+						ID:             "F1",
+					},
 				},
 			},
 			request: &gateway.Request{
@@ -211,7 +251,11 @@ func TestGateway_Do(t *testing.T) {
 		{
 			name: "Do gateway should return error when post process filters failed",
 			globalFilters: gateway.Filters{
-				&DummyFilter{"GF1", nil, nil},
+				&DummyFilter{
+					PreProcessErr:  nil,
+					PostProcessErr: nil,
+					ID:             "GF1",
+				},
 			},
 			httpClient: &MockHTTPClient{
 				Response: &http.Response{
@@ -226,7 +270,11 @@ func TestGateway_Do(t *testing.T) {
 					Host:   "example.org",
 				},
 				Filters: []gateway.Filter{
-					&DummyFilter{"F1", nil, io.EOF},
+					&DummyFilter{
+						PreProcessErr:  nil,
+						PostProcessErr: io.EOF,
+						ID:             "F1",
+					},
 				},
 			},
 			request: &gateway.Request{

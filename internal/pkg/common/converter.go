@@ -6,10 +6,16 @@ import (
 	"time"
 )
 
+// ErrRequiredValue is returned when a value is required but is nil.
 var ErrRequiredValue = errors.New("value is required")
+
+// ErrRequiredStringValue is returned when a value is required to be a string but is not.
 var ErrRequiredStringValue = errors.New("value is required to be a valid string")
+
+// ErrRequiredSliceValue is returned when a value is required to be a slice but is not.
 var ErrRequiredSliceValue = errors.New("value is required to be a valid slice")
 
+// ConvertToString converts the given value to a string.
 func ConvertToString(val any) (string, error) {
 	if val == nil {
 		return "", ErrRequiredValue
@@ -21,6 +27,7 @@ func ConvertToString(val any) (string, error) {
 	return valStr, nil
 }
 
+// ConvertToStringSlice converts the given value to a string slice.
 func ConvertToStringSlice(val any) ([]string, error) {
 	if val == nil {
 		return nil, ErrRequiredValue
@@ -40,6 +47,7 @@ func ConvertToStringSlice(val any) ([]string, error) {
 	return valStrSlice, nil
 }
 
+// ConvertSlice converts the given value to a slice of the given type.
 func ConvertSlice[T any](sliceAny []any) ([]T, error) {
 	result := make([]T, 0, len(sliceAny))
 	for i, item := range sliceAny {
@@ -52,6 +60,13 @@ func ConvertSlice[T any](sliceAny []any) ([]T, error) {
 	return result, nil
 }
 
+// ConvertToDateTime converts the given value to a time.Time.
+//
+// The value can be a string or a time.Time.
+//
+// The string value is expected to be a valid RFC3339 datetime.
+//
+// The time.Time value is returned as is.
 func ConvertToDateTime(val any) (time.Time, error) {
 	if val == nil {
 		return time.Time{}, ErrRequiredValue

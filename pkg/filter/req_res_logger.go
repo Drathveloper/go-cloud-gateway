@@ -4,22 +4,26 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/drathveloper/go-cloud-gateway/pkg/common"
+	"github.com/drathveloper/go-cloud-gateway/internal/pkg/common"
 	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 )
 
+// RequestResponseLoggerFilterName is the name of the filter.
 const RequestResponseLoggerFilterName = "RequestResponseLogger"
 
+// RequestResponseLogger is a filter that logs the request and response.
 type RequestResponseLogger struct {
 	level slog.Level
 }
 
+// NewRequestResponseLoggerFilter creates a new RequestResponseLoggerFilter.
 func NewRequestResponseLoggerFilter(level slog.Level) *RequestResponseLogger {
 	return &RequestResponseLogger{
 		level: level,
 	}
 }
 
+// NewRequestResponseLoggerBuilder creates a new RequestResponseLoggerBuilder.
 func NewRequestResponseLoggerBuilder() gateway.FilterBuilder {
 	return gateway.FilterBuilderFunc(func(args map[string]any) (gateway.Filter, error) {
 		level, _ := common.ConvertToString(args["level"])
@@ -38,6 +42,7 @@ func NewRequestResponseLoggerBuilder() gateway.FilterBuilder {
 	})
 }
 
+// PreProcess logs the request.
 func (f *RequestResponseLogger) PreProcess(ctx *gateway.Context) error {
 	if ctx.Logger.Enabled(ctx, f.level) {
 		ctx.Logger.Log(ctx, f.level, "Received request",
@@ -48,6 +53,7 @@ func (f *RequestResponseLogger) PreProcess(ctx *gateway.Context) error {
 	return nil
 }
 
+// PostProcess logs the response.
 func (f *RequestResponseLogger) PostProcess(ctx *gateway.Context) error {
 	if ctx.Logger.Enabled(ctx, f.level) {
 		ctx.Logger.Log(ctx, f.level, "Returned response",
@@ -58,6 +64,7 @@ func (f *RequestResponseLogger) PostProcess(ctx *gateway.Context) error {
 	return nil
 }
 
+// Name returns the name of the filter.
 func (f *RequestResponseLogger) Name() string {
 	return RequestResponseLoggerFilterName
 }

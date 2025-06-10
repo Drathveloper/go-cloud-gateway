@@ -10,9 +10,12 @@ import (
 	"sync"
 )
 
+// ErrHTTP is the error returned when the gateway http request to backend failed.
 var ErrHTTP = errors.New("gateway http request to backend failed")
 
+// HTTPClient is the interface for the http client.
 type HTTPClient interface {
+	// Do perform the http request. It returns the http response and an error if the request failed.
 	Do(r *http.Request) (*http.Response, error)
 }
 
@@ -23,11 +26,13 @@ var readerPool = sync.Pool{
 	New: func() any { return new(bytes.Reader) },
 }
 
+// Gateway is the gateway struct. It holds the gateway configuration and the http client.
 type Gateway struct {
-	globalFilters Filters
 	httpClient    HTTPClient
+	globalFilters Filters
 }
 
+// NewGateway creates a new gateway.
 func NewGateway(globalFilters Filters, client HTTPClient) *Gateway {
 	return &Gateway{
 		globalFilters: globalFilters,
@@ -35,6 +40,9 @@ func NewGateway(globalFilters Filters, client HTTPClient) *Gateway {
 	}
 }
 
+// Do process the gateway request. It will call the global filters, the route filters, and the backend.
+// It will return an error if the gateway request failed.
+// If the gateway request and filters are successful, it will return nil.
 func (g *Gateway) Do(ctx *Context) error {
 	allFilters := ctx.Route.CombineGlobalFilters(g.globalFilters...)
 	if err := allFilters.PreProcessAll(ctx); err != nil {

@@ -11,9 +11,9 @@ import (
 
 func TestNewCookiePredicateBuilder(t *testing.T) {
 	tests := []struct {
-		name        string
-		args        map[string]any
 		expectedErr error
+		args        map[string]any
+		name        string
 	}{
 		{
 			name: "build should succeed when args are present and are valid",
@@ -54,10 +54,10 @@ func TestNewCookiePredicateBuilder(t *testing.T) {
 
 func TestCookiePredicate_Test(t *testing.T) {
 	tests := []struct {
+		cookie      *http.Cookie
 		name        string
 		cookieName  string
 		cookieRegex string
-		cookie      *http.Cookie
 		expected    bool
 	}{
 		{
@@ -108,6 +108,42 @@ func TestCookiePredicate_Test(t *testing.T) {
 			actual := p.Test(req)
 			if tt.expected != actual {
 				t.Errorf("expected %t actual %t", tt.expected, actual)
+			}
+		})
+	}
+}
+
+func TestNewCookiePredicate(t *testing.T) {
+	tests := []struct {
+		expectedErr error
+		name        string
+		cookieName  string
+		cookieRegex string
+	}{
+		{
+			name:        "test should succeed when cookie is present and no regex",
+			cookieName:  "First",
+			cookieRegex: "",
+			expectedErr: nil,
+		},
+		{
+			name:        "test should succeed when cookie and regex are present",
+			cookieName:  "First",
+			cookieRegex: "[0-9].*",
+			expectedErr: nil,
+		},
+		{
+			name:        "test should return error when regex is not valid",
+			cookieName:  "First",
+			cookieRegex: "[",
+			expectedErr: errors.New("invalid cookie regexp: error parsing regexp: missing closing ]: `[`"),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := predicate.NewCookiePredicate(tt.cookieName, tt.cookieRegex)
+			if fmt.Sprintf("%s", err) != fmt.Sprintf("%s", tt.expectedErr) {
+				t.Errorf("expected err %s actual %s", tt.expectedErr, err)
 			}
 		})
 	}

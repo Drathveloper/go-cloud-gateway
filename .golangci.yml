@@ -26,19 +26,25 @@ linters:
             - sync
             - testing
             - time
+    govet:
+      enable-all: true
+    tagalign:
+      order:
+        - json
+        - yaml
+        - validate
   default: all
   disable:
-    - revive
     - wsl
     - tagliatelle
-    - tagalign
     - nlreturn
     - exhaustruct
     - ireturn
   exclusions:
     generated: lax
     rules:
-      - linters:
+      - path: _test\.go
+        linters:
           - varnamelen
           - paralleltest
           - mirror
@@ -48,7 +54,7 @@ linters:
           - gochecknoglobals
           - err113
           - dupl
-        path: _test\.go
+          - maintidx
       - linters:
           - gosec
         text: 'G104:'

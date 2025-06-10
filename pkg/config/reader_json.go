@@ -7,16 +7,19 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
+// ReaderJSON is a reader for json files.
 type ReaderJSON struct {
 	validate *validator.Validate
 }
 
+// NewReaderJSON creates a new reader for json files.
 func NewReaderJSON(validate *validator.Validate) *ReaderJSON {
 	return &ReaderJSON{
 		validate: validate,
 	}
 }
 
+// Read reads the given input and returns the config or error if config is invalid.
 func (r *ReaderJSON) Read(input []byte) (*Config, error) {
 	baseErr := "read json config failed"
 	var cfg Config

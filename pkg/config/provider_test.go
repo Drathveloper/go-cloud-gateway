@@ -19,10 +19,10 @@ import (
 func TestNewRoutes(t *testing.T) {
 	logger := slog.Default()
 	tests := []struct {
-		name        string
-		config      *config.Config
-		expected    gateway.Routes
 		expectedErr error
+		config      *config.Config
+		name        string
+		expected    gateway.Routes
 	}{
 		{
 			name: "new routes should succeed",
@@ -163,10 +163,10 @@ func TestNewRoutes(t *testing.T) {
 
 func TestNewGlobalFilters(t *testing.T) {
 	tests := []struct {
-		name        string
-		config      *config.Config
-		expected    gateway.Filters
 		expectedErr error
+		config      *config.Config
+		name        string
+		expected    gateway.Filters
 	}{
 		{
 			name: "new global filters should succeed",
@@ -345,11 +345,11 @@ F0WydPKUjl3tmQRxYd9C8zDt6yB/fQbIoM/uGgZ0ZoZ+E5hvLVe+rYk=
 `
 	trueBool := true
 	tests := []struct {
-		name        string
 		cfg         *config.Config
+		checkClient func(*http.Client) bool
+		name        string
 		wantClient  bool
 		wantErr     bool
-		checkClient func(*http.Client) bool
 	}{
 		{
 			name:       "nil config - default client",

@@ -1,26 +1,33 @@
-package gateway_handler
+package gatewayhandler
 
 import (
 	"errors"
 	"log/slog"
 	"net/http"
 
-	"github.com/drathveloper/go-cloud-gateway/pkg/common"
+	"github.com/drathveloper/go-cloud-gateway/internal/pkg/common"
 	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 )
 
+// ErrRouteNotFound is the error returned when no route matched the request.
 var ErrRouteNotFound = errors.New("route not found")
 
+// Gateway is the interface for the gateway.
+// It is used to handle the request and return the response.
+// The gateway context is used to store the request, response, contextual logging and other information.
 type Gateway interface {
 	Do(ctx *gateway.Context) error
 }
 
+// GatewayHandler is the handler for the gateway.
+// It is used to handle the request, search the appropriate route and handle the gateway the response from context.
 type GatewayHandler struct {
 	gateway    Gateway
-	routes     gateway.Routes
 	errHandler ErrorHandler
+	routes     gateway.Routes
 }
 
+// NewGatewayHandler creates a new gateway handler.
 func NewGatewayHandler(
 	gateway Gateway,
 	routes gateway.Routes,
@@ -32,6 +39,7 @@ func NewGatewayHandler(
 	}
 }
 
+// ServeHTTP is the entrypoint for all requests to the gateway.
 func (h *GatewayHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	logger := slog.Default()
 	route := h.routes.FindMatching(request)

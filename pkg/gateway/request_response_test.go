@@ -14,10 +14,10 @@ import (
 
 func TestNewGatewayRequest(t *testing.T) {
 	tests := []struct {
-		name        string
+		expectedErr error
 		request     *http.Request
 		expected    *gateway.Request
-		expectedErr error
+		name        string
 	}{
 		{
 			name: "new gateway should succeed",
@@ -95,10 +95,10 @@ func TestNewGatewayRequest(t *testing.T) {
 
 func TestNewGatewayResponse(t *testing.T) {
 	tests := []struct {
-		name        string
+		expectedErr error
 		response    *http.Response
 		expected    *gateway.Response
-		expectedErr error
+		name        string
 	}{
 		{
 			name: "new gateway should succeed",

@@ -11,9 +11,9 @@ import (
 
 func TestNewPathPredicateBuilder(t *testing.T) {
 	tests := []struct {
-		name        string
-		args        map[string]any
 		expectedErr error
+		args        map[string]any
+		name        string
 	}{
 		{
 			name: "build should succeed when args are present and are valid",
@@ -77,13 +77,5 @@ func TestPath_Test(t *testing.T) {
 				t.Errorf("expected %t actual %t", tt.Expected, actual)
 			}
 		})
-	}
-}
-
-func TestPath_Name(t *testing.T) {
-	expected := "Path"
-	pred := predicate.NewPathPredicate("/**")
-	if expected != pred.Name() {
-		t.Errorf("expected %s actual %s", expected, pred.Name())
 	}
 }

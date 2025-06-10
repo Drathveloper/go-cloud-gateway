@@ -25,15 +25,13 @@ jobs:
       with:
         go-version: ${{ env.GO_VERSION }}
 
-    - name: Cache Go modules
+    - name: Cache Go build
       uses: actions/cache@v3
       with:
-        path: |
-          ~/go/pkg/mod
-          ./.go-cache
-        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        path: ./.go-cache
+        key: ${{ runner.os }}-gobuild-${{ hashFiles('**/go.sum') }}
         restore-keys: |
-          ${{ runner.os }}-go-
+          ${{ runner.os }}-gobuild-
 
     - name: Install dependencies
       run: sudo apt-get update && sudo apt-get install -y make

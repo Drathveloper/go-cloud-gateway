@@ -17,8 +17,10 @@ import (
 	"github.com/drathveloper/go-cloud-gateway/pkg/predicate"
 )
 
+// ErrInitializeMTLS is the error returned when the mTLS initialization failed.
 var ErrInitializeMTLS = errors.New("failed to initialize mTLS")
 
+// NewRoutes creates a new gateway route from the given config.
 func NewRoutes(
 	cfg *Config,
 	predicateFactory *predicate.Factory,
@@ -27,12 +29,14 @@ func NewRoutes(
 	return mapRoutesFromConfigToGateway(cfg.Gateway, predicateFactory, filterFactory, logger)
 }
 
+// NewGlobalFilters creates a new gateway filter from the given config.
 func NewGlobalFilters(
 	cfg *Config,
 	filterFactory *filter.Factory) (gateway.Filters, error) {
 	return mapFiltersFromConfigToGateway(cfg.Gateway.GlobalFilters, filterFactory)
 }
 
+// NewHTTPClient creates a new http client from the given config.
 func NewHTTPClient(cfg *Config) (*http.Client, error) {
 	tlsConfig, err := buildTLSConfig(cfg)
 	if err != nil {

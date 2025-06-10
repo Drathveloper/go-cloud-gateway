@@ -20,9 +20,9 @@ func (t *DummyTime) Now() time.Time {
 
 func TestBeforePredicate_Test(t *testing.T) {
 	tests := []struct {
-		name     string
 		before   time.Time
 		now      time.Time
+		name     string
 		expected bool
 	}{
 		{
@@ -54,9 +54,9 @@ func TestBeforePredicate_Test(t *testing.T) {
 func TestNewBeforePredicateBuilder(t *testing.T) {
 	datetime := time.Now().Add(-100 * time.Second)
 	tests := []struct {
-		name        string
-		args        map[string]any
 		expectedErr error
+		args        map[string]any
+		name        string
 	}{
 		{
 			name: "build should succeed when args are present and are valid",
@@ -87,9 +87,9 @@ func TestNewBeforePredicateBuilder(t *testing.T) {
 
 func TestAfterPredicate_Test(t *testing.T) {
 	tests := []struct {
-		name     string
 		before   time.Time
 		now      time.Time
+		name     string
 		expected bool
 	}{
 		{
@@ -121,9 +121,9 @@ func TestAfterPredicate_Test(t *testing.T) {
 func TestNewAfterPredicateBuilder(t *testing.T) {
 	datetime := time.Now().Add(-100 * time.Second)
 	tests := []struct {
-		name        string
-		args        map[string]any
 		expectedErr error
+		args        map[string]any
+		name        string
 	}{
 		{
 			name: "build should succeed when args are present and are valid",
@@ -156,9 +156,9 @@ func TestNewBetweenPredicateBuilder(t *testing.T) {
 	before := time.Now().Add(-100 * time.Second)
 	after := time.Now().Add(100 * time.Second)
 	tests := []struct {
-		name        string
-		args        map[string]any
 		expectedErr error
+		args        map[string]any
+		name        string
 	}{
 		{
 			name: "build should succeed when args are present and are valid",
@@ -199,10 +199,10 @@ func TestNewBetweenPredicateBuilder(t *testing.T) {
 
 func TestBetweenPredicate_Test(t *testing.T) {
 	tests := []struct {
-		name     string
 		before   time.Time
 		after    time.Time
 		now      time.Time
+		name     string
 		expected bool
 	}{
 		{

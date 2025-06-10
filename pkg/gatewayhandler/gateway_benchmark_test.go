@@ -1,4 +1,4 @@
-package gateway_handler_test
+package gatewayhandler_test
 
 import (
 	"bytes"
@@ -12,7 +12,7 @@ import (
 	"testing"
 
 	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
-	"github.com/drathveloper/go-cloud-gateway/pkg/gateway_handler"
+	"github.com/drathveloper/go-cloud-gateway/pkg/gatewayhandler"
 	"github.com/drathveloper/go-cloud-gateway/pkg/predicate"
 )
 
@@ -42,7 +42,7 @@ func BenchmarkServeHTTP_HappyPath(b *testing.B) {
 			pred,
 		},
 	}
-	handler := gateway_handler.NewGatewayHandler(
+	handler := gatewayhandler.NewGatewayHandler(
 		&mockGateway{
 			doFunc: func(ctx *gateway.Context) error {
 				ctx.Response = &gateway.Response{
@@ -81,7 +81,7 @@ func BenchmarkServeHTTP_RouteNotFound(b *testing.B) {
 			pred,
 		},
 	}
-	gwHandler := gateway_handler.NewGatewayHandler(
+	gwHandler := gatewayhandler.NewGatewayHandler(
 		&mockGateway{},
 		gateway.Routes{route},
 		&mockErrorHandler{handleFunc: func(_ *slog.Logger, _ error, _ http.ResponseWriter) {}},
@@ -107,9 +107,9 @@ func BenchmarkServeHTTP_BackendError(b *testing.B) {
 		},
 	}
 
-	gwHandler := gateway_handler.NewGatewayHandler(
+	gwHandler := gatewayhandler.NewGatewayHandler(
 		&mockGateway{
-			doFunc: func(ctx *gateway.Context) error {
+			doFunc: func(_ *gateway.Context) error {
 				return errors.New("backend error")
 			},
 		},
@@ -134,7 +134,7 @@ func BenchmarkServeHTTP_LargeBody(b *testing.B) {
 	}
 	largeBody := strings.Repeat("a", 1024*1024) // 1MB
 
-	gwHandler := gateway_handler.NewGatewayHandler(
+	gwHandler := gatewayhandler.NewGatewayHandler(
 		&mockGateway{
 			doFunc: func(ctx *gateway.Context) error {
 				ctx.Response = &gateway.Response{

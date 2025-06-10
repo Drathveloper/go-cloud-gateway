@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/drathveloper/go-cloud-gateway/pkg/common"
+	"github.com/drathveloper/go-cloud-gateway/internal/pkg/common"
 )
 
 func BenchmarkPathMatcher(b *testing.B) {
