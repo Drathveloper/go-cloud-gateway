@@ -115,10 +115,10 @@ func TestCookiePredicate_Test(t *testing.T) {
 
 func TestNewCookiePredicate(t *testing.T) {
 	tests := []struct {
+		expectedErr error
 		name        string
 		cookieName  string
 		cookieRegex string
-		expectedErr error
 	}{
 		{
 			name:        "test should succeed when cookie is present and no regex",
