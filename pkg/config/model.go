@@ -7,10 +7,10 @@ type Config struct {
 }
 
 type Gateway struct {
+	HTTPClient    *HTTPClient         `json:"httpclient"     yaml:"httpclient"`
 	Routes        []Route             `validate:"required,min=1,dive" json:"routes" yaml:"routes"`
 	GlobalFilters []ParameterizedItem `validate:"dive"                json:"global-filters" yaml:"global-filters"`
 	GlobalTimeout Duration            `json:"global-timeout" yaml:"global-timeout"`
-	HTTPClient    *HTTPClient         `json:"httpclient"     yaml:"httpclient"`
 }
 
 type Route struct {
@@ -22,8 +22,8 @@ type Route struct {
 }
 
 type ParameterizedItem struct {
-	Name string         `validate:"required" json:"name" yaml:"name"`
 	Args map[string]any `json:"args" yaml:"args"`
+	Name string         `validate:"required" json:"name" yaml:"name"`
 }
 
 type HTTPClient struct {
@@ -36,11 +36,11 @@ type HTTPClient struct {
 type Pool struct {
 	Timeout             *Duration `validate:"required" json:"timeout"                 yaml:"timeout"`
 	KeepAlive           *Duration `validate:"required" json:"keep-alive"              yaml:"keep-alive"`
+	IdleConnTimeout     *Duration `validate:"required" json:"idle-conn-timeout"       yaml:"idle-conn-timeout"`
+	TLSHandshakeTimeout *Duration `validate:"required" json:"tls-handshake-timeout"   yaml:"tls-handshake-timeout"`
 	MaxIdleConns        int       `validate:"required" json:"max-idle-conns"          yaml:"max-idle-conns"`
 	MaxIdleConnsPerHost int       `validate:"required" json:"max-idle-conns-per-host" yaml:"max-idle-conns-per-host"`
 	MaxConnsPerHost     int       `validate:"required" json:"max-conns-per-host"      yaml:"max-conns-per-host"`
-	IdleConnTimeout     *Duration `validate:"required" json:"idle-conn-timeout"       yaml:"idle-conn-timeout"`
-	TLSHandshakeTimeout *Duration `validate:"required" json:"tls-handshake-timeout"   yaml:"tls-handshake-timeout"`
 }
 
 type MTLS struct {

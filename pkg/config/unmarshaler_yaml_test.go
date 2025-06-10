@@ -17,10 +17,10 @@ type DummyYAML struct {
 
 func TestDuration_UnmarshalYAML(t *testing.T) {
 	tests := []struct {
+		expectedErr error
 		name        string
 		input       string
 		expected    config.Duration
-		expectedErr error
 	}{
 		{
 			name:        "unmarshal yaml should succeed when duration is valid string",

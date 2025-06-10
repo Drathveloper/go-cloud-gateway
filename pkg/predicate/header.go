@@ -12,8 +12,8 @@ import (
 const HeaderPredicateName = "Header"
 
 type HeaderPredicate struct {
-	Name    string
 	Pattern *regexp.Regexp
+	Name    string
 }
 
 func NewHeaderPredicate(header, regexpStr string) (*HeaderPredicate, error) {

@@ -12,9 +12,9 @@ import (
 
 func TestNewRewritePathBuilder(t *testing.T) {
 	tests := []struct {
-		name        string
-		args        map[string]any
 		expectedErr error
+		args        map[string]any
+		name        string
 	}{
 		{
 			name: "build should succeed when args are present and are valid",

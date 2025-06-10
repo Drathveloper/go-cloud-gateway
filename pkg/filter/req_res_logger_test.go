@@ -15,9 +15,9 @@ import (
 
 func TestNewRequestResponseLoggerFilterBuilder(t *testing.T) {
 	tests := []struct {
-		name        string
-		args        map[string]any
 		expectedErr error
+		args        map[string]any
+		name        string
 	}{
 		{
 			name:        "build should succeed when no args present",
@@ -88,12 +88,12 @@ func TestRequestResponseLogger_Name(t *testing.T) {
 
 func TestRequestResponseLogger_PreProcess(t *testing.T) {
 	tests := []struct {
+		headers  http.Header
 		name     string
 		path     string
 		method   string
-		headers  http.Header
-		body     []byte
 		expected string
+		body     []byte
 	}{
 		{
 			name:     "log request should succeed when body is empty",
@@ -142,11 +142,11 @@ func TestRequestResponseLogger_PreProcess(t *testing.T) {
 
 func TestRequestResponseLogger_PostProcess(t *testing.T) {
 	tests := []struct {
-		name     string
-		status   int
 		headers  http.Header
-		body     []byte
+		name     string
 		expected string
+		body     []byte
+		status   int
 	}{
 		{
 			name:     "log response should succeed when body is empty",

@@ -13,9 +13,9 @@ import (
 
 func TestNewAddRequestHeaderBuilder(t *testing.T) {
 	tests := []struct {
-		name        string
-		args        map[string]any
 		expectedErr error
+		args        map[string]any
+		name        string
 	}{
 		{
 			name: "build should succeed when args are present and are valid",
@@ -68,11 +68,11 @@ func TestAddRequestHeaderFilter_Name(t *testing.T) {
 
 func TestAddRequestHeaderFilter_PreProcess(t *testing.T) {
 	tests := []struct {
+		currentHeaders  http.Header
+		expectedHeaders http.Header
 		name            string
 		headerKey       string
 		headerValue     string
-		currentHeaders  http.Header
-		expectedHeaders http.Header
 	}{
 		{
 			name:            "add request header should succeed when header not present",
@@ -118,9 +118,9 @@ func TestAddRequestHeaderFilter_PostProcess(t *testing.T) {
 
 func TestNewSetRequestHeaderBuilder(t *testing.T) {
 	tests := []struct {
-		name        string
-		args        map[string]any
 		expectedErr error
+		args        map[string]any
+		name        string
 	}{
 		{
 			name: "build should succeed when args are present and are valid",
@@ -173,11 +173,11 @@ func TestSetRequestHeaderFilter_Name(t *testing.T) {
 
 func TestSetRequestHeaderFilter_PreProcess(t *testing.T) {
 	tests := []struct {
+		currentHeaders  http.Header
+		expectedHeaders http.Header
 		name            string
 		headerKey       string
 		headerValue     string
-		currentHeaders  http.Header
-		expectedHeaders http.Header
 	}{
 		{
 			name:            "set request header should succeed when header not present",
@@ -223,9 +223,9 @@ func TestSetRequestHeaderFilter_PostProcess(t *testing.T) {
 
 func TestNewRemoveRequestHeaderBuilder(t *testing.T) {
 	tests := []struct {
-		name        string
-		args        map[string]any
 		expectedErr error
+		args        map[string]any
+		name        string
 	}{
 		{
 			name: "build should succeed when args are present and are valid",
@@ -268,10 +268,10 @@ func TestRemoveRequestHeaderFilter_Name(t *testing.T) {
 
 func TestRemoveRequestHeaderFilter_PreProcess(t *testing.T) {
 	tests := []struct {
-		name            string
-		headerKey       string
 		currentHeaders  http.Header
 		expectedHeaders http.Header
+		name            string
+		headerKey       string
 	}{
 		{
 			name:            "remove request header should succeed when header not present",

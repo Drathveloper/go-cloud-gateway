@@ -12,11 +12,11 @@ import (
 
 func TestFactory_Build(t *testing.T) {
 	tests := []struct {
-		name        string
-		builderName string
-		builderArgs map[string]any
 		expected    any
 		expectedErr error
+		builderArgs map[string]any
+		name        string
+		builderName string
 	}{
 		{
 			name:        "build should succeed when builder is registered",

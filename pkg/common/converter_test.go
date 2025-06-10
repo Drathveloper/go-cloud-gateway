@@ -13,10 +13,10 @@ import (
 
 func TestConvertToString(t *testing.T) {
 	tests := []struct {
-		name        string
 		input       any
-		expected    string
 		expectedErr error
+		name        string
+		expected    string
 	}{
 		{
 			name:        "convert string to string should succeed",
@@ -53,10 +53,10 @@ func TestConvertToString(t *testing.T) {
 
 func TestConvertToStringSlice(t *testing.T) {
 	tests := []struct {
-		name        string
 		input       any
-		expected    []string
 		expectedErr error
+		name        string
+		expected    []string
 	}{
 		{
 			name:        "convert any string slice to string slice should succeed",
@@ -108,10 +108,10 @@ func TestConvertToDateTime(t *testing.T) {
 	nowStr := now.Format(time.RFC3339)
 	nowFromStr, _ := time.Parse(time.RFC3339, nowStr)
 	tests := []struct {
-		name        string
-		input       any
 		expected    time.Time
+		input       any
 		expectedErr error
+		name        string
 	}{
 		{
 			name:        "convert datetime to datetime should succeed",

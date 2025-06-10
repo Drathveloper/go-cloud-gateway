@@ -17,8 +17,8 @@ type Gateway interface {
 
 type GatewayHandler struct {
 	gateway    Gateway
-	routes     gateway.Routes
 	errHandler ErrorHandler
+	routes     gateway.Routes
 }
 
 func NewGatewayHandler(

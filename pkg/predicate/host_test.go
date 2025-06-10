@@ -11,9 +11,9 @@ import (
 
 func TestNewHostPredicateBuilder(t *testing.T) {
 	tests := []struct {
-		name        string
-		args        map[string]any
 		expectedErr error
+		args        map[string]any
+		name        string
 	}{
 		{
 			name: "build should succeed when args are present and are valid",
@@ -45,8 +45,8 @@ func TestNewHostPredicateBuilder(t *testing.T) {
 func TestHostPredicate_Test(t *testing.T) {
 	tests := []struct {
 		name     string
-		patterns []string
 		host     string
+		patterns []string
 		expected bool
 	}{
 		{

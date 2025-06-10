@@ -9,12 +9,12 @@ import (
 )
 
 type Route struct {
-	ID         string
 	URI        *url.URL
+	Logger     *slog.Logger
+	ID         string
 	Predicates Predicates
 	Filters    Filters
 	Timeout    time.Duration
-	Logger     *slog.Logger
 }
 
 func NewRoute(

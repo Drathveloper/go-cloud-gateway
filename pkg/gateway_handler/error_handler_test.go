@@ -15,9 +15,9 @@ import (
 )
 
 type DummyWriter struct {
+	WriteErr           error
 	CurrHeader         http.Header
 	ExpectedStatusCode int
-	WriteErr           error
 }
 
 func (d DummyWriter) Header() http.Header {
@@ -36,10 +36,10 @@ func (d DummyWriter) WriteHeader(statusCode int) {
 
 func TestBaseErrorHandler(t *testing.T) {
 	tests := []struct {
-		name               string
-		expectedStatusCode int
 		err                error
+		name               string
 		expectedErrMsg     string
+		expectedStatusCode int
 	}{
 		{
 			name:           "test base error handler should succeed when error is nil",

@@ -12,8 +12,8 @@ import (
 const QueryPredicateName = "Query"
 
 type QueryPredicate struct {
-	Name    string
 	Pattern *regexp.Regexp
+	Name    string
 }
 
 func NewQueryPredicate(name, regexpStr string) (*QueryPredicate, error) {

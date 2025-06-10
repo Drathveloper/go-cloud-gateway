@@ -11,9 +11,9 @@ import (
 
 func TestNewCookiePredicateBuilder(t *testing.T) {
 	tests := []struct {
-		name        string
-		args        map[string]any
 		expectedErr error
+		args        map[string]any
+		name        string
 	}{
 		{
 			name: "build should succeed when args are present and are valid",
@@ -54,10 +54,10 @@ func TestNewCookiePredicateBuilder(t *testing.T) {
 
 func TestCookiePredicate_Test(t *testing.T) {
 	tests := []struct {
+		cookie      *http.Cookie
 		name        string
 		cookieName  string
 		cookieRegex string
-		cookie      *http.Cookie
 		expected    bool
 	}{
 		{

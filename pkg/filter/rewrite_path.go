@@ -14,9 +14,9 @@ const RewritePathFilterName = "RewritePath"
 const GatewayOriginalRequestAttr = "GATEWAY_ORIGINAL_REQUEST_URL"
 
 type RewritePath struct {
+	pattern     *regexp.Regexp
 	Regexp      string
 	Replacement string
-	pattern     *regexp.Regexp
 }
 
 func NewRewritePathFilter(regexpStr, replacement string) (*RewritePath, error) {

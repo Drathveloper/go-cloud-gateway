@@ -19,12 +19,28 @@ func TestRoute_CombineGlobalFilters(t *testing.T) {
 		{
 			name: "combine global filters should succeed with expected order when route has filters",
 			filters: []gateway.Filter{
-				&DummyFilter{"DF1", nil, nil},
-				&DummyFilter{"DF2", nil, nil},
+				&DummyFilter{
+					PreProcessErr:  nil,
+					PostProcessErr: nil,
+					ID:             "DF1",
+				},
+				&DummyFilter{
+					PreProcessErr:  nil,
+					PostProcessErr: nil,
+					ID:             "DF2",
+				},
 			},
 			globalFilters: []gateway.Filter{
-				&DummyFilter{"DGF1", nil, nil},
-				&DummyFilter{"DGF2", nil, nil},
+				&DummyFilter{
+					PreProcessErr:  nil,
+					PostProcessErr: nil,
+					ID:             "DGF1",
+				},
+				&DummyFilter{
+					PreProcessErr:  nil,
+					PostProcessErr: nil,
+					ID:             "DGF2",
+				},
 			},
 			expectedOrder: []string{"DGF1", "DGF2", "DF1", "DF2"},
 		},
@@ -32,16 +48,32 @@ func TestRoute_CombineGlobalFilters(t *testing.T) {
 			name:    "combine global filters should succeed with expected order when route doesn't have filters",
 			filters: nil,
 			globalFilters: []gateway.Filter{
-				&DummyFilter{"DGF1", nil, nil},
-				&DummyFilter{"DGF2", nil, nil},
+				&DummyFilter{
+					PreProcessErr:  nil,
+					PostProcessErr: nil,
+					ID:             "DGF1",
+				},
+				&DummyFilter{
+					PreProcessErr:  nil,
+					PostProcessErr: nil,
+					ID:             "DGF2",
+				},
 			},
 			expectedOrder: []string{"DGF1", "DGF2"},
 		},
 		{
 			name: "combine global filters should succeed with expected order when no global filters present",
 			filters: []gateway.Filter{
-				&DummyFilter{"DF1", nil, nil},
-				&DummyFilter{"DF2", nil, nil},
+				&DummyFilter{
+					PreProcessErr:  nil,
+					PostProcessErr: nil,
+					ID:             "DF1",
+				},
+				&DummyFilter{
+					PreProcessErr:  nil,
+					PostProcessErr: nil,
+					ID:             "DF2",
+				},
 			},
 			expectedOrder: []string{"DF1", "DF2"},
 		},
@@ -110,8 +142,8 @@ func TestRoutes_FindMatching(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		routes        []gateway.Route
 		expectedRoute string
+		routes        []gateway.Route
 	}{
 		{
 			name: "find matching should succeed when one route matched predicate",

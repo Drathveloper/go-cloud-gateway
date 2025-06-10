@@ -13,10 +13,10 @@ import (
 
 func TestReaderJSON_Read(t *testing.T) {
 	tests := []struct {
+		expectedErr error
+		expected    *config.Config
 		name        string
 		input       string
-		expected    *config.Config
-		expectedErr error
 	}{
 		{
 			name:  "read should succeed when input is valid",

@@ -24,8 +24,8 @@ var readerPool = sync.Pool{
 }
 
 type Gateway struct {
-	globalFilters Filters
 	httpClient    HTTPClient
+	globalFilters Filters
 }
 
 func NewGateway(globalFilters Filters, client HTTPClient) *Gateway {

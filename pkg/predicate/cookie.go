@@ -15,8 +15,8 @@ const CookiePredicateName = "Cookie"
 var ErrInvalidRegexp = errors.New("invalid regexp")
 
 type CookiePredicate struct {
-	Name    string
 	Pattern *regexp.Regexp
+	Name    string
 }
 
 func NewCookiePredicate(name, regexpStr string) (*CookiePredicate, error) {

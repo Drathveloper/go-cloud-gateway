@@ -10,8 +10,8 @@ import (
 
 type Request struct {
 	URL     *url.URL
-	Method  string
 	Headers http.Header
+	Method  string
 	Body    []byte
 }
 
@@ -29,9 +29,9 @@ func NewGatewayRequest(request *http.Request) (*Request, error) {
 }
 
 type Response struct {
-	Status  int
 	Headers http.Header
 	Body    []byte
+	Status  int
 }
 
 func NewGatewayResponse(response *http.Response) (*Response, error) {
