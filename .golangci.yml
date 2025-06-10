@@ -28,12 +28,16 @@ linters:
             - time
     govet:
       enable-all: true
+    tagalign:
+      order:
+        - json
+        - yaml
+        - validate
   default: all
   disable:
     - revive
     - wsl
     - tagliatelle
-    - tagalign
     - nlreturn
     - exhaustruct
     - ireturn
