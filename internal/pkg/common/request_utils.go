@@ -4,11 +4,16 @@ import (
 	"bytes"
 	"io"
 	"net/http"
+	"strings"
 	"sync"
 )
 
+const initialBufferSize = 64 * 1024
+
 const (
-	initialBufferSize = 64 * 1024
+	xForwardedForHeader = "X-Forwarded-For"
+	xRealIPHeader       = "X-Real-Ip"
+	localIPAddr         = "127.0.0.1"
 )
 
 var (
@@ -46,4 +51,22 @@ func WriteHeader(w http.ResponseWriter, header http.Header) {
 	for k, values := range header {
 		dst[k] = values
 	}
+}
+
+// GetRemoteAddr returns the remote address of the request. It will make the best effort to return the IP address
+// of the client. This is the order followed by the function to get the IP address of the client:
+// 1. Check X-Forwarded-For header, return if present.
+// 2. Check X-Real-Ip header, return if present.
+// 3. Return request RemoteAddr attribute trimming port.
+func GetRemoteAddr(request *http.Request) string {
+	if len(request.Header[xForwardedForHeader]) != 0 {
+		return request.Header[xForwardedForHeader][0]
+	}
+	if len(request.Header[xRealIPHeader]) != 0 {
+		return request.Header[xRealIPHeader][0]
+	}
+	if strings.HasPrefix(request.RemoteAddr, "[::1]") {
+		return localIPAddr
+	}
+	return strings.Split(request.RemoteAddr, ":")[0]
 }

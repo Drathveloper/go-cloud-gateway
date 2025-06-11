@@ -135,3 +135,45 @@ func TestWriteHeader(t *testing.T) {
 		})
 	}
 }
+
+func TestGetRemoteAddr(t *testing.T) {
+	tests := []struct {
+		name     string
+		request  *http.Request
+		expected string
+	}{
+		{
+			name: "get remote address from request should return remoteAddr when headers not set",
+			request: &http.Request{
+				RemoteAddr: "localhost:8080",
+			},
+			expected: "localhost",
+		},
+		{
+			name: "get remote address from request should return X-Forwarded-For IP when X-Real-IP and X-Forwarded-For are set",
+			request: &http.Request{
+				Header: http.Header{
+					"X-Forwarded-For": {"10.10.10.100", "10.10.20.100"},
+					"X-Real-Ip":       {"20.10.10.100", "20.10.20.100"},
+				},
+			},
+			expected: "10.10.10.100",
+		},
+		{
+			name: "get remote address from request should return X-Real-IP when X-Forwarded-For is not set",
+			request: &http.Request{
+				Header: http.Header{
+					"X-Real-Ip": {"20.10.10.100", "20.10.20.100"},
+				},
+			},
+			expected: "20.10.10.100",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := common.GetRemoteAddr(tt.request); got != tt.expected {
+				t.Errorf("GetRemoteAddr() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
+}

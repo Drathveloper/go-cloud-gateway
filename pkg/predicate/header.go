@@ -12,14 +12,14 @@ import (
 // HeaderPredicateName is the name of the header predicate.
 const HeaderPredicateName = "Header"
 
-// HeaderPredicate is a predicate that checks if a header exists and matches a given regexp.
-type HeaderPredicate struct {
-	Pattern *regexp.Regexp
-	Name    string
+// Header is a predicate that checks if a header exists and matches a given regexp.
+type Header struct {
+	pattern *regexp.Regexp
+	name    string
 }
 
 // NewHeaderPredicate creates a new header predicate.
-func NewHeaderPredicate(header, regexpStr string) (*HeaderPredicate, error) {
+func NewHeaderPredicate(header, regexpStr string) (*Header, error) {
 	var pattern *regexp.Regexp
 	var err error
 	if regexpStr != "" {
@@ -28,9 +28,9 @@ func NewHeaderPredicate(header, regexpStr string) (*HeaderPredicate, error) {
 			return nil, fmt.Errorf("invalid regexp: %w", err)
 		}
 	}
-	return &HeaderPredicate{
-		Name:    header,
-		Pattern: pattern,
+	return &Header{
+		name:    header,
+		pattern: pattern,
 	}, nil
 }
 
@@ -54,13 +54,13 @@ func NewHeaderPredicateBuilder() gateway.PredicateBuilderFunc {
 // If the header does not exist, the predicate will return false.
 // If the header exists but does not match the regexp, the predicate will return false.
 // If the header exists and matches the regexp, the predicate will return true.
-func (p *HeaderPredicate) Test(request *http.Request) bool {
-	value := request.Header.Get(p.Name)
+func (p *Header) Test(request *http.Request) bool {
+	value := request.Header.Get(p.name)
 	if value == "" {
 		return false
 	}
-	if p.Pattern != nil {
-		return p.Pattern.MatchString(value)
+	if p.pattern != nil {
+		return p.pattern.MatchString(value)
 	}
 	return true
 }
