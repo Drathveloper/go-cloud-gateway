@@ -29,8 +29,8 @@ jobs:
       uses: actions/cache@v3
       with:
         path: |
-          ~/.cache/go-build     # Compilaciones
-          ~/go/pkg/mod          # Módulos descargados
+          ${{ env.HOME }}/.cache/go-build     # Compilaciones
+          ${{ env.HOME }}/go/pkg/mod          # Módulos descargados
         key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
         restore-keys: |
           ${{ runner.os }}-go-
