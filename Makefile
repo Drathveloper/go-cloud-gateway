@@ -75,3 +75,4 @@ clean:
 
 build:
 	@$(shell $(GO_BIN) build ./...)
+
