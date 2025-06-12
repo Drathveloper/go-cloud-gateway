@@ -168,6 +168,13 @@ func TestGetRemoteAddr(t *testing.T) {
 			},
 			expected: "20.10.10.100",
 		},
+		{
+			name: "get remote address from request should return 127.0.0.1 when local ipv6 is set",
+			request: &http.Request{
+				RemoteAddr: "[::1]:8080",
+			},
+			expected: "127.0.0.1",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
