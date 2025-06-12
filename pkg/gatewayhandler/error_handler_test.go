@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/drathveloper/go-cloud-gateway/pkg/filter"
 	"io"
 	"log/slog"
 	"net/http"
 	"strings"
 	"testing"
 
+	"github.com/drathveloper/go-cloud-gateway/pkg/filter"
 	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 	"github.com/drathveloper/go-cloud-gateway/pkg/gatewayhandler"
 )
