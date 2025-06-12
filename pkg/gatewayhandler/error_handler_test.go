@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/drathveloper/go-cloud-gateway/pkg/filter"
 	"io"
 	"log/slog"
 	"net/http"
@@ -63,6 +64,12 @@ func TestBaseErrorHandler(t *testing.T) {
 			expectedStatusCode: http.StatusBadGateway,
 			err:                gateway.ErrHTTP,
 			expectedErrMsg:     "level=ERROR msg=\"http request failed\" error=\"gateway http request to backend failed\"",
+		},
+		{
+			name:               "test base error handler should succeed when error is rate limit exceeded",
+			expectedStatusCode: http.StatusTooManyRequests,
+			err:                filter.ErrRateLimitExceeded,
+			expectedErrMsg:     "level=ERROR msg=\"rate limit exceeded\" error=\"rate limit exceeded",
 		},
 		{
 			name:               "test base error handler should succeed when error is unhandled error",

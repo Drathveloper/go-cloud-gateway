@@ -3,6 +3,7 @@ package common
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 )
 
@@ -11,6 +12,9 @@ var ErrRequiredValue = errors.New("value is required")
 
 // ErrRequiredStringValue is returned when a value is required to be a string but is not.
 var ErrRequiredStringValue = errors.New("value is required to be a valid string")
+
+// ErrRequiredIntValue is returned when a value is required to be an int but is not.
+var ErrRequiredIntValue = errors.New("value is required to be a valid int")
 
 // ErrRequiredSliceValue is returned when a value is required to be a slice but is not.
 var ErrRequiredSliceValue = errors.New("value is required to be a valid slice")
@@ -84,4 +88,31 @@ func ConvertToDateTime(val any) (time.Time, error) {
 		return time.Time{}, fmt.Errorf("value is required to be a valid datetime: %w", err)
 	}
 	return valDateTime, nil
+}
+
+// ConvertToInt converts the given value to an int.
+//
+// The value can be a string or an int.
+//
+// The string value is expected to be a valid int.
+//
+// The int value is returned as is.
+//
+// The function returns an error if the value is not a string or int.
+func ConvertToInt(val any) (int, error) {
+	if val == nil {
+		return 0, ErrRequiredValue
+	}
+	if valInt, ok := val.(int); ok {
+		return valInt, nil
+	}
+	valStr, ok := val.(string)
+	if !ok {
+		return 0, ErrRequiredIntValue
+	}
+	valInt, err := strconv.Atoi(valStr)
+	if err != nil {
+		return 0, ErrRequiredIntValue
+	}
+	return valInt, nil
 }

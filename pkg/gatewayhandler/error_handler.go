@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/drathveloper/go-cloud-gateway/pkg/filter"
 	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 )
 
@@ -26,7 +27,8 @@ func (f ErrorHandlerFunc) Handle(logger *slog.Logger, err error, w http.Response
 // BaseErrorHandler is the base error handler. It will handle the following errors:
 // 1. ErrRouteNotFound: no route matched the request. It will return a 404 Not Found.
 // 2. context.DeadlineExceeded: the request timeout. It will return a 502 Bad Gateway.
-// 3. gateway.ErrHTTP: the gateway http request to backend failed. It will return a 502 Bad Gateway.
+// 3. gateway.ErrHTTP: the gateway http request to backend failed. It will return 502 Bad Gateway.
+// 4. filter.ErrRateLimitExceeded: the rate limit exceeded. It will return 429 Too Many Requests.
 // 4. any other error: unexpected error. It will return a 500 Internal Server Error.
 // If the error is not one of the above, it will log the error and return a 500 Internal Server Error.
 // If the error is nil, it will do nothing.
@@ -45,6 +47,9 @@ func BaseErrorHandler() ErrorHandlerFunc {
 		case errors.Is(err, gateway.ErrHTTP):
 			logger.Error("http request failed", "error", err)
 			http.Error(writer, "", http.StatusBadGateway)
+		case errors.Is(err, filter.ErrRateLimitExceeded):
+			logger.Error("rate limit exceeded", "error", err)
+			http.Error(writer, "", http.StatusTooManyRequests)
 		default:
 			logger.Error("unexpected error", "error", err)
 			http.Error(writer, "", http.StatusInternalServerError)
