@@ -157,3 +157,54 @@ func TestConvertToDateTime(t *testing.T) {
 		})
 	}
 }
+
+func TestConvertToInt(t *testing.T) {
+	tests := []struct {
+		input       any
+		expectedErr error
+		name        string
+		expected    int
+	}{
+		{
+			name:        "convert int to int should succeed",
+			input:       160,
+			expected:    160,
+			expectedErr: nil,
+		},
+		{
+			name:        "convert string to int should succeed",
+			input:       "160",
+			expected:    160,
+			expectedErr: nil,
+		},
+		{
+			name:        "convert nil to int should return error",
+			input:       nil,
+			expected:    0,
+			expectedErr: errors.New("value is required"),
+		},
+		{
+			name:        "convert bool to int should return error",
+			input:       false,
+			expected:    0,
+			expectedErr: errors.New("value is required to be a valid int"),
+		},
+		{
+			name:        "convert non integer string to int should return error",
+			input:       "potato",
+			expected:    0,
+			expectedErr: errors.New("value is required to be a valid int"),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := common.ConvertToInt(tt.input)
+			if fmt.Sprintf("%s", tt.expectedErr) != fmt.Sprintf("%s", err) {
+				t.Errorf("expected err %s actual %s", tt.expectedErr, err)
+			}
+			if tt.expected != result {
+				t.Errorf("expected %d actual %d", tt.expected, result)
+			}
+		})
+	}
+}

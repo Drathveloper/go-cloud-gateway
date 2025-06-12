@@ -12,16 +12,16 @@ import (
 // QueryPredicateName is the name of the query predicate.
 const QueryPredicateName = "Query"
 
-// QueryPredicate is a predicate that checks if a query parameter exists and matches a given regexp.
-type QueryPredicate struct {
-	Pattern *regexp.Regexp
+// Query is a predicate that checks if a query parameter exists and matches a given regexp.
+type Query struct {
+	pattern *regexp.Regexp
 	Name    string
 }
 
 // NewQueryPredicate creates a new query predicate.
 //
 // If the regexp is invalid, the predicate will return an error.
-func NewQueryPredicate(name, regexpStr string) (*QueryPredicate, error) {
+func NewQueryPredicate(name, regexpStr string) (*Query, error) {
 	var pattern *regexp.Regexp
 	var err error
 	if regexpStr != "" {
@@ -30,9 +30,9 @@ func NewQueryPredicate(name, regexpStr string) (*QueryPredicate, error) {
 			return nil, fmt.Errorf("invalid regexp: %w", err)
 		}
 	}
-	return &QueryPredicate{
+	return &Query{
 		Name:    name,
-		Pattern: pattern,
+		pattern: pattern,
 	}, nil
 }
 
@@ -56,13 +56,13 @@ func NewQueryPredicateBuilder() gateway.PredicateBuilderFunc {
 // If the query parameter does not exist, the predicate will return false.
 // If the query parameter exists but does not match the regexp, the predicate will return false.
 // If the query parameter exists and matches the regexp, the predicate will return true.
-func (p *QueryPredicate) Test(request *http.Request) bool {
+func (p *Query) Test(request *http.Request) bool {
 	value := request.URL.Query().Get(p.Name)
 	if value == "" {
 		return false
 	}
-	if p.Pattern != nil {
-		return p.Pattern.MatchString(value)
+	if p.pattern != nil {
+		return p.pattern.MatchString(value)
 	}
 	return true
 }

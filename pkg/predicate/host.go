@@ -12,14 +12,14 @@ import (
 // HostPredicateName is the name of the host predicate.
 const HostPredicateName = "Host"
 
-// HostPredicate is a predicate that checks if a host matches a given pattern.
-type HostPredicate struct {
-	Patterns      []string
+// Host is a predicate that checks if a host matches a given pattern.
+type Host struct {
+	patterns      []string
 	compiledRegex []*regexp.Regexp
 }
 
 // NewHostPredicate creates a new host predicate.
-func NewHostPredicate(patterns ...string) (*HostPredicate, error) {
+func NewHostPredicate(patterns ...string) (*Host, error) {
 	compiled := make([]*regexp.Regexp, 0, len(patterns))
 	for _, pattern := range patterns {
 		if pattern == "**" {
@@ -33,8 +33,8 @@ func NewHostPredicate(patterns ...string) (*HostPredicate, error) {
 		}
 		compiled = append(compiled, re)
 	}
-	return &HostPredicate{
-		Patterns:      patterns,
+	return &Host{
+		patterns:      patterns,
 		compiledRegex: compiled,
 	}, nil
 }
@@ -54,7 +54,7 @@ func NewHostPredicateBuilder() gateway.PredicateBuilderFunc {
 //
 // If the host does not match any pattern, the predicate will return false.
 // If the host matches at least one pattern, the predicate will return true. .
-func (p *HostPredicate) Test(request *http.Request) bool {
+func (p *Host) Test(request *http.Request) bool {
 	for _, pattern := range p.compiledRegex {
 		if common.HostMatcher(pattern, request.Host) {
 			return true

@@ -14,10 +14,11 @@ import (
 //
 // The body field is nil if the original request body is empty.
 type Request struct {
-	URL     *url.URL
-	Headers http.Header
-	Method  string
-	Body    []byte
+	URL        *url.URL
+	Headers    http.Header
+	Method     string
+	RemoteAddr string
+	Body       []byte
 }
 
 // NewGatewayRequest creates a new gateway request from an http request.
@@ -27,10 +28,11 @@ func NewGatewayRequest(request *http.Request) (*Request, error) {
 		return nil, fmt.Errorf("build gateway request failed: %w", err)
 	}
 	return &Request{
-		URL:     request.URL,
-		Method:  request.Method,
-		Headers: request.Header,
-		Body:    append([]byte(nil), bodyBytes...),
+		RemoteAddr: common.GetRemoteAddr(request),
+		URL:        request.URL,
+		Method:     request.Method,
+		Headers:    request.Header,
+		Body:       append([]byte(nil), bodyBytes...),
 	}, nil
 }
 

@@ -17,4 +17,5 @@ var BuilderRegistry gateway.FilterBuilderRegistry = map[string]gateway.FilterBui
 	RemoveResponseHeaderFilterName:  NewRemoveResponseHeaderBuilder(),
 	RequestResponseLoggerFilterName: NewRequestResponseLoggerBuilder(),
 	RewritePathFilterName:           NewRewritePathBuilder(),
+	RateLimitFilterName:             NewRateLimitBuilder(),
 }

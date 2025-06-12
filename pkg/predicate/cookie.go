@@ -16,14 +16,14 @@ const CookiePredicateName = "Cookie"
 // ErrInvalidCookieRegexp is returned when the cookie predicate's regexp is invalid.
 var ErrInvalidCookieRegexp = errors.New("invalid cookie regexp")
 
-// CookiePredicate is a predicate that checks if a cookie exists and matches a given regexp.
-type CookiePredicate struct {
-	Pattern *regexp.Regexp
-	Name    string
+// Cookie is a predicate that checks if a cookie exists and matches a given regexp.
+type Cookie struct {
+	pattern *regexp.Regexp
+	name    string
 }
 
 // NewCookiePredicate creates a new cookie predicate.
-func NewCookiePredicate(name, regexpStr string) (*CookiePredicate, error) {
+func NewCookiePredicate(name, regexpStr string) (*Cookie, error) {
 	var pattern *regexp.Regexp
 	var err error
 	if regexpStr != "" {
@@ -32,9 +32,9 @@ func NewCookiePredicate(name, regexpStr string) (*CookiePredicate, error) {
 			return nil, fmt.Errorf("%w: %v", ErrInvalidCookieRegexp, err.Error())
 		}
 	}
-	return &CookiePredicate{
-		Name:    name,
-		Pattern: pattern,
+	return &Cookie{
+		name:    name,
+		pattern: pattern,
 	}, nil
 }
 
@@ -58,12 +58,12 @@ func NewCookiePredicateBuilder() gateway.PredicateBuilderFunc {
 // If the cookie does not exist, the predicate will return false.
 // If the cookie exists but does not match the regexp, the predicate will return false.
 // If the cookie exists and matches the regexp, the predicate will return true.
-func (p *CookiePredicate) Test(request *http.Request) bool {
+func (p *Cookie) Test(request *http.Request) bool {
 	cookies := request.Cookies()
 	for _, cookie := range cookies {
-		if cookie.Name == p.Name {
-			if p.Pattern != nil {
-				return p.Pattern.MatchString(cookie.Value)
+		if cookie.Name == p.name {
+			if p.pattern != nil {
+				return p.pattern.MatchString(cookie.Value)
 			}
 			return true
 		}
