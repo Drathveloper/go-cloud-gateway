@@ -187,3 +187,13 @@ func TestFilters_PostProcessAll(t *testing.T) {
 		})
 	}
 }
+
+func TestFilterBuilderRegistry_Register(t *testing.T) {
+	registry := gateway.FilterBuilderRegistry{}
+	registry.Register("x", gateway.FilterBuilderFunc(func(_ map[string]any) (gateway.Filter, error) {
+		return nil, nil //nolint:nilnil
+	}))
+	if len(registry) != 1 {
+		t.Errorf("expected 1 actual %d", len(registry))
+	}
+}

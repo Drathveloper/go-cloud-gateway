@@ -2,20 +2,34 @@ package gateway
 
 import (
 	"fmt"
+	"time"
+
 	"log/slog"
 	"net/http"
 	"net/url"
-	"time"
+
+	"github.com/drathveloper/go-cloud-gateway/pkg/circuitbreaker"
 )
+
+// CircuitBreaker is a circuit breaker.
+//
+// T is the type of the result of the circuit breaker.
+type CircuitBreaker[T any] interface {
+	Name() string
+	State() circuitbreaker.State
+	Counts() circuitbreaker.Counts
+	Execute(req func() (T, error)) (T, error)
+}
 
 // Route represents a gateway route.
 type Route struct {
-	URI        *url.URL
-	Logger     *slog.Logger
-	ID         string
-	Predicates Predicates
-	Filters    Filters
-	Timeout    time.Duration
+	CircuitBreaker CircuitBreaker[*http.Response]
+	URI            *url.URL
+	Logger         *slog.Logger
+	ID             string
+	Predicates     Predicates
+	Filters        Filters
+	Timeout        time.Duration
 }
 
 // NewRoute creates a new route.
@@ -25,18 +39,20 @@ func NewRoute(
 	predicates Predicates,
 	filters Filters,
 	timeout time.Duration,
+	circuitBreaker CircuitBreaker[*http.Response],
 	logger *slog.Logger) (*Route, error) {
 	routeURI, err := url.Parse(uri)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse route uri: %w", err)
 	}
 	return &Route{
-		ID:         routeID,
-		URI:        routeURI,
-		Predicates: predicates,
-		Filters:    filters,
-		Timeout:    timeout,
-		Logger:     logger,
+		ID:             routeID,
+		URI:            routeURI,
+		Predicates:     predicates,
+		Filters:        filters,
+		Timeout:        timeout,
+		CircuitBreaker: circuitBreaker,
+		Logger:         logger,
 	}, nil
 }
 

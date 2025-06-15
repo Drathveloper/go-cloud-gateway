@@ -69,3 +69,13 @@ func TestPredicates_TestAll(t *testing.T) {
 		})
 	}
 }
+
+func TestPredicateBuilderRegistry_Register(t *testing.T) {
+	registry := gateway.PredicateBuilderRegistry{}
+	registry.Register("x", gateway.PredicateBuilderFunc(func(_ map[string]any) (gateway.Predicate, error) {
+		return nil, nil //nolint:nilnil
+	}))
+	if len(registry) != 1 {
+		t.Errorf("expected 1 actual %d", len(registry))
+	}
+}

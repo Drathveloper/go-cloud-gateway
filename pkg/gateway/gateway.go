@@ -8,10 +8,15 @@ import (
 	"io"
 	"net/http"
 	"sync"
+
+	"github.com/drathveloper/go-cloud-gateway/pkg/circuitbreaker"
 )
 
 // ErrHTTP is the error returned when the gateway http request to backend failed.
 var ErrHTTP = errors.New("gateway http request to backend failed")
+
+// ErrCircuitBreaker is the error returned when the circuit breaker failed.
+var ErrCircuitBreaker = errors.New("circuit breaker failed")
 
 // HTTPClient is the interface for the http client.
 type HTTPClient interface {
@@ -57,12 +62,7 @@ func (g *Gateway) Do(ctx *Context) error {
 		readerPool.Put(reader)
 	}
 	if err != nil {
-		switch {
-		case errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled):
-			return fmt.Errorf(gatewayErrMsg, ctx.Route.ID, context.DeadlineExceeded)
-		default:
-			return fmt.Errorf(gatewayErrMsg, ctx.Route.ID, fmt.Errorf("%w: %s", ErrHTTP, err.Error()))
-		}
+		return g.handleBackendError(ctx, err)
 	}
 	ctx.Response, err = NewGatewayResponse(backendRes)
 	if err != nil {
@@ -72,6 +72,17 @@ func (g *Gateway) Do(ctx *Context) error {
 		return fmt.Errorf(gatewayErrMsg, ctx.Route.ID, err)
 	}
 	return nil
+}
+
+func (g *Gateway) handleBackendError(ctx *Context, err error) error {
+	switch {
+	case errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled):
+		return fmt.Errorf(gatewayErrMsg, ctx.Route.ID, context.DeadlineExceeded)
+	case errors.Is(err, circuitbreaker.ErrOpenState) || errors.Is(err, circuitbreaker.ErrHalfOpenRequestExceeded):
+		return fmt.Errorf(gatewayErrMsg, ctx.Route.ID, fmt.Errorf("%w: %s", ErrCircuitBreaker, err.Error()))
+	default:
+		return fmt.Errorf(gatewayErrMsg, ctx.Route.ID, fmt.Errorf("%w: %s", ErrHTTP, err.Error()))
+	}
 }
 
 func (g *Gateway) buildProxyRequest(ctx *Context) (*http.Request, *bytes.Reader, error) {

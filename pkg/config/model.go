@@ -17,11 +17,24 @@ type Gateway struct {
 
 // Route represents the gateway route config.
 type Route struct {
-	ID         string              `json:"id"         yaml:"id"         validate:"required"`
-	URI        string              `json:"uri"        yaml:"uri"        validate:"required"`
-	Predicates []ParameterizedItem `json:"predicates" yaml:"predicates" validate:"dive"`
-	Filters    []ParameterizedItem `json:"filters"    yaml:"filters"    validate:"dive"`
-	Timeout    Duration            `json:"timeout"    yaml:"timeout"`
+	ID             string              `json:"id"              yaml:"id"              validate:"required"`
+	URI            string              `json:"uri"             yaml:"uri"             validate:"required"`
+	Predicates     []ParameterizedItem `json:"predicates"      yaml:"predicates"      validate:"dive"`
+	Filters        []ParameterizedItem `json:"filters"         yaml:"filters"         validate:"dive"`
+	Timeout        Duration            `json:"timeout"         yaml:"timeout"`
+	CircuitBreaker CircuitBreaker      `json:"circuit-breaker" yaml:"circuit-breaker"`
+}
+
+// CircuitBreaker represents the gateway circuit breaker config.
+//
+// The circuit breaker configuration fields are required if the circuit breaker is enabled.
+type CircuitBreaker struct {
+	Enabled                 bool     `json:"enabled"                     yaml:"enabled"`
+	Interval                Duration `json:"interval"                    yaml:"interval"                    validate:"required_if=Enabled true"` //nolint:lll
+	FailureRateThreshold    int      `json:"failure-rate-threshold"      yaml:"failure-rate-threshold"      validate:"required_if=Enabled true"` //nolint:lll
+	NumAllowedHalfOpenCalls int      `json:"num-allowed-half-open-calls" yaml:"num-allowed-half-open-calls" validate:"required_if=Enabled true"` //nolint:lll
+	WaitDurationInOpenState Duration `json:"wait-duration-in-open-state" yaml:"wait-duration-in-open-state" validate:"required_if=Enabled true"` //nolint:lll
+	MinRequestsThreshold    int      `json:"min-requests-threshold"      yaml:"min-requests-threshold"      validate:"required_if=Enabled true"` //nolint:lll
 }
 
 // ParameterizedItem represents the gateway predicate or filter config.

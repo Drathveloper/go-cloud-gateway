@@ -14,18 +14,22 @@ linters:
             - log
             - net
             - github.com/drathveloper/go-cloud-gateway
+            - github.com/stretchr/testify/assert
+            - github.com/stretchr/testify/require
             - github.com/go-playground/validator/v10
             - golang.org/x/net/http2
             - gopkg.in/yaml.v3
             - io
             - reflect
             - regexp
+            - runtime
             - slices
             - strconv
             - strings
             - sync
             - testing
             - time
+            - unsafe
     govet:
       enable-all: true
     tagalign:
@@ -55,6 +59,7 @@ linters:
           - err113
           - dupl
           - maintidx
+          - cyclop
       - linters:
           - gosec
         text: 'G104:'

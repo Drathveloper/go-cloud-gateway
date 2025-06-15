@@ -627,6 +627,61 @@ func TestRoute_ValidateJSON(t *testing.T) {
 			},
 			expectedErr: errors.New("Key: 'Route.ID' Error:Field validation for 'ID' failed on the 'required' tag"),
 		},
+		{
+			name:  "unmarshal and validate should return error when input is valid and circuit breaker is enabled and empty",
+			input: "{\"id\":\"someID\",\"uri\":\"someUri\",\"timeout\":\"30s\",\"predicates\":[{\"name\":\"p1\"}],\"filters\":[{\"name\":\"f1\"}],\"circuit-breaker\":{\"enabled\":true}}",
+			expected: config.Route{
+				ID:  "someID",
+				URI: "someUri",
+				Predicates: []config.ParameterizedItem{
+					{
+						Name: "p1",
+					},
+				},
+				Filters: []config.ParameterizedItem{
+					{
+						Name: "f1",
+					},
+				},
+				Timeout: config.Duration{Duration: 30 * time.Second},
+				CircuitBreaker: config.CircuitBreaker{
+					Enabled: true,
+				},
+			},
+			expectedErr: errors.New("Key: 'Route.CircuitBreaker.Interval' Error:Field validation for 'Interval' failed on the 'required_if' tag\nKey: 'Route.CircuitBreaker.FailureRateThreshold' Error:Field validation for 'FailureRateThreshold' failed on the 'required_if' tag\nKey: 'Route.CircuitBreaker.NumAllowedHalfOpenCalls' Error:Field validation for 'NumAllowedHalfOpenCalls' failed on the 'required_if' tag\nKey: 'Route.CircuitBreaker.WaitDurationInOpenState' Error:Field validation for 'WaitDurationInOpenState' failed on the 'required_if' tag\nKey: 'Route.CircuitBreaker.MinRequestsThreshold' Error:Field validation for 'MinRequestsThreshold' failed on the 'required_if' tag"),
+		},
+		{
+			name:  "unmarshal and validate should succeed when input is valid and circuit breaker is enabled and configured",
+			input: "{\"id\":\"someID\",\"uri\":\"someUri\",\"timeout\":\"30s\",\"predicates\":[{\"name\":\"p1\"}],\"filters\":[{\"name\":\"f1\"}],\"circuit-breaker\":{\"enabled\":true,\"interval\":\"30s\",\"failure-rate-threshold\":10,\"num-allowed-half-open-calls\":10,\"wait-duration-in-open-state\":\"10s\",\"min-requests-threshold\":10}}",
+			expected: config.Route{
+				ID:  "someID",
+				URI: "someUri",
+				Predicates: []config.ParameterizedItem{
+					{
+						Name: "p1",
+					},
+				},
+				Filters: []config.ParameterizedItem{
+					{
+						Name: "f1",
+					},
+				},
+				Timeout: config.Duration{Duration: 30 * time.Second},
+				CircuitBreaker: config.CircuitBreaker{
+					Enabled: true,
+					Interval: config.Duration{
+						Duration: 30 * time.Second,
+					},
+					FailureRateThreshold:    10,
+					NumAllowedHalfOpenCalls: 10,
+					WaitDurationInOpenState: config.Duration{
+						Duration: 10 * time.Second,
+					},
+					MinRequestsThreshold: 10,
+				},
+			},
+			expectedErr: nil,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

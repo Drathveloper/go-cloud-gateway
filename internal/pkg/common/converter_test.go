@@ -178,6 +178,12 @@ func TestConvertToInt(t *testing.T) {
 			expectedErr: nil,
 		},
 		{
+			name:        "convert float64 to int should succeed",
+			input:       float64(160),
+			expected:    160,
+			expectedErr: nil,
+		},
+		{
 			name:        "convert nil to int should return error",
 			input:       nil,
 			expected:    0,
@@ -199,6 +205,51 @@ func TestConvertToInt(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result, err := common.ConvertToInt(tt.input)
+			if fmt.Sprintf("%s", tt.expectedErr) != fmt.Sprintf("%s", err) {
+				t.Errorf("expected err %s actual %s", tt.expectedErr, err)
+			}
+			if tt.expected != result {
+				t.Errorf("expected %d actual %d", tt.expected, result)
+			}
+		})
+	}
+}
+
+func TestConvertToDuration(t *testing.T) {
+	tests := []struct {
+		input       any
+		expectedErr error
+		name        string
+		expected    time.Duration
+	}{
+		{
+			name:        "convert string to duration should succeed",
+			input:       "30s",
+			expectedErr: nil,
+			expected:    30 * time.Second,
+		},
+		{
+			name:        "convert nil to duration should return error",
+			input:       nil,
+			expectedErr: common.ErrRequiredValue,
+			expected:    0,
+		},
+		{
+			name:        "convert non string to duration should return error",
+			input:       false,
+			expectedErr: common.ErrRequiredStringValue,
+			expected:    0,
+		},
+		{
+			name:        "convert invalid string to duration should return error",
+			input:       "pepe",
+			expectedErr: common.ErrRequiredDurationValue,
+			expected:    0,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := common.ConvertToDuration(tt.input)
 			if fmt.Sprintf("%s", tt.expectedErr) != fmt.Sprintf("%s", err) {
 				t.Errorf("expected err %s actual %s", tt.expectedErr, err)
 			}
