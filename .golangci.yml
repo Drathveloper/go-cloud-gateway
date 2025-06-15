@@ -29,6 +29,7 @@ linters:
             - sync
             - testing
             - time
+            - unsafe
     govet:
       enable-all: true
     tagalign:

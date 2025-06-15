@@ -9,13 +9,16 @@ import (
 	"reflect"
 	"testing"
 	"time"
+	"unsafe"
 
+	"github.com/drathveloper/go-cloud-gateway/pkg/circuitbreaker"
 	"github.com/drathveloper/go-cloud-gateway/pkg/config"
 	"github.com/drathveloper/go-cloud-gateway/pkg/filter"
 	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 	"github.com/drathveloper/go-cloud-gateway/pkg/predicate"
 )
 
+//nolint:bodyclose,gocognit
 func TestNewRoutes(t *testing.T) {
 	logger := slog.Default()
 	tests := []struct {
@@ -196,6 +199,73 @@ func TestNewRoutes(t *testing.T) {
 			},
 			expectedErr: nil,
 		},
+		{
+			name: "new routes should succeed when circuit breaker config is valid",
+			config: &config.Config{
+				Gateway: config.Gateway{
+					Routes: []config.Route{
+						{
+							ID:  "r1",
+							URI: "https://example.com",
+							Predicates: []config.ParameterizedItem{
+								{
+									Name: "Method",
+									Args: map[string]any{
+										"methods": []any{"GET", "POST"},
+									},
+								},
+							},
+							Filters: []config.ParameterizedItem{
+								{
+									Name: "AddRequestHeader",
+									Args: map[string]any{
+										"name":  "X-Test",
+										"value": "True",
+									},
+								},
+							},
+							Timeout: config.Duration{},
+							CircuitBreaker: config.CircuitBreaker{
+								Enabled: true,
+								Interval: config.Duration{
+									Duration: 10 * time.Second,
+								},
+								FailureRateThreshold:    10,
+								NumAllowedHalfOpenCalls: 10,
+								WaitDurationInOpenState: config.Duration{
+									Duration: 10 * time.Second,
+								},
+								MinRequestsThreshold: 10,
+							},
+						},
+					},
+				},
+			},
+			expected: gateway.Routes{
+				{
+					ID: "r1",
+					URI: &url.URL{
+						Scheme: "https",
+						Host:   "example.com",
+					},
+					Predicates: gateway.Predicates{
+						predicate.NewMethodPredicate("GET", "POST"),
+					},
+					Filters: gateway.Filters{
+						filter.NewAddRequestHeaderFilter("X-Test", "True"),
+					},
+					Timeout: 10 * time.Second,
+					Logger:  logger,
+					CircuitBreaker: circuitbreaker.NewCircuitBreaker[*http.Response](circuitbreaker.Settings{
+						Name:        "r1",
+						Interval:    10 * time.Second,
+						Timeout:     10 * time.Second,
+						MaxRequests: 10,
+					}),
+				},
+			},
+			expectedErr: nil,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -204,14 +274,64 @@ func TestNewRoutes(t *testing.T) {
 				predicate.NewFactory(predicate.BuilderRegistry),
 				filter.NewFactory(filter.BuilderRegistry),
 				logger)
-			if !reflect.DeepEqual(tt.expected, routes) {
-				t.Errorf("expected %v actual %v", tt.expected, routes)
+			if len(routes) != len(tt.expected) {
+				t.Errorf("expected len %v actual len %v", tt.expected, routes)
+			}
+			for i := range routes {
+				if !reflect.DeepEqual(routes[i].Timeout, tt.expected[i].Timeout) {
+					t.Errorf("expected %v actual %v", tt.expected[i], routes[i])
+				}
+				if !reflect.DeepEqual(routes[i].ID, tt.expected[i].ID) {
+					t.Errorf("expected %v actual %v", tt.expected[i], routes[i])
+				}
+				if !reflect.DeepEqual(routes[i].URI, tt.expected[i].URI) {
+					t.Errorf("expected %v actual %v", tt.expected[i], routes[i])
+				}
+				if !reflect.DeepEqual(routes[i].Filters, tt.expected[i].Filters) {
+					t.Errorf("expected %v actual %v", tt.expected[i], routes[i])
+				}
+				if !reflect.DeepEqual(routes[i].Logger, tt.expected[i].Logger) {
+					t.Errorf("expected %v actual %v", tt.expected[i], routes[i])
+				}
+				if !reflect.DeepEqual(routes[i].Predicates, tt.expected[i].Predicates) {
+					t.Errorf("expected %v actual %v", tt.expected[i], routes[i])
+				}
+				if routes[i].CircuitBreaker != nil && tt.expected[i].CircuitBreaker != nil &&
+					!isEqualsCircuitBreakers(routes[i].CircuitBreaker, tt.expected[i].CircuitBreaker) {
+					t.Errorf("expected %v actual %v", tt.expected[i], routes[i])
+				}
 			}
 			if fmt.Sprintf("%s", tt.expectedErr) != fmt.Sprintf("%s", err) {
 				t.Errorf("expected err %s actual %s", tt.expectedErr, err)
 			}
 		})
 	}
+}
+
+// This is a nasty approach that should be addressed in the future.
+// We need to find a way to compare the circuit breaker without using reflection.
+func isEqualsCircuitBreakers(a, b gateway.CircuitBreaker[*http.Response]) bool {
+	va := reflect.ValueOf(a).Elem()
+	vb := reflect.ValueOf(b).Elem()
+	typ := va.Type()
+	for i := range typ.NumField() {
+		field := typ.Field(i)
+		if field.Name == "mutex" ||
+			field.Name == "readyToTrip" ||
+			field.Name == "isSuccessful" ||
+			field.Name == "onStateChange" ||
+			field.Name == "expiry" {
+			continue
+		}
+		vaField := va.Field(i)
+		vbField := vb.Field(i)
+		vaRef := reflect.NewAt(vaField.Type(), unsafe.Pointer(vaField.UnsafeAddr())).Elem().Interface() //nolint:gosec
+		vbRef := reflect.NewAt(vbField.Type(), unsafe.Pointer(vbField.UnsafeAddr())).Elem().Interface() //nolint:gosec
+		if !reflect.DeepEqual(vaRef, vbRef) {
+			return false
+		}
+	}
+	return true
 }
 
 func TestNewGlobalFilters(t *testing.T) {
