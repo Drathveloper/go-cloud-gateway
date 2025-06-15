@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/drathveloper/go-cloud-gateway/pkg/circuitbreaker"
 	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 )
 
@@ -71,6 +72,52 @@ func TestGateway_Do(t *testing.T) {
 				Method:  http.MethodPost,
 				Headers: http.Header{},
 				Body:    []byte("someBody"),
+			},
+			expectedResponse: &gateway.Response{
+				Status: http.StatusOK,
+				Body:   nil,
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "Do gateway should succeed when request body is empty",
+			globalFilters: gateway.Filters{
+				&DummyFilter{
+					PreProcessErr:  nil,
+					PostProcessErr: nil,
+					ID:             "GF1",
+				},
+			},
+			httpClient: &MockHTTPClient{
+				Response: &http.Response{
+					StatusCode: http.StatusOK,
+				},
+				Err: nil,
+			},
+			route: &gateway.Route{
+				ID: "r1",
+				URI: &url.URL{
+					Scheme: "https",
+					Host:   "example.org",
+				},
+				Filters: []gateway.Filter{
+					&DummyFilter{
+						PreProcessErr:  nil,
+						PostProcessErr: nil,
+						ID:             "F1",
+					},
+				},
+			},
+			request: &gateway.Request{
+				URL: &url.URL{
+					Scheme:   "https",
+					Host:     "example.org",
+					Path:     "/server/test",
+					RawQuery: "key=value",
+				},
+				Method:  http.MethodPost,
+				Headers: http.Header{},
+				Body:    []byte{},
 			},
 			expectedResponse: &gateway.Response{
 				Status: http.StatusOK,
@@ -247,6 +294,86 @@ func TestGateway_Do(t *testing.T) {
 			expectedResponse: nil,
 			expectedErr:      gateway.ErrHTTP,
 			expectedErrMsg:   "gateway request for route r1 failed: gateway http request to backend failed: someErr",
+		},
+		{
+			name: "Do gateway should return error when generic circuit breaker is open",
+			globalFilters: gateway.Filters{
+				&DummyFilter{
+					ID: "GF1",
+				},
+			},
+			httpClient: &MockHTTPClient{
+				Response: nil,
+				Err:      circuitbreaker.ErrOpenState,
+			},
+			route: &gateway.Route{
+				ID: "r1",
+				URI: &url.URL{
+					Scheme: "https",
+					Host:   "example.org",
+				},
+				Filters: []gateway.Filter{
+					&DummyFilter{
+						PreProcessErr:  nil,
+						PostProcessErr: nil,
+						ID:             "F1",
+					},
+				},
+			},
+			request: &gateway.Request{
+				URL: &url.URL{
+					Scheme:   "https",
+					Host:     "example.org",
+					Path:     "/server/test",
+					RawQuery: "key=value",
+				},
+				Method:  http.MethodPost,
+				Headers: http.Header{},
+				Body:    []byte("someBody"),
+			},
+			expectedResponse: nil,
+			expectedErr:      gateway.ErrCircuitBreaker,
+			expectedErrMsg:   "gateway request for route r1 failed: circuit breaker failed: circuit breaker is open",
+		},
+		{
+			name: "Do gateway should return error when generic circuit breaker is half open",
+			globalFilters: gateway.Filters{
+				&DummyFilter{
+					ID: "GF1",
+				},
+			},
+			httpClient: &MockHTTPClient{
+				Response: nil,
+				Err:      circuitbreaker.ErrHalfOpenRequestExceeded,
+			},
+			route: &gateway.Route{
+				ID: "r1",
+				URI: &url.URL{
+					Scheme: "https",
+					Host:   "example.org",
+				},
+				Filters: []gateway.Filter{
+					&DummyFilter{
+						PreProcessErr:  nil,
+						PostProcessErr: nil,
+						ID:             "F1",
+					},
+				},
+			},
+			request: &gateway.Request{
+				URL: &url.URL{
+					Scheme:   "https",
+					Host:     "example.org",
+					Path:     "/server/test",
+					RawQuery: "key=value",
+				},
+				Method:  http.MethodPost,
+				Headers: http.Header{},
+				Body:    []byte("someBody"),
+			},
+			expectedResponse: nil,
+			expectedErr:      gateway.ErrCircuitBreaker,
+			expectedErrMsg:   "gateway request for route r1 failed: circuit breaker failed: too many requests while circuit breaker is half-open",
 		},
 		{
 			name: "Do gateway should return error when post process filters failed",

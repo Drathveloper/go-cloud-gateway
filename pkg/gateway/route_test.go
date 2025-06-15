@@ -80,7 +80,7 @@ func TestRoute_CombineGlobalFilters(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			route, _ := gateway.NewRoute("id", "/test", nil, tt.filters, 0, nil)
+			route, _ := gateway.NewRoute("id", "/test", nil, tt.filters, 0, nil, nil)
 
 			allFilters := route.CombineGlobalFilters(tt.globalFilters...)
 
@@ -118,7 +118,7 @@ func TestRoute_GetDestinationURL(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			route, _ := gateway.NewRoute("someRoute", tt.routeURL, nil, nil, 0, nil)
+			route, _ := gateway.NewRoute("someRoute", tt.routeURL, nil, nil, 0, nil, nil)
 
 			reqURL, _ := url.Parse(tt.reqURL)
 
@@ -135,10 +135,10 @@ func TestRoutes_FindMatching(t *testing.T) {
 	matchedPredicate := DummyPredicate{true}
 	unMatchedPredicate := DummyPredicate{false}
 
-	unmatchedRoute1, _ := gateway.NewRoute("R1", "/test1", []gateway.Predicate{unMatchedPredicate}, nil, 0, nil)
-	matchedRoute1, _ := gateway.NewRoute("R1", "/test1", []gateway.Predicate{matchedPredicate}, nil, 0, nil)
-	unmatchedRoute2, _ := gateway.NewRoute("R2", "/test1", []gateway.Predicate{unMatchedPredicate}, nil, 0, nil)
-	matchedRoute2, _ := gateway.NewRoute("R2", "/test1", []gateway.Predicate{matchedPredicate}, nil, 0, nil)
+	unmatchedRoute1, _ := gateway.NewRoute("R1", "/test1", []gateway.Predicate{unMatchedPredicate}, nil, 0, nil, nil)
+	matchedRoute1, _ := gateway.NewRoute("R1", "/test1", []gateway.Predicate{matchedPredicate}, nil, 0, nil, nil)
+	unmatchedRoute2, _ := gateway.NewRoute("R2", "/test1", []gateway.Predicate{unMatchedPredicate}, nil, 0, nil, nil)
+	matchedRoute2, _ := gateway.NewRoute("R2", "/test1", []gateway.Predicate{matchedPredicate}, nil, 0, nil, nil)
 
 	tests := []struct {
 		name          string

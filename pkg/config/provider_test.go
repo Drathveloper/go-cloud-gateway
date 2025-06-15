@@ -67,8 +67,9 @@ func TestNewRoutes(t *testing.T) {
 					Filters: gateway.Filters{
 						filter.NewAddRequestHeaderFilter("X-Test", "True"),
 					},
-					Timeout: 10 * time.Second,
-					Logger:  logger,
+					Timeout:        10 * time.Second,
+					Logger:         logger,
+					CircuitBreaker: gateway.CircuitBreaker[*http.Response](nil),
 				},
 			},
 			expectedErr: nil,
@@ -142,6 +143,59 @@ func TestNewRoutes(t *testing.T) {
 			expected:    gateway.Routes{},
 			expectedErr: nil,
 		},
+		{
+			name: "new routes should succeed when circuit breaker config is disabled",
+			config: &config.Config{
+				Gateway: config.Gateway{
+					Routes: []config.Route{
+						{
+							ID:  "r1",
+							URI: "https://example.com",
+							Predicates: []config.ParameterizedItem{
+								{
+									Name: "Method",
+									Args: map[string]any{
+										"methods": []any{"GET", "POST"},
+									},
+								},
+							},
+							Filters: []config.ParameterizedItem{
+								{
+									Name: "AddRequestHeader",
+									Args: map[string]any{
+										"name":  "X-Test",
+										"value": "True",
+									},
+								},
+							},
+							Timeout: config.Duration{},
+							CircuitBreaker: config.CircuitBreaker{
+								Enabled: false,
+							},
+						},
+					},
+				},
+			},
+			expected: gateway.Routes{
+				{
+					ID: "r1",
+					URI: &url.URL{
+						Scheme: "https",
+						Host:   "example.com",
+					},
+					Predicates: gateway.Predicates{
+						predicate.NewMethodPredicate("GET", "POST"),
+					},
+					Filters: gateway.Filters{
+						filter.NewAddRequestHeaderFilter("X-Test", "True"),
+					},
+					Timeout:        10 * time.Second,
+					Logger:         logger,
+					CircuitBreaker: nil,
+				},
+			},
+			expectedErr: nil,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -150,7 +204,6 @@ func TestNewRoutes(t *testing.T) {
 				predicate.NewFactory(predicate.BuilderRegistry),
 				filter.NewFactory(filter.BuilderRegistry),
 				logger)
-
 			if !reflect.DeepEqual(tt.expected, routes) {
 				t.Errorf("expected %v actual %v", tt.expected, routes)
 			}
@@ -346,7 +399,7 @@ F0WydPKUjl3tmQRxYd9C8zDt6yB/fQbIoM/uGgZ0ZoZ+E5hvLVe+rYk=
 	trueBool := true
 	tests := []struct {
 		cfg         *config.Config
-		checkClient func(*http.Client) bool
+		checkClient func(c gateway.HTTPClient) bool
 		name        string
 		wantClient  bool
 		wantErr     bool
@@ -356,8 +409,13 @@ F0WydPKUjl3tmQRxYd9C8zDt6yB/fQbIoM/uGgZ0ZoZ+E5hvLVe+rYk=
 			cfg:        nil,
 			wantClient: true,
 			wantErr:    false,
-			checkClient: func(c *http.Client) bool {
-				return c.Timeout == config.DefaultTimeout
+			checkClient: func(c gateway.HTTPClient) bool {
+				switch client := c.(type) {
+				case *http.Client:
+					return client.Timeout == config.DefaultTimeout
+				default:
+					return false
+				}
 			},
 		},
 		{
@@ -365,8 +423,13 @@ F0WydPKUjl3tmQRxYd9C8zDt6yB/fQbIoM/uGgZ0ZoZ+E5hvLVe+rYk=
 			cfg:        &config.Config{},
 			wantClient: true,
 			wantErr:    false,
-			checkClient: func(c *http.Client) bool {
-				return c.Timeout == config.DefaultTimeout
+			checkClient: func(c gateway.HTTPClient) bool {
+				switch client := c.(type) {
+				case *http.Client:
+					return client.Timeout == config.DefaultTimeout
+				default:
+					return false
+				}
 			},
 		},
 		{
@@ -388,8 +451,13 @@ F0WydPKUjl3tmQRxYd9C8zDt6yB/fQbIoM/uGgZ0ZoZ+E5hvLVe+rYk=
 			},
 			wantClient: true,
 			wantErr:    false,
-			checkClient: func(c *http.Client) bool {
-				return c.Timeout == 30*time.Second
+			checkClient: func(c gateway.HTTPClient) bool {
+				switch client := c.(type) {
+				case *http.Client:
+					return client.Timeout == 30*time.Second
+				default:
+					return false
+				}
 			},
 		},
 		{
@@ -403,9 +471,14 @@ F0WydPKUjl3tmQRxYd9C8zDt6yB/fQbIoM/uGgZ0ZoZ+E5hvLVe+rYk=
 			},
 			wantClient: true,
 			wantErr:    false,
-			checkClient: func(c *http.Client) bool {
-				transport := c.Transport.(*http.Transport)
-				return transport.TLSClientConfig.InsecureSkipVerify
+			checkClient: func(c gateway.HTTPClient) bool {
+				switch client := c.(type) {
+				case *http.Client:
+					transport := client.Transport.(*http.Transport)
+					return transport.TLSClientConfig.InsecureSkipVerify
+				default:
+					return false
+				}
 			},
 		},
 		{
@@ -424,10 +497,15 @@ F0WydPKUjl3tmQRxYd9C8zDt6yB/fQbIoM/uGgZ0ZoZ+E5hvLVe+rYk=
 			},
 			wantClient: true,
 			wantErr:    false,
-			checkClient: func(c *http.Client) bool {
-				transport := c.Transport.(*http.Transport)
-				return len(transport.TLSClientConfig.Certificates) > 0 &&
-					transport.TLSClientConfig.RootCAs != nil
+			checkClient: func(c gateway.HTTPClient) bool {
+				switch client := c.(type) {
+				case *http.Client:
+					transport := client.Transport.(*http.Transport)
+					return len(transport.TLSClientConfig.Certificates) > 0 &&
+						transport.TLSClientConfig.RootCAs != nil
+				default:
+					return false
+				}
 			},
 		},
 		{

@@ -72,6 +72,12 @@ func TestBaseErrorHandler(t *testing.T) {
 			expectedErrMsg:     "level=ERROR msg=\"rate limit exceeded\" error=\"rate limit exceeded",
 		},
 		{
+			name:               "test base error handler should succeed when error is rate limit exceeded",
+			expectedStatusCode: http.StatusServiceUnavailable,
+			err:                gateway.ErrCircuitBreaker,
+			expectedErrMsg:     "level=ERROR msg=\"circuit breaker is open\" error=\"circuit breaker failed",
+		},
+		{
 			name:               "test base error handler should succeed when error is unhandled error",
 			expectedStatusCode: http.StatusInternalServerError,
 			err:                io.EOF,

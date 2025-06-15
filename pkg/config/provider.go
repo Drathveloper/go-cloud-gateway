@@ -12,8 +12,10 @@ import (
 
 	"golang.org/x/net/http2"
 
+	"github.com/drathveloper/go-cloud-gateway/pkg/circuitbreaker"
 	"github.com/drathveloper/go-cloud-gateway/pkg/filter"
 	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
+	"github.com/drathveloper/go-cloud-gateway/pkg/httpclient"
 	"github.com/drathveloper/go-cloud-gateway/pkg/predicate"
 )
 
@@ -37,7 +39,24 @@ func NewGlobalFilters(
 }
 
 // NewHTTPClient creates a new http client from the given config.
-func NewHTTPClient(cfg *Config) (*http.Client, error) {
+// If any route has circuit breaker enabled, the http client will be wrapped with a circuit breaker client.
+// Otherwise, the http client will be returned as is.
+func NewHTTPClient(cfg *Config) (gateway.HTTPClient, error) {
+	httpClient, err := buildHTTPClient(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build http client: %w", err)
+	}
+	if cfg != nil {
+		for _, route := range cfg.Gateway.Routes {
+			if route.CircuitBreaker.Enabled {
+				return httpclient.NewCircuitBreakerHTTPClient(httpClient), nil
+			}
+		}
+	}
+	return httpClient, nil
+}
+
+func buildHTTPClient(cfg *Config) (*http.Client, error) {
 	tlsConfig, err := buildTLSConfig(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build TLS config: %w", err)
@@ -139,6 +158,7 @@ func buildDefaultHTTPClient(tlsConfig *tls.Config) *http.Client {
 	}
 }
 
+//nolint:bodyclose
 func mapRoutesFromConfigToGateway(
 	gwConfig Gateway,
 	predicateFactory *predicate.Factory,
@@ -155,7 +175,8 @@ func mapRoutesFromConfigToGateway(
 			return nil, fmt.Errorf("map routes from config to gateway failed: %w", err)
 		}
 		timeout := calculateTimeout(route.Timeout, gwConfig.GlobalTimeout)
-		buildRoute, err := gateway.NewRoute(route.ID, route.URI, predicates, filters, timeout, logger)
+		circuitBreaker := mapCircuitBreakerFromConfigToGateway(route.ID, route.CircuitBreaker)
+		buildRoute, err := gateway.NewRoute(route.ID, route.URI, predicates, filters, timeout, circuitBreaker, logger)
 		if err != nil {
 			return nil, fmt.Errorf("map routes from config to gateway failed: %w", err)
 		}
@@ -200,4 +221,23 @@ func mapFiltersFromConfigToGateway(
 		out = append(out, gwFilter)
 	}
 	return out, nil
+}
+
+//nolint:bodyclose
+func mapCircuitBreakerFromConfigToGateway(
+	name string, circuitBreaker CircuitBreaker) gateway.CircuitBreaker[*http.Response] {
+	if !circuitBreaker.Enabled {
+		return nil
+	}
+	settings := circuitbreaker.Settings{
+		Name:        name,
+		MaxRequests: uint32(circuitBreaker.NumAllowedHalfOpenCalls), //nolint:gosec
+		Interval:    circuitBreaker.Interval.Duration,
+		Timeout:     circuitBreaker.WaitDurationInOpenState.Duration,
+		ReadyToTrip: circuitbreaker.DefaultReadyToTrip(
+			circuitBreaker.MinRequestsThreshold, circuitBreaker.FailureRateThreshold),
+		OnStateChange: func(_ string, _, _ circuitbreaker.State) {},
+		IsSuccessful:  circuitbreaker.DefaultIsSuccessful(httpclient.ErrInternalServer),
+	}
+	return circuitbreaker.NewCircuitBreaker[*http.Response](settings)
 }

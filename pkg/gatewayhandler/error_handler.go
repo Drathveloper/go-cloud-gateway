@@ -50,6 +50,9 @@ func BaseErrorHandler() ErrorHandlerFunc {
 		case errors.Is(err, filter.ErrRateLimitExceeded):
 			logger.Error("rate limit exceeded", "error", err)
 			http.Error(writer, "", http.StatusTooManyRequests)
+		case errors.Is(err, gateway.ErrCircuitBreaker):
+			logger.Error("circuit breaker is open", "error", err)
+			http.Error(writer, "", http.StatusServiceUnavailable)
 		default:
 			logger.Error("unexpected error", "error", err)
 			http.Error(writer, "", http.StatusInternalServerError)
