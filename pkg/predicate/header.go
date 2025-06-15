@@ -64,3 +64,7 @@ func (p *Header) Test(request *http.Request) bool {
 	}
 	return true
 }
+
+func (p *Header) Name() string {
+	return HeaderPredicateName
+}

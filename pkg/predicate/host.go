@@ -62,3 +62,7 @@ func (p *Host) Test(request *http.Request) bool {
 	}
 	return false
 }
+
+func (p *Host) Name() string {
+	return HostPredicateName
+}

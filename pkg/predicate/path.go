@@ -46,3 +46,7 @@ func (p *Path) Test(r *http.Request) bool {
 	}
 	return false
 }
+
+func (p *Path) Name() string {
+	return PathPredicateName
+}

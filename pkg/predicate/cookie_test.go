@@ -148,3 +148,11 @@ func TestNewCookiePredicate(t *testing.T) {
 		})
 	}
 }
+
+func TestCookiePredicate_Name(t *testing.T) {
+	p, _ := predicate.NewCookiePredicate("SessionId", "1234")
+
+	if p.Name() != predicate.CookiePredicateName {
+		t.Errorf("expected %s actual %s", predicate.CookiePredicateName, p.Name())
+	}
+}

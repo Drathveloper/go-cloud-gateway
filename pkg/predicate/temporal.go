@@ -65,6 +65,10 @@ func (p *After) Test(_ *http.Request) bool {
 	return p.timeProvider.Now().UTC().After(p.dateTime)
 }
 
+func (p *After) Name() string {
+	return AfterPredicateName
+}
+
 // Before is a predicate that checks if the current time is before a given time.
 type Before struct {
 	dateTime     time.Time
@@ -110,6 +114,10 @@ func NewBeforePredicateBuilder() gateway.PredicateBuilderFunc {
 // The time is always represented in UTC.
 func (p *Before) Test(_ *http.Request) bool {
 	return p.timeProvider.Now().UTC().Before(p.dateTime)
+}
+
+func (p *Before) Name() string {
+	return BeforePredicateName
 }
 
 // Between is a predicate that checks if the current time is between a given time range.
@@ -166,4 +174,8 @@ func NewBetweenPredicateBuilder() gateway.PredicateBuilderFunc {
 func (p *Between) Test(_ *http.Request) bool {
 	now := p.timeProvider.Now()
 	return now.After(p.startDateTime) && now.Before(p.endDateTime)
+}
+
+func (p *Between) Name() string {
+	return BetweenPredicateName
 }

@@ -15,6 +15,10 @@ func (d DummyPredicate) Test(_ *http.Request) bool {
 	return d.Matches
 }
 
+func (d DummyPredicate) Name() string {
+	return "dummy"
+}
+
 func TestPredicates_TestAll(t *testing.T) {
 	tests := []struct {
 		name       string

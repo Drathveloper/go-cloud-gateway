@@ -102,3 +102,11 @@ func TestHeaderPredicate_Test(t *testing.T) {
 		})
 	}
 }
+
+func TestHeaderPredicate_Name(t *testing.T) {
+	p, _ := predicate.NewHeaderPredicate("X-Test-Id", "1234")
+
+	if p.Name() != predicate.HeaderPredicateName {
+		t.Errorf("expected %s actual %s", predicate.HeaderPredicateName, p.Name())
+	}
+}

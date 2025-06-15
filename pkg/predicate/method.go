@@ -38,11 +38,15 @@ func NewMethodPredicateBuilder() gateway.PredicateBuilderFunc {
 //
 // If the request method does not match any method, the predicate will return false.
 // If the request method matches at least one method, the predicate will return true.
-func (m *Method) Test(r *http.Request) bool {
-	for _, method := range m.methods {
+func (p *Method) Test(r *http.Request) bool {
+	for _, method := range p.methods {
 		if r.Method == method {
 			return true
 		}
 	}
 	return false
+}
+
+func (p *Method) Name() string {
+	return MethodPredicateName
 }
