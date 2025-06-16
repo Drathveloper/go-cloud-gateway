@@ -47,6 +47,7 @@ func (p *Method) Test(r *http.Request) bool {
 	return false
 }
 
+// Name returns the name of the predicate.
 func (p *Method) Name() string {
 	return MethodPredicateName
 }

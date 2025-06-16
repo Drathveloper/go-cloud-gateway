@@ -67,9 +67,7 @@ linters:
           - revive
         text: 'package-comments:'
     paths:
-      - third_party$
-      - builtin$
-      - examples$
+      - ^examples/
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0

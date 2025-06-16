@@ -67,6 +67,7 @@ func (p *Query) Test(request *http.Request) bool {
 	return true
 }
 
+// Name returns the name of the predicate.
 func (p *Query) Name() string {
 	return QueryPredicateName
 }

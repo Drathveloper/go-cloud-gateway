@@ -65,6 +65,7 @@ func (p *After) Test(_ *http.Request) bool {
 	return p.timeProvider.Now().UTC().After(p.dateTime)
 }
 
+// Name returns the name of the predicate.
 func (p *After) Name() string {
 	return AfterPredicateName
 }
@@ -116,6 +117,7 @@ func (p *Before) Test(_ *http.Request) bool {
 	return p.timeProvider.Now().UTC().Before(p.dateTime)
 }
 
+// Name returns the name of the predicate.
 func (p *Before) Name() string {
 	return BeforePredicateName
 }
@@ -176,6 +178,7 @@ func (p *Between) Test(_ *http.Request) bool {
 	return now.After(p.startDateTime) && now.Before(p.endDateTime)
 }
 
+// Name returns the name of the predicate.
 func (p *Between) Name() string {
 	return BetweenPredicateName
 }

@@ -65,6 +65,7 @@ func (p *Header) Test(request *http.Request) bool {
 	return true
 }
 
+// Name returns the name of the predicate.
 func (p *Header) Name() string {
 	return HeaderPredicateName
 }

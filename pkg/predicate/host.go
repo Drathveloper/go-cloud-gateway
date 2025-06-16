@@ -63,6 +63,7 @@ func (p *Host) Test(request *http.Request) bool {
 	return false
 }
 
+// Name returns the name of the predicate.
 func (p *Host) Name() string {
 	return HostPredicateName
 }
