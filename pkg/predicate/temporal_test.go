@@ -85,6 +85,14 @@ func TestNewBeforePredicateBuilder(t *testing.T) {
 	}
 }
 
+func TestBeforePredicate_Name(t *testing.T) {
+	p := predicate.NewBeforePredicate(time.Now())
+
+	if p.Name() != predicate.BeforePredicateName {
+		t.Errorf("expected %s actual %s", predicate.BeforePredicateName, p.Name())
+	}
+}
+
 func TestAfterPredicate_Test(t *testing.T) {
 	tests := []struct {
 		before   time.Time
@@ -149,6 +157,14 @@ func TestNewAfterPredicateBuilder(t *testing.T) {
 				t.Errorf("expected %v to be present", actual)
 			}
 		})
+	}
+}
+
+func TestAfterPredicate_Name(t *testing.T) {
+	p := predicate.NewAfterPredicate(time.Now())
+
+	if p.Name() != predicate.AfterPredicateName {
+		t.Errorf("expected %s actual %s", predicate.AfterPredicateName, p.Name())
 	}
 }
 
@@ -237,5 +253,13 @@ func TestBetweenPredicate_Test(t *testing.T) {
 				t.Errorf("expected %t actual %t", tt.expected, actual)
 			}
 		})
+	}
+}
+
+func TestBetweenPredicate_Name(t *testing.T) {
+	p := predicate.NewBetweenPredicate(time.Now(), time.Now())
+
+	if p.Name() != predicate.BetweenPredicateName {
+		t.Errorf("expected %s actual %s", predicate.BetweenPredicateName, p.Name())
 	}
 }

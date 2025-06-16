@@ -81,3 +81,11 @@ func TestHostPredicate_Test(t *testing.T) {
 		})
 	}
 }
+
+func TestHostPredicate_Name(t *testing.T) {
+	p, _ := predicate.NewHostPredicate("example.org")
+
+	if p.Name() != predicate.HostPredicateName {
+		t.Errorf("expected %s actual %s", predicate.HostPredicateName, p.Name())
+	}
+}

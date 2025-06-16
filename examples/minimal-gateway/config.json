@@ -1,0 +1,26 @@
+{
+  "gateway": {
+    "global-filters": [
+      {
+        "name": "RequestResponseLogger"
+      }
+    ],
+    "routes": [
+      {
+        "id": "default_route",
+        "uri": "http://localhost:8001",
+        "predicates": [
+          {
+            "name": "Path",
+            "args": {
+              "patterns": [
+                "/**"
+              ]
+            }
+          }
+        ],
+        "filters": []
+      }
+    ]
+  }
+}

@@ -8,6 +8,7 @@ import (
 type Predicate interface {
 	// Test returns true if the request should be forwarded to the backend.
 	Test(request *http.Request) bool
+	Name() string
 }
 
 // PredicateBuilder represents a predicate builder.

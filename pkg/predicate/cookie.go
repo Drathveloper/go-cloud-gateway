@@ -70,3 +70,8 @@ func (p *Cookie) Test(request *http.Request) bool {
 	}
 	return false
 }
+
+// Name returns the name of the predicate.
+func (p *Cookie) Name() string {
+	return CookiePredicateName
+}

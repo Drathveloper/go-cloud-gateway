@@ -102,3 +102,11 @@ func TestQueryPredicate_Test(t *testing.T) {
 		})
 	}
 }
+
+func TestQueryPredicate_Name(t *testing.T) {
+	p, _ := predicate.NewQueryPredicate("name", "")
+
+	if p.Name() != predicate.QueryPredicateName {
+		t.Errorf("expected %s actual %s", predicate.QueryPredicateName, p.Name())
+	}
+}
