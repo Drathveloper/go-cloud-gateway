@@ -42,13 +42,14 @@ func BenchmarkServeHTTP_HappyPath(b *testing.B) {
 			pred,
 		},
 	}
+	body := []byte(`{"status":"ok"}`)
 	handler := gatewayhandler.NewGatewayHandler(
 		&mockGateway{
 			doFunc: func(ctx *gateway.Context) error {
 				ctx.Response = &gateway.Response{
-					Status:  http.StatusOK,
-					Headers: http.Header{"Content-Type": {"application/json"}},
-					Body:    []byte(`{"status":"ok"}`),
+					Status:     http.StatusOK,
+					Headers:    http.Header{"Content-Type": {"application/json"}},
+					BodyReader: gateway.NewReplayableBody(io.NopCloser(bytes.NewBuffer(body)), int64(len(body))),
 				}
 				return nil
 			},
@@ -133,14 +134,14 @@ func BenchmarkServeHTTP_LargeBody(b *testing.B) {
 		URI: uri,
 	}
 	largeBody := strings.Repeat("a", 1024*1024) // 1MB
-
+	body := []byte(`{"status":"ok"}`)
 	gwHandler := gatewayhandler.NewGatewayHandler(
 		&mockGateway{
 			doFunc: func(ctx *gateway.Context) error {
 				ctx.Response = &gateway.Response{
-					Status:  http.StatusOK,
-					Headers: http.Header{"Content-Type": {"application/json"}},
-					Body:    []byte(`{"status":"ok"}`),
+					Status:     http.StatusOK,
+					Headers:    http.Header{"Content-Type": {"application/json"}},
+					BodyReader: gateway.NewReplayableBody(io.NopCloser(bytes.NewBuffer(body)), int64(len(body))),
 				}
 				return nil
 			},

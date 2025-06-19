@@ -98,7 +98,7 @@ func TestAddResponseHeaderFilter_PostProcess(t *testing.T) {
 				StatusCode: http.StatusOK,
 				Header:     tt.currentHeaders,
 			}
-			gwRes, _ := gateway.NewGatewayResponse(res)
+			gwRes := gateway.NewGatewayResponse(res)
 			ctx.Response = gwRes
 
 			f := filter.NewAddResponseHeaderFilter(tt.headerKey, tt.headerValue)
@@ -209,7 +209,7 @@ func TestSetResponseHeaderFilter_PostProcess(t *testing.T) {
 				StatusCode: http.StatusOK,
 				Header:     tt.currentHeaders,
 			}
-			gwRes, _ := gateway.NewGatewayResponse(res)
+			gwRes := gateway.NewGatewayResponse(res)
 			ctx.Response = gwRes
 
 			f := filter.NewSetResponseHeaderFilter(tt.headerKey, tt.headerValue)
@@ -307,7 +307,7 @@ func TestRemoveResponseHeaderFilter_PostProcess(t *testing.T) {
 				StatusCode: http.StatusOK,
 				Header:     tt.currentHeaders,
 			}
-			gwRes, _ := gateway.NewGatewayResponse(res)
+			gwRes := gateway.NewGatewayResponse(res)
 			ctx.Response = gwRes
 
 			f := filter.NewRemoveResponseHeaderFilter(tt.headerKey)

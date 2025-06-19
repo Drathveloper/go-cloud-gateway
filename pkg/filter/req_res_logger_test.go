@@ -183,7 +183,7 @@ func TestRequestResponseLogger_PostProcess(t *testing.T) {
 				Header:     tt.headers,
 				Body:       bodyBytes,
 			}
-			gwRes, _ := gateway.NewGatewayResponse(res)
+			gwRes := gateway.NewGatewayResponse(res)
 			ctx, _ := gateway.NewGatewayContext(&gateway.Route{}, nil)
 			ctx.Logger = logger
 			ctx.Response = gwRes

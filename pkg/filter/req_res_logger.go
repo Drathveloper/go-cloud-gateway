@@ -1,6 +1,9 @@
 package filter
 
 import (
+	"bytes"
+	"fmt"
+	"io"
 	"log/slog"
 	"strings"
 
@@ -45,10 +48,17 @@ func NewRequestResponseLoggerBuilder() gateway.FilterBuilder {
 // PreProcess logs the request.
 func (f *RequestResponseLogger) PreProcess(ctx *gateway.Context) error {
 	if ctx.Logger.Enabled(ctx, f.level) {
+		if err := ctx.Request.BodyReader.Capture(); err != nil {
+			return fmt.Errorf("failed to capture request body: %w", err)
+		}
+		buf := bytes.NewBuffer(nil)
+		if _, err := io.Copy(buf, ctx.Request.BodyReader); err != nil {
+			return fmt.Errorf("failed to copy request body: %w", err)
+		}
 		ctx.Logger.Log(ctx, f.level, "Received request",
 			"url", ctx.Request.Method+" "+ctx.Request.URL.String(),
 			"headers", ctx.Request.Headers,
-			"body", ctx.Request.Body)
+			"body", buf.Bytes())
 	}
 	return nil
 }
@@ -56,10 +66,17 @@ func (f *RequestResponseLogger) PreProcess(ctx *gateway.Context) error {
 // PostProcess logs the response.
 func (f *RequestResponseLogger) PostProcess(ctx *gateway.Context) error {
 	if ctx.Logger.Enabled(ctx, f.level) {
+		if err := ctx.Response.BodyReader.Capture(); err != nil {
+			return fmt.Errorf("failed to capture response body: %w", err)
+		}
+		buf := bytes.NewBuffer(nil)
+		if _, err := io.Copy(buf, ctx.Response.BodyReader); err != nil {
+			return fmt.Errorf("failed to copy response body: %w", err)
+		}
 		ctx.Logger.Log(ctx, f.level, "Returned response",
 			"status", ctx.Response.Status,
 			"headers", ctx.Response.Headers,
-			"body", ctx.Response.Body)
+			"body", buf.Bytes())
 	}
 	return nil
 }

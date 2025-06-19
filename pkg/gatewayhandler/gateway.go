@@ -2,8 +2,10 @@ package gatewayhandler
 
 import (
 	"errors"
+	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 
 	"github.com/drathveloper/go-cloud-gateway/internal/pkg/common"
 	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
@@ -58,10 +60,15 @@ func (h *GatewayHandler) ServeHTTP(writer http.ResponseWriter, request *http.Req
 		h.errHandler.Handle(ctx.Logger, err, writer)
 		return
 	}
+
+	if ctx.Response.BodyReader.Len() == -1 {
+		writer.Header().Set("Transfer-Encoding", "chunked")
+	} else {
+		writer.Header().Set("Content-Length", strconv.FormatInt(ctx.Response.BodyReader.Len(), 10))
+	}
 	common.WriteHeader(writer, ctx.Response.Headers)
 	writer.WriteHeader(ctx.Response.Status)
-	if len(ctx.Response.Body) > 0 {
-		_, _ = writer.Write(ctx.Response.Body)
-	}
+	_, _ = io.Copy(writer, ctx.Response.BodyReader)
+
 	gateway.ReleaseGatewayContext(ctx)
 }
