@@ -21,8 +21,8 @@ func BenchmarkNewGatewayRequest(b *testing.B) {
 			Header: http.Header{"Content-Type": {"application/json"}},
 			Body:   io.NopCloser(bytes.NewReader(body)),
 		}
-		r, err := gateway.NewGatewayRequest(req)
-		if err != nil || r.BodyReader == nil {
+		r := gateway.NewGatewayRequest(req)
+		if r.BodyReader == nil {
 			b.Fatal("failed to create gateway request")
 		}
 	}
@@ -38,8 +38,8 @@ func BenchmarkNewGatewayRequest_LargeBody(b *testing.B) {
 			Header: http.Header{"Content-Type": {"application/json"}},
 			Body:   io.NopCloser(bytes.NewReader(largeBody)),
 		}
-		r, err := gateway.NewGatewayRequest(req)
-		if err != nil || r.BodyReader == nil {
+		r := gateway.NewGatewayRequest(req)
+		if r.BodyReader == nil {
 			b.Fatal("failed to create gateway request")
 		}
 	}

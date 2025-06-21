@@ -36,14 +36,14 @@ type Request struct {
 }
 
 // NewGatewayRequest creates a new gateway request from an http request.
-func NewGatewayRequest(request *http.Request) (*Request, error) {
+func NewGatewayRequest(request *http.Request) *Request {
 	return &Request{
 		RemoteAddr: common.GetRemoteAddr(request),
 		URL:        request.URL,
 		Method:     request.Method,
 		Headers:    request.Header,
 		BodyReader: NewReplayableBody(request.Body, request.ContentLength),
-	}, nil
+	}
 }
 
 // Response represents a gateway response.

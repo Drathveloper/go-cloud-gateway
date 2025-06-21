@@ -16,22 +16,6 @@ import (
 	"github.com/drathveloper/go-cloud-gateway/pkg/predicate"
 )
 
-type mockGateway struct {
-	doFunc func(ctx *gateway.Context) error
-}
-
-func (m *mockGateway) Do(ctx *gateway.Context) error {
-	return m.doFunc(ctx)
-}
-
-type mockErrorHandler struct {
-	handleFunc func(logger *slog.Logger, err error, w http.ResponseWriter)
-}
-
-func (m *mockErrorHandler) Handle(logger *slog.Logger, err error, w http.ResponseWriter) {
-	m.handleFunc(logger, err, w)
-}
-
 func BenchmarkServeHTTP_HappyPath(b *testing.B) {
 	uri, _ := url.Parse("http://localhost")
 	pred := predicate.NewPathPredicate("/test")
