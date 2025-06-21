@@ -16,22 +16,6 @@ import (
 	"github.com/drathveloper/go-cloud-gateway/pkg/predicate"
 )
 
-type mockGateway struct {
-	doFunc func(ctx *gateway.Context) error
-}
-
-func (m *mockGateway) Do(ctx *gateway.Context) error {
-	return m.doFunc(ctx)
-}
-
-type mockErrorHandler struct {
-	handleFunc func(logger *slog.Logger, err error, w http.ResponseWriter)
-}
-
-func (m *mockErrorHandler) Handle(logger *slog.Logger, err error, w http.ResponseWriter) {
-	m.handleFunc(logger, err, w)
-}
-
 func BenchmarkServeHTTP_HappyPath(b *testing.B) {
 	uri, _ := url.Parse("http://localhost")
 	pred := predicate.NewPathPredicate("/test")
@@ -42,13 +26,14 @@ func BenchmarkServeHTTP_HappyPath(b *testing.B) {
 			pred,
 		},
 	}
+	body := []byte(`{"status":"ok"}`)
 	handler := gatewayhandler.NewGatewayHandler(
 		&mockGateway{
 			doFunc: func(ctx *gateway.Context) error {
 				ctx.Response = &gateway.Response{
-					Status:  http.StatusOK,
-					Headers: http.Header{"Content-Type": {"application/json"}},
-					Body:    []byte(`{"status":"ok"}`),
+					Status:     http.StatusOK,
+					Headers:    http.Header{"Content-Type": {"application/json"}},
+					BodyReader: gateway.NewReplayableBody(io.NopCloser(bytes.NewBuffer(body)), int64(len(body))),
 				}
 				return nil
 			},
@@ -133,14 +118,14 @@ func BenchmarkServeHTTP_LargeBody(b *testing.B) {
 		URI: uri,
 	}
 	largeBody := strings.Repeat("a", 1024*1024) // 1MB
-
+	body := []byte(`{"status":"ok"}`)
 	gwHandler := gatewayhandler.NewGatewayHandler(
 		&mockGateway{
 			doFunc: func(ctx *gateway.Context) error {
 				ctx.Response = &gateway.Response{
-					Status:  http.StatusOK,
-					Headers: http.Header{"Content-Type": {"application/json"}},
-					Body:    []byte(`{"status":"ok"}`),
+					Status:     http.StatusOK,
+					Headers:    http.Header{"Content-Type": {"application/json"}},
+					BodyReader: gateway.NewReplayableBody(io.NopCloser(bytes.NewBuffer(body)), int64(len(body))),
 				}
 				return nil
 			},

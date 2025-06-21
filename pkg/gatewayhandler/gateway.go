@@ -2,8 +2,10 @@ package gatewayhandler
 
 import (
 	"errors"
+	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 
 	"github.com/drathveloper/go-cloud-gateway/internal/pkg/common"
 	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
@@ -47,21 +49,26 @@ func (h *GatewayHandler) ServeHTTP(writer http.ResponseWriter, request *http.Req
 		h.errHandler.Handle(logger, ErrRouteNotFound, writer)
 		return
 	}
-	gwRequest, err := gateway.NewGatewayRequest(request)
-	if err != nil {
-		h.errHandler.Handle(logger, err, writer)
-		return
-	}
+	gwRequest := gateway.NewGatewayRequest(request)
 	ctx, cancel := gateway.NewGatewayContext(route, gwRequest)
 	defer cancel()
-	if err = h.gateway.Do(ctx); err != nil {
+	if err := h.gateway.Do(ctx); err != nil {
 		h.errHandler.Handle(ctx.Logger, err, writer)
 		return
 	}
-	common.WriteHeader(writer, ctx.Response.Headers)
-	writer.WriteHeader(ctx.Response.Status)
-	if len(ctx.Response.Body) > 0 {
-		_, _ = writer.Write(ctx.Response.Body)
+
+	if ctx.Response.BodyReader.Len() == -1 {
+		writer.Header().Set("Transfer-Encoding", "chunked")
+	} else {
+		writer.Header().Set("Content-Length", strconv.FormatInt(ctx.Response.BodyReader.Len(), 10))
 	}
+	h.writeResponse(writer, ctx.Response)
 	gateway.ReleaseGatewayContext(ctx)
+}
+
+func (h *GatewayHandler) writeResponse(writer http.ResponseWriter, response *gateway.Response) {
+	common.WriteHeader(writer, response.Headers)
+	writer.WriteHeader(response.Status)
+	_, _ = io.Copy(writer, response.BodyReader)
+	_ = response.BodyReader.Close()
 }

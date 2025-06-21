@@ -20,6 +20,7 @@ linters:
             - golang.org/x/net/http2
             - gopkg.in/yaml.v3
             - io
+            - math/rand
             - reflect
             - regexp
             - runtime

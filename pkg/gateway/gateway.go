@@ -1,13 +1,10 @@
 package gateway
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
-	"sync"
 
 	"github.com/drathveloper/go-cloud-gateway/pkg/circuitbreaker"
 )
@@ -25,11 +22,6 @@ type HTTPClient interface {
 }
 
 const gatewayErrMsg = "gateway request for route %s failed: %w"
-
-//nolint:gochecknoglobals
-var readerPool = sync.Pool{
-	New: func() any { return new(bytes.Reader) },
-}
 
 // Gateway is the gateway struct. It holds the gateway configuration and the http client.
 type Gateway struct {
@@ -53,21 +45,12 @@ func (g *Gateway) Do(ctx *Context) error {
 	if err := allFilters.PreProcessAll(ctx); err != nil {
 		return fmt.Errorf(gatewayErrMsg, ctx.Route.ID, err)
 	}
-	backendReq, reader, err := g.buildProxyRequest(ctx)
-	if err != nil {
-		return fmt.Errorf(gatewayErrMsg, ctx.Route.ID, err)
-	}
+	backendReq := g.buildProxyRequest(ctx)
 	backendRes, err := g.httpClient.Do(backendReq) //nolint:bodyclose
-	if reader != nil {
-		readerPool.Put(reader)
-	}
 	if err != nil {
 		return g.handleBackendError(ctx, err)
 	}
-	ctx.Response, err = NewGatewayResponse(backendRes)
-	if err != nil {
-		return fmt.Errorf(gatewayErrMsg, ctx.Route.ID, err)
-	}
+	ctx.Response = NewGatewayResponse(backendRes)
 	if err = allFilters.PostProcessAll(ctx); err != nil {
 		return fmt.Errorf(gatewayErrMsg, ctx.Route.ID, err)
 	}
@@ -85,33 +68,13 @@ func (g *Gateway) handleBackendError(ctx *Context, err error) error {
 	}
 }
 
-func (g *Gateway) buildProxyRequest(ctx *Context) (*http.Request, *bytes.Reader, error) {
-	if len(ctx.Request.Body) == 0 {
-		return g.buildNoBodyProxyRequest(ctx), nil, nil
-	}
-	return g.buildBodyProxyRequest(ctx)
-}
-
-func (g *Gateway) buildBodyProxyRequest(ctx *Context) (*http.Request, *bytes.Reader, error) {
-	reader := readerPool.Get().(*bytes.Reader) //nolint:forcetypeassert
-	reader.Reset(ctx.Request.Body)
+func (g *Gateway) buildProxyRequest(ctx *Context) *http.Request {
 	req := &http.Request{
-		ContentLength: int64(len(ctx.Request.Body)),
+		ContentLength: ctx.Request.BodyReader.Len(),
 		Method:        ctx.Request.Method,
 		URL:           ctx.Route.GetDestinationURL(ctx.Request.URL),
 		Header:        ctx.Request.Headers,
-		Body:          io.NopCloser(reader),
-	}
-	return req.WithContext(ctx), reader, nil
-}
-
-func (g *Gateway) buildNoBodyProxyRequest(ctx *Context) *http.Request {
-	req := &http.Request{
-		ContentLength: 0,
-		Method:        ctx.Request.Method,
-		URL:           ctx.Route.GetDestinationURL(ctx.Request.URL),
-		Header:        ctx.Request.Headers,
-		Body:          http.NoBody,
+		Body:          ctx.Request.BodyReader,
 	}
 	return req.WithContext(ctx)
 }

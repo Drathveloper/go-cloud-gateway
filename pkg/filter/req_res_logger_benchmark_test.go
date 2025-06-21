@@ -3,6 +3,7 @@ package filter_test
 import (
 	"bytes"
 	"context"
+	"io"
 	"log/slog"
 	"net/url"
 	"testing"
@@ -24,14 +25,14 @@ func newSilentLogger() *slog.Logger {
 
 func BenchmarkRequestResponseLogger_SilentPreProcess(b *testing.B) {
 	f := filter.NewRequestResponseLoggerFilter(slog.LevelInfo)
-
+	body := []byte(`request body`)
 	ctx := &gateway.Context{
 		Logger: newSilentLogger(),
 		Request: &gateway.Request{
-			Method:  "GET",
-			URL:     mustParseURL("https://example.com/test"),
-			Headers: map[string][]string{"X-Test": {"true"}},
-			Body:    []byte("request body"),
+			Method:     "GET",
+			URL:        mustParseURL("https://example.com/test"),
+			Headers:    map[string][]string{"X-Test": {"true"}},
+			BodyReader: gateway.NewReplayableBody(io.NopCloser(bytes.NewBuffer(body)), int64(len(body))),
 		},
 	}
 
@@ -43,13 +44,13 @@ func BenchmarkRequestResponseLogger_SilentPreProcess(b *testing.B) {
 
 func BenchmarkRequestResponseLogger_SilentPostProcess(b *testing.B) {
 	f := filter.NewRequestResponseLoggerFilter(slog.LevelInfo)
-
+	body := []byte(`{"status":"ok"}`)
 	ctx := &gateway.Context{
 		Logger: newSilentLogger(),
 		Response: &gateway.Response{
-			Status:  200,
-			Headers: map[string][]string{"Content-Type": {"application/json"}},
-			Body:    []byte(`{"status":"ok"}`),
+			Status:     200,
+			Headers:    map[string][]string{"Content-Type": {"application/json"}},
+			BodyReader: gateway.NewReplayableBody(io.NopCloser(bytes.NewBuffer(body)), int64(len(body))),
 		},
 	}
 
@@ -63,14 +64,14 @@ func BenchmarkRequestResponseLogger_PreProcess_WithRealLogger(b *testing.B) {
 	f := filter.NewRequestResponseLoggerFilter(slog.LevelInfo)
 	var buf bytes.Buffer
 	logger := newBufferedLogger(&buf)
-
+	body := []byte(`{"key":"value"}`)
 	ctx := &gateway.Context{
 		Logger: logger,
 		Request: &gateway.Request{
-			Method:  "POST",
-			URL:     mustParseURL("https://example.com/api"),
-			Headers: map[string][]string{"Authorization": {"Bearer xyz"}},
-			Body:    []byte(`{"key":"value"}`),
+			Method:     "POST",
+			URL:        mustParseURL("https://example.com/api"),
+			Headers:    map[string][]string{"Authorization": {"Bearer xyz"}},
+			BodyReader: gateway.NewReplayableBody(io.NopCloser(bytes.NewBuffer(body)), int64(len(body))),
 		},
 	}
 
@@ -85,13 +86,13 @@ func BenchmarkRequestResponseLogger_PostProcess_WithRealLogger(b *testing.B) {
 	f := filter.NewRequestResponseLoggerFilter(slog.LevelInfo)
 	var buf bytes.Buffer
 	logger := newBufferedLogger(&buf)
-
+	body := []byte(`{"success":true}`)
 	ctx := &gateway.Context{
 		Logger: logger,
 		Response: &gateway.Response{
-			Status:  201,
-			Headers: map[string][]string{"Content-Type": {"application/json"}},
-			Body:    []byte(`{"success":true}`),
+			Status:     201,
+			Headers:    map[string][]string{"Content-Type": {"application/json"}},
+			BodyReader: gateway.NewReplayableBody(io.NopCloser(bytes.NewBuffer(body)), int64(len(body))),
 		},
 	}
 

@@ -92,13 +92,13 @@ func TestAddResponseHeaderFilter_PostProcess(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
-			gwReq, _ := gateway.NewGatewayRequest(req)
+			gwReq := gateway.NewGatewayRequest(req)
 			ctx, _ := gateway.NewGatewayContext(&gateway.Route{}, gwReq)
 			res := &http.Response{
 				StatusCode: http.StatusOK,
 				Header:     tt.currentHeaders,
 			}
-			gwRes, _ := gateway.NewGatewayResponse(res)
+			gwRes := gateway.NewGatewayResponse(res)
 			ctx.Response = gwRes
 
 			f := filter.NewAddResponseHeaderFilter(tt.headerKey, tt.headerValue)
@@ -203,13 +203,13 @@ func TestSetResponseHeaderFilter_PostProcess(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 			req.Header = tt.currentHeaders
-			gwReq, _ := gateway.NewGatewayRequest(req)
+			gwReq := gateway.NewGatewayRequest(req)
 			ctx, _ := gateway.NewGatewayContext(&gateway.Route{}, gwReq)
 			res := &http.Response{
 				StatusCode: http.StatusOK,
 				Header:     tt.currentHeaders,
 			}
-			gwRes, _ := gateway.NewGatewayResponse(res)
+			gwRes := gateway.NewGatewayResponse(res)
 			ctx.Response = gwRes
 
 			f := filter.NewSetResponseHeaderFilter(tt.headerKey, tt.headerValue)
@@ -301,13 +301,13 @@ func TestRemoveResponseHeaderFilter_PostProcess(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 			req.Header = tt.currentHeaders
-			gwReq, _ := gateway.NewGatewayRequest(req)
+			gwReq := gateway.NewGatewayRequest(req)
 			ctx, _ := gateway.NewGatewayContext(&gateway.Route{}, gwReq)
 			res := &http.Response{
 				StatusCode: http.StatusOK,
 				Header:     tt.currentHeaders,
 			}
-			gwRes, _ := gateway.NewGatewayResponse(res)
+			gwRes := gateway.NewGatewayResponse(res)
 			ctx.Response = gwRes
 
 			f := filter.NewRemoveResponseHeaderFilter(tt.headerKey)

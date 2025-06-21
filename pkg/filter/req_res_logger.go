@@ -45,10 +45,14 @@ func NewRequestResponseLoggerBuilder() gateway.FilterBuilder {
 // PreProcess logs the request.
 func (f *RequestResponseLogger) PreProcess(ctx *gateway.Context) error {
 	if ctx.Logger.Enabled(ctx, f.level) {
+		var body []byte
+		if err := ctx.Request.BodyReader.Capture(); err == nil {
+			body, _ = common.ReadBody(ctx.Request.BodyReader)
+		}
 		ctx.Logger.Log(ctx, f.level, "Received request",
 			"url", ctx.Request.Method+" "+ctx.Request.URL.String(),
 			"headers", ctx.Request.Headers,
-			"body", ctx.Request.Body)
+			"body", body)
 	}
 	return nil
 }
@@ -56,10 +60,14 @@ func (f *RequestResponseLogger) PreProcess(ctx *gateway.Context) error {
 // PostProcess logs the response.
 func (f *RequestResponseLogger) PostProcess(ctx *gateway.Context) error {
 	if ctx.Logger.Enabled(ctx, f.level) {
+		var body []byte
+		if err := ctx.Response.BodyReader.Capture(); err == nil {
+			body, _ = common.ReadBody(ctx.Response.BodyReader)
+		}
 		ctx.Logger.Log(ctx, f.level, "Returned response",
 			"status", ctx.Response.Status,
 			"headers", ctx.Response.Headers,
-			"body", ctx.Response.Body)
+			"body", body)
 	}
 	return nil
 }

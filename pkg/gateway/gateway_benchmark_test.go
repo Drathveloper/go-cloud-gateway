@@ -1,7 +1,9 @@
 package gateway_test
 
 import (
+	"bytes"
 	"errors"
+	"io"
 	"net/http"
 	"net/url"
 	"testing"
@@ -27,10 +29,10 @@ func (c *dummyHTTPClient) Do(_ *http.Request) (*http.Response, error) {
 func newDummyContext() *gateway.Context {
 	reqURL, _ := url.Parse("https://example.com")
 	req := &gateway.Request{
-		Method:  http.MethodGet,
-		URL:     reqURL,
-		Headers: make(http.Header),
-		Body:    []byte("payload"),
+		Method:     http.MethodGet,
+		URL:        reqURL,
+		Headers:    make(http.Header),
+		BodyReader: gateway.NewReplayableBody(io.NopCloser(bytes.NewBuffer([]byte("payload"))), int64(len("payload"))),
 	}
 	routeURL, _ := url.Parse("https://example.com/test")
 	route := &gateway.Route{
