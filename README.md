@@ -99,7 +99,8 @@ This design enables dynamic creation and application of filters and predicates b
 Key external libraries are used:
 
 * [`github.com/go-playground/validator/v10`](https://pkg.go.dev/github.com/go-playground/validator/v10): For configuration validation.
-* [`github.com/google/uuid`](https://pkg.go.dev/github.com/google/uuid): For generating UUIDs, useful in request tracking.
+* [`github.com/stretchr/testify`](https://pkg.go.dev/github.com/stretchr/testify): For additional testing utilities.
+* [`golang.org/x/net`](https://pkg.go.dev/golang.org/x/net): For http2 networking package.
 * [`gopkg.in/yaml.v3`](https://pkg.go.dev/gopkg.in/yaml.v3): For parsing YAML configuration files.
 
 ## Contributing
