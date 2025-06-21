@@ -29,6 +29,8 @@ func NewFactory(registry gateway.PredicateBuilderRegistry) *Factory {
 // If the predicate builder is found and the args are valid, the factory will return a predicate.
 //
 // The args are expected to be a map of strings to any.
+//
+//nolint:ireturn
 func (f *Factory) Build(name string, args map[string]any) (gateway.Predicate, error) {
 	if f.registry[name] != nil {
 		fi, err := f.registry[name].Build(args)

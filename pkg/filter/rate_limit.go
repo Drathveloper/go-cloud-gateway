@@ -45,10 +45,10 @@ func NewRateLimitFilter(limiter ratelimit.RateLimiter, keyFunc ratelimit.KeyFunc
 // The args are expected to contain the following keys:
 // - type: the type of the rate limiter.
 // - key: the key of the rate limiter.
-// other specific args are expected to be passed to the rate limiter and key func builders depending on the
+// Other specific args are expected to be passed to the rate limiter and key func builders depending on the
 // implementation details.
-func NewRateLimitBuilder() gateway.FilterBuilder {
-	return gateway.FilterBuilderFunc(func(args map[string]any) (gateway.Filter, error) {
+func NewRateLimitBuilder() gateway.FilterBuilderFunc {
+	return func(args map[string]any) (gateway.Filter, error) {
 		rateLimitType, err := common.ConvertToString(args["type"])
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert 'type' attribute: %w", err)
@@ -74,7 +74,7 @@ func NewRateLimitBuilder() gateway.FilterBuilder {
 			return nil, fmt.Errorf("failed to build rate limiter: %w", err)
 		}
 		return NewRateLimitFilter(rateLimiter, keyFunc), nil
-	})
+	}
 }
 
 // PreProcess checks if the request is allowed to proceed.

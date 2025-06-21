@@ -33,8 +33,8 @@ func NewAddRequestHeaderFilter(name, value string) *AddRequestHeader {
 }
 
 // NewAddRequestHeaderBuilder creates a new AddRequestHeaderBuilder.
-func NewAddRequestHeaderBuilder() gateway.FilterBuilder {
-	return gateway.FilterBuilderFunc(func(args map[string]any) (gateway.Filter, error) {
+func NewAddRequestHeaderBuilder() gateway.FilterBuilderFunc {
+	return func(args map[string]any) (gateway.Filter, error) {
 		name, err := common.ConvertToString(args["name"])
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert 'name' attribute: %w", err)
@@ -44,7 +44,7 @@ func NewAddRequestHeaderBuilder() gateway.FilterBuilder {
 			return nil, fmt.Errorf("failed to convert 'value' attribute: %w", err)
 		}
 		return NewAddRequestHeaderFilter(name, value), nil
-	})
+	}
 }
 
 // PreProcess adds the header to the request.
@@ -70,8 +70,8 @@ type SetRequestHeader struct {
 }
 
 // NewSetRequestHeaderBuilder creates a new SetRequestHeaderBuilder.
-func NewSetRequestHeaderBuilder() gateway.FilterBuilder {
-	return gateway.FilterBuilderFunc(func(args map[string]any) (gateway.Filter, error) {
+func NewSetRequestHeaderBuilder() gateway.FilterBuilderFunc {
+	return func(args map[string]any) (gateway.Filter, error) {
 		name, err := common.ConvertToString(args["name"])
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert 'name' attribute: %w", err)
@@ -81,7 +81,7 @@ func NewSetRequestHeaderBuilder() gateway.FilterBuilder {
 			return nil, fmt.Errorf("failed to convert 'value' attribute: %w", err)
 		}
 		return NewSetRequestHeaderFilter(name, value), nil
-	})
+	}
 }
 
 // NewSetRequestHeaderFilter creates a new SetRequestHeaderFilter.
@@ -121,14 +121,14 @@ func NewRemoveRequestHeaderFilter(name string) *RemoveRequestHeader {
 }
 
 // NewRemoveRequestHeaderBuilder creates a new RemoveRequestHeaderBuilder.
-func NewRemoveRequestHeaderBuilder() gateway.FilterBuilder {
-	return gateway.FilterBuilderFunc(func(args map[string]any) (gateway.Filter, error) {
+func NewRemoveRequestHeaderBuilder() gateway.FilterBuilderFunc {
+	return func(args map[string]any) (gateway.Filter, error) {
 		name, err := common.ConvertToString(args["name"])
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert 'name' attribute: %w", err)
 		}
 		return NewRemoveRequestHeaderFilter(name), nil
-	})
+	}
 }
 
 // PreProcess removes the header from the request.

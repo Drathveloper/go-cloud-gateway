@@ -45,7 +45,7 @@ func newDummyContext() *gateway.Context {
 }
 
 func BenchmarkGatewayDo_Success(b *testing.B) {
-	g := gateway.NewGateway([]gateway.Filter{&DummyFilter{}}, &dummyHTTPClient{})
+	g := gateway.NewGateway(&dummyHTTPClient{})
 	b.ResetTimer()
 	for range b.N {
 		ctx := newDummyContext()
@@ -55,7 +55,7 @@ func BenchmarkGatewayDo_Success(b *testing.B) {
 }
 
 func BenchmarkGatewayDo_HTTPError(b *testing.B) {
-	g := gateway.NewGateway(nil, &dummyHTTPClient{fail: true})
+	g := gateway.NewGateway(&dummyHTTPClient{fail: true})
 	b.ResetTimer()
 	for range b.N {
 		ctx := newDummyContext()
@@ -65,7 +65,7 @@ func BenchmarkGatewayDo_HTTPError(b *testing.B) {
 }
 
 func BenchmarkGatewayDo_PreFilterError(b *testing.B) {
-	g := gateway.NewGateway([]gateway.Filter{&DummyFilter{PreProcessErr: errors.New("someErr")}}, &dummyHTTPClient{})
+	g := gateway.NewGateway(&dummyHTTPClient{})
 	b.ResetTimer()
 	for range b.N {
 		ctx := newDummyContext()
@@ -75,7 +75,7 @@ func BenchmarkGatewayDo_PreFilterError(b *testing.B) {
 }
 
 func BenchmarkGatewayDo_PostFilterError(b *testing.B) {
-	g := gateway.NewGateway([]gateway.Filter{&DummyFilter{PostProcessErr: errors.New("someErr")}}, &dummyHTTPClient{})
+	g := gateway.NewGateway(&dummyHTTPClient{})
 	b.ResetTimer()
 	for range b.N {
 		ctx := newDummyContext()

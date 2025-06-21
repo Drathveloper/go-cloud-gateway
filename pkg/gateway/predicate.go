@@ -23,6 +23,8 @@ type PredicateBuilder interface {
 type PredicateBuilderFunc func(args map[string]any) (Predicate, error)
 
 // Build calls f(args).
+//
+//nolint:ireturn
 func (f PredicateBuilderFunc) Build(args map[string]any) (Predicate, error) {
 	return f(args)
 }

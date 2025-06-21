@@ -38,8 +38,8 @@ func NewRewritePathFilter(regexpStr, replacement string) (*RewritePath, error) {
 }
 
 // NewRewritePathBuilder creates a new RewritePathBuilder.
-func NewRewritePathBuilder() gateway.FilterBuilder {
-	return gateway.FilterBuilderFunc(func(args map[string]any) (gateway.Filter, error) {
+func NewRewritePathBuilder() gateway.FilterBuilderFunc {
+	return func(args map[string]any) (gateway.Filter, error) {
 		regex, err := common.ConvertToString(args["regexp"])
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert 'regexp' attribute: %w", err)
@@ -49,7 +49,7 @@ func NewRewritePathBuilder() gateway.FilterBuilder {
 			return nil, fmt.Errorf("failed to convert 'replacement' attribute: %w", err)
 		}
 		return NewRewritePathFilter(regex, replacement)
-	})
+	}
 }
 
 // PreProcess rewrites the path of the request.

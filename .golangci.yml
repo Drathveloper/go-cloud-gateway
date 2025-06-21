@@ -44,7 +44,6 @@ linters:
     - tagliatelle
     - nlreturn
     - exhaustruct
-    - ireturn
   exclusions:
     generated: lax
     rules:

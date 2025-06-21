@@ -37,7 +37,8 @@ func NewRoute(
 	routeID string,
 	uri string,
 	predicates Predicates,
-	filters Filters,
+	globalFilters Filters,
+	routeFilters Filters,
 	timeout time.Duration,
 	circuitBreaker CircuitBreaker[*http.Response],
 	logger *slog.Logger) (*Route, error) {
@@ -49,17 +50,11 @@ func NewRoute(
 		ID:             routeID,
 		URI:            routeURI,
 		Predicates:     predicates,
-		Filters:        filters,
+		Filters:        append(globalFilters, routeFilters...),
 		Timeout:        timeout,
 		CircuitBreaker: circuitBreaker,
 		Logger:         logger,
 	}, nil
-}
-
-// CombineGlobalFilters combines the global filters with the route filters.
-func (r *Route) CombineGlobalFilters(globalFilters ...Filter) Filters {
-	allFilters := globalFilters
-	return append(allFilters, r.Filters...)
 }
 
 // GetDestinationURL returns the destination url for the given request url combining scheme and host from the route

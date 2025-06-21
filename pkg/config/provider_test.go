@@ -78,7 +78,67 @@ func TestNewRoutes(t *testing.T) {
 			expectedErr: nil,
 		},
 		{
-			name: "new routes should return error when predicate is not valid",
+			name: "new routes should succeed when global filters are defined",
+			config: &config.Config{
+				Gateway: config.Gateway{
+					GlobalFilters: []config.ParameterizedItem{
+						{
+							Name: "AddRequestHeader",
+							Args: map[string]any{
+								"name":  "X-Global-Test",
+								"value": "True",
+							},
+						},
+					},
+					Routes: []config.Route{
+						{
+							ID:  "r1",
+							URI: "https://example.com",
+							Predicates: []config.ParameterizedItem{
+								{
+									Name: "Method",
+									Args: map[string]any{
+										"methods": []any{"GET", "POST"},
+									},
+								},
+							},
+							Filters: []config.ParameterizedItem{
+								{
+									Name: "AddRequestHeader",
+									Args: map[string]any{
+										"name":  "X-Test",
+										"value": "True",
+									},
+								},
+							},
+							Timeout: config.Duration{},
+						},
+					},
+				},
+			},
+			expected: gateway.Routes{
+				{
+					ID: "r1",
+					URI: &url.URL{
+						Scheme: "https",
+						Host:   "example.com",
+					},
+					Predicates: gateway.Predicates{
+						predicate.NewMethodPredicate("GET", "POST"),
+					},
+					Filters: gateway.Filters{
+						filter.NewAddRequestHeaderFilter("X-Global-Test", "True"),
+						filter.NewAddRequestHeaderFilter("X-Test", "True"),
+					},
+					Timeout:        10 * time.Second,
+					Logger:         logger,
+					CircuitBreaker: gateway.CircuitBreaker[*http.Response](nil),
+				},
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "new routes should return error when predicates are not valid",
 			config: &config.Config{
 				Gateway: config.Gateway{
 					Routes: []config.Route{
@@ -108,7 +168,7 @@ func TestNewRoutes(t *testing.T) {
 			expectedErr: errors.New("map routes from config to gateway failed: parse predicates failed: invalid predicate args: name: Other"),
 		},
 		{
-			name: "new routes should return error when filter is not valid",
+			name: "new routes should return error when filter are not valid",
 			config: &config.Config{
 				Gateway: config.Gateway{
 					Routes: []config.Route{
@@ -137,7 +197,37 @@ func TestNewRoutes(t *testing.T) {
 			expectedErr: errors.New("map routes from config to gateway failed: parse filters failed: filter builder failed: filter builder not found for filter Invent"),
 		},
 		{
-			name: "new routes should return empty when predicate is not valid",
+			name: "new routes should return error when global filters are not valid",
+			config: &config.Config{
+				Gateway: config.Gateway{
+					GlobalFilters: []config.ParameterizedItem{
+						{
+							Name: "Invent",
+						},
+					},
+					Routes: []config.Route{
+						{
+							ID:  "r1",
+							URI: "someUri",
+							Predicates: []config.ParameterizedItem{
+								{
+									Name: "Method",
+									Args: map[string]any{
+										"methods": []any{"GET", "POST"},
+									},
+								},
+							},
+							Filters: []config.ParameterizedItem{},
+							Timeout: config.Duration{},
+						},
+					},
+				},
+			},
+			expected:    nil,
+			expectedErr: errors.New("map routes from config to gateway failed: parse filters failed: filter builder failed: filter builder not found for filter Invent"),
+		},
+		{
+			name: "new routes should return empty when predicates are not valid",
 			config: &config.Config{
 				Gateway: config.Gateway{
 					Routes: nil,
@@ -332,74 +422,6 @@ func isEqualsCircuitBreakers(a, b gateway.CircuitBreaker[*http.Response]) bool {
 		}
 	}
 	return true
-}
-
-func TestNewGlobalFilters(t *testing.T) {
-	tests := []struct {
-		expectedErr error
-		config      *config.Config
-		name        string
-		expected    gateway.Filters
-	}{
-		{
-			name: "new global filters should succeed",
-			config: &config.Config{
-				Gateway: config.Gateway{
-					GlobalFilters: []config.ParameterizedItem{
-						{
-							Name: "AddRequestHeader",
-							Args: map[string]any{
-								"name":  "X-Test",
-								"value": "True",
-							},
-						},
-					},
-				},
-			},
-			expected: gateway.Filters{
-				filter.NewAddRequestHeaderFilter("X-Test", "True"),
-			},
-			expectedErr: nil,
-		},
-		{
-			name: "new global filters should return error when filter is not valid",
-			config: &config.Config{
-				Gateway: config.Gateway{
-					GlobalFilters: []config.ParameterizedItem{
-						{
-							Name: "Invent",
-						},
-					},
-				},
-			},
-			expected:    nil,
-			expectedErr: errors.New("parse filters failed: filter builder failed: filter builder not found for filter Invent"),
-		},
-		{
-			name: "new global filters should return empty when no global filters are defined",
-			config: &config.Config{
-				Gateway: config.Gateway{
-					GlobalFilters: nil,
-				},
-			},
-			expected:    gateway.Filters{},
-			expectedErr: nil,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			globalFilters, err := config.NewGlobalFilters(
-				tt.config,
-				filter.NewFactory(filter.BuilderRegistry))
-
-			if !reflect.DeepEqual(tt.expected, globalFilters) {
-				t.Errorf("expected %v actual %v", tt.expected, globalFilters)
-			}
-			if fmt.Sprintf("%s", tt.expectedErr) != fmt.Sprintf("%s", err) {
-				t.Errorf("expected err %s actual %s", tt.expectedErr, err)
-			}
-		})
-	}
 }
 
 func TestNewHTTPClient(t *testing.T) {

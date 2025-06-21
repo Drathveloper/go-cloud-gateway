@@ -33,6 +33,8 @@ type FilterBuilder interface {
 type FilterBuilderFunc func(args map[string]any) (Filter, error)
 
 // Build calls f(args).
+//
+//nolint:ireturn
 func (f FilterBuilderFunc) Build(args map[string]any) (Filter, error) {
 	return f(args)
 }

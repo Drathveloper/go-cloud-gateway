@@ -30,15 +30,11 @@ func Initialize(opts *Options) (*http.Server, error) {
 	if err != nil {
 		return nil, fmt.Errorf(initializeErrMsg, err)
 	}
-	globalFilters, err := config.NewGlobalFilters(opts.Config, filterFactory)
-	if err != nil {
-		return nil, fmt.Errorf(initializeErrMsg, err)
-	}
 	client, err := config.NewHTTPClient(opts.Config)
 	if err != nil {
 		return nil, fmt.Errorf(initializeErrMsg, err)
 	}
-	gwy := gateway.NewGateway(globalFilters, client)
+	gwy := gateway.NewGateway(client)
 
 	gatewayHandler := gatewayhandler.NewGatewayHandler(gwy, routes, opts.GatewayErrorHandler)
 

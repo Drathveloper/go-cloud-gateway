@@ -33,8 +33,8 @@ func NewAddResponseHeaderFilter(name, value string) *AddResponseHeader {
 }
 
 // NewAddResponseHeaderBuilder creates a new AddResponseHeaderBuilder.
-func NewAddResponseHeaderBuilder() gateway.FilterBuilder {
-	return gateway.FilterBuilderFunc(func(args map[string]any) (gateway.Filter, error) {
+func NewAddResponseHeaderBuilder() gateway.FilterBuilderFunc {
+	return func(args map[string]any) (gateway.Filter, error) {
 		name, err := common.ConvertToString(args["name"])
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert 'name' attribute: %w", err)
@@ -44,7 +44,7 @@ func NewAddResponseHeaderBuilder() gateway.FilterBuilder {
 			return nil, fmt.Errorf("failed to convert 'value' attribute: %w", err)
 		}
 		return NewAddResponseHeaderFilter(name, value), nil
-	})
+	}
 }
 
 // PreProcess does nothing.
@@ -78,8 +78,8 @@ func NewSetResponseHeaderFilter(name, value string) *SetResponseHeader {
 }
 
 // NewSetResponseHeaderBuilder creates a new SetResponseHeaderBuilder.
-func NewSetResponseHeaderBuilder() gateway.FilterBuilder {
-	return gateway.FilterBuilderFunc(func(args map[string]any) (gateway.Filter, error) {
+func NewSetResponseHeaderBuilder() gateway.FilterBuilderFunc {
+	return func(args map[string]any) (gateway.Filter, error) {
 		name, err := common.ConvertToString(args["name"])
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert 'name' attribute: %w", err)
@@ -89,7 +89,7 @@ func NewSetResponseHeaderBuilder() gateway.FilterBuilder {
 			return nil, fmt.Errorf("failed to convert 'value' attribute: %w", err)
 		}
 		return NewSetResponseHeaderFilter(name, value), nil
-	})
+	}
 }
 
 // PreProcess does nothing.
@@ -121,14 +121,14 @@ func NewRemoveResponseHeaderFilter(name string) *RemoveResponseHeader {
 }
 
 // NewRemoveResponseHeaderBuilder creates a new RemoveResponseHeaderBuilder.
-func NewRemoveResponseHeaderBuilder() gateway.FilterBuilder {
-	return gateway.FilterBuilderFunc(func(args map[string]any) (gateway.Filter, error) {
+func NewRemoveResponseHeaderBuilder() gateway.FilterBuilderFunc {
+	return func(args map[string]any) (gateway.Filter, error) {
 		name, err := common.ConvertToString(args["name"])
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert 'name' attribute: %w", err)
 		}
 		return NewRemoveResponseHeaderFilter(name), nil
-	})
+	}
 }
 
 // PreProcess does nothing.

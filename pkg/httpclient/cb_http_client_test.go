@@ -42,6 +42,7 @@ func (cb *MockCircuitBreaker[T]) Counts() circuitbreaker.Counts {
 	return cb.ExpectedCounts
 }
 
+//nolint:ireturn
 func (cb *MockCircuitBreaker[T]) Execute(f func() (T, error)) (T, error) {
 	return f()
 }
