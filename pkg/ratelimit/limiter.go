@@ -25,6 +25,8 @@ type RateLimiterBuilder interface {
 type RateLimiterBuilderFunc func(args map[string]any) (RateLimiter, error)
 
 // Build calls rate limiter builder func.
+//
+//nolint:ireturn
 func (f RateLimiterBuilderFunc) Build(args map[string]any) (RateLimiter, error) {
 	return f(args)
 }

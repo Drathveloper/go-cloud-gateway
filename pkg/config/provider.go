@@ -31,16 +31,11 @@ func NewRoutes(
 	return mapRoutesFromConfigToGateway(cfg.Gateway, predicateFactory, filterFactory, logger)
 }
 
-// NewGlobalFilters creates a new gateway filter from the given config.
-func NewGlobalFilters(
-	cfg *Config,
-	filterFactory *filter.Factory) (gateway.Filters, error) {
-	return mapFiltersFromConfigToGateway(cfg.Gateway.GlobalFilters, filterFactory)
-}
-
 // NewHTTPClient creates a new http client from the given config.
 // If any route has circuit breaker enabled, the http client will be wrapped with a circuit breaker client.
 // Otherwise, the http client will be returned as is.
+//
+//nolint:ireturn
 func NewHTTPClient(cfg *Config) (gateway.HTTPClient, error) {
 	httpClient, err := buildHTTPClient(cfg)
 	if err != nil {
@@ -166,17 +161,22 @@ func mapRoutesFromConfigToGateway(
 	logger *slog.Logger) (gateway.Routes, error) {
 	out := make(gateway.Routes, 0)
 	for _, route := range gwConfig.Routes {
-		predicates, err := mapPredicatesFromConfigToGateway(route.Predicates, predicateFactory)
+		predicates, err := mapPredicatesFromConfigToGateway(predicateFactory, route.Predicates...)
 		if err != nil {
 			return nil, fmt.Errorf("map routes from config to gateway failed: %w", err)
 		}
-		filters, err := mapFiltersFromConfigToGateway(route.Filters, filterFactory)
+		globalFilters, err := mapFiltersFromConfigToGateway(filterFactory, gwConfig.GlobalFilters...)
+		if err != nil {
+			return nil, fmt.Errorf("map routes from config to gateway failed: %w", err)
+		}
+		filters, err := mapFiltersFromConfigToGateway(filterFactory, route.Filters...)
 		if err != nil {
 			return nil, fmt.Errorf("map routes from config to gateway failed: %w", err)
 		}
 		timeout := calculateTimeout(route.Timeout, gwConfig.GlobalTimeout)
 		circuitBreaker := mapCircuitBreakerFromConfigToGateway(route.ID, route.CircuitBreaker)
-		buildRoute, err := gateway.NewRoute(route.ID, route.URI, predicates, filters, timeout, circuitBreaker, logger)
+		buildRoute, err := gateway.NewRoute(
+			route.ID, route.URI, predicates, globalFilters, filters, timeout, circuitBreaker, logger)
 		if err != nil {
 			return nil, fmt.Errorf("map routes from config to gateway failed: %w", err)
 		}
@@ -196,8 +196,8 @@ func calculateTimeout(routeTimeout, globalTimeout Duration) time.Duration {
 }
 
 func mapPredicatesFromConfigToGateway(
-	predicates []ParameterizedItem,
-	predicateFactory *predicate.Factory) (gateway.Predicates, error) {
+	predicateFactory *predicate.Factory,
+	predicates ...ParameterizedItem) (gateway.Predicates, error) {
 	out := make(gateway.Predicates, 0)
 	for _, pred := range predicates {
 		gwPred, err := predicateFactory.Build(pred.Name, pred.Args)
@@ -210,8 +210,8 @@ func mapPredicatesFromConfigToGateway(
 }
 
 func mapFiltersFromConfigToGateway(
-	filters []ParameterizedItem,
-	filterFactory *filter.Factory) (gateway.Filters, error) {
+	filterFactory *filter.Factory,
+	filters ...ParameterizedItem) (gateway.Filters, error) {
 	out := make(gateway.Filters, 0)
 	for _, fi := range filters {
 		gwFilter, err := filterFactory.Build(fi.Name, fi.Args)

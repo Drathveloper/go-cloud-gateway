@@ -24,8 +24,8 @@ func NewRequestResponseLoggerFilter(level slog.Level) *RequestResponseLogger {
 }
 
 // NewRequestResponseLoggerBuilder creates a new RequestResponseLoggerBuilder.
-func NewRequestResponseLoggerBuilder() gateway.FilterBuilder {
-	return gateway.FilterBuilderFunc(func(args map[string]any) (gateway.Filter, error) {
+func NewRequestResponseLoggerBuilder() gateway.FilterBuilderFunc {
+	return func(args map[string]any) (gateway.Filter, error) {
 		level, _ := common.ConvertToString(args["level"])
 		switch strings.ToLower(level) {
 		case "debug":
@@ -39,7 +39,7 @@ func NewRequestResponseLoggerBuilder() gateway.FilterBuilder {
 		default:
 			return NewRequestResponseLoggerFilter(slog.LevelInfo), nil
 		}
-	})
+	}
 }
 
 // PreProcess logs the request.

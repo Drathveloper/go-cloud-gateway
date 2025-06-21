@@ -3,98 +3,10 @@ package gateway_test
 import (
 	"net/http"
 	"net/url"
-	"slices"
 	"testing"
 
 	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 )
-
-func TestRoute_CombineGlobalFilters(t *testing.T) {
-	tests := []struct {
-		name          string
-		filters       []gateway.Filter
-		globalFilters []gateway.Filter
-		expectedOrder []string
-	}{
-		{
-			name: "combine global filters should succeed with expected order when route has filters",
-			filters: []gateway.Filter{
-				&DummyFilter{
-					PreProcessErr:  nil,
-					PostProcessErr: nil,
-					ID:             "DF1",
-				},
-				&DummyFilter{
-					PreProcessErr:  nil,
-					PostProcessErr: nil,
-					ID:             "DF2",
-				},
-			},
-			globalFilters: []gateway.Filter{
-				&DummyFilter{
-					PreProcessErr:  nil,
-					PostProcessErr: nil,
-					ID:             "DGF1",
-				},
-				&DummyFilter{
-					PreProcessErr:  nil,
-					PostProcessErr: nil,
-					ID:             "DGF2",
-				},
-			},
-			expectedOrder: []string{"DGF1", "DGF2", "DF1", "DF2"},
-		},
-		{
-			name:    "combine global filters should succeed with expected order when route doesn't have filters",
-			filters: nil,
-			globalFilters: []gateway.Filter{
-				&DummyFilter{
-					PreProcessErr:  nil,
-					PostProcessErr: nil,
-					ID:             "DGF1",
-				},
-				&DummyFilter{
-					PreProcessErr:  nil,
-					PostProcessErr: nil,
-					ID:             "DGF2",
-				},
-			},
-			expectedOrder: []string{"DGF1", "DGF2"},
-		},
-		{
-			name: "combine global filters should succeed with expected order when no global filters present",
-			filters: []gateway.Filter{
-				&DummyFilter{
-					PreProcessErr:  nil,
-					PostProcessErr: nil,
-					ID:             "DF1",
-				},
-				&DummyFilter{
-					PreProcessErr:  nil,
-					PostProcessErr: nil,
-					ID:             "DF2",
-				},
-			},
-			expectedOrder: []string{"DF1", "DF2"},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			route, _ := gateway.NewRoute("id", "/test", nil, tt.filters, 0, nil, nil)
-
-			allFilters := route.CombineGlobalFilters(tt.globalFilters...)
-
-			actualOrder := make([]string, 0)
-			for _, filter := range allFilters {
-				actualOrder = append(actualOrder, filter.Name())
-			}
-
-			if !slices.Equal(tt.expectedOrder, actualOrder) {
-				t.Errorf("expected order %v actual %v", tt.expectedOrder, actualOrder)
-			}
-		})
-	}
-}
 
 func TestRoute_GetDestinationURL(t *testing.T) {
 	tests := []struct {
@@ -118,7 +30,7 @@ func TestRoute_GetDestinationURL(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			route, _ := gateway.NewRoute("someRoute", tt.routeURL, nil, nil, 0, nil, nil)
+			route, _ := gateway.NewRoute("someRoute", tt.routeURL, nil, nil, nil, 0, nil, nil)
 
 			reqURL, _ := url.Parse(tt.reqURL)
 
@@ -135,10 +47,10 @@ func TestRoutes_FindMatching(t *testing.T) {
 	matchedPredicate := DummyPredicate{true}
 	unMatchedPredicate := DummyPredicate{false}
 
-	unmatchedRoute1, _ := gateway.NewRoute("R1", "/test1", []gateway.Predicate{unMatchedPredicate}, nil, 0, nil, nil)
-	matchedRoute1, _ := gateway.NewRoute("R1", "/test1", []gateway.Predicate{matchedPredicate}, nil, 0, nil, nil)
-	unmatchedRoute2, _ := gateway.NewRoute("R2", "/test1", []gateway.Predicate{unMatchedPredicate}, nil, 0, nil, nil)
-	matchedRoute2, _ := gateway.NewRoute("R2", "/test1", []gateway.Predicate{matchedPredicate}, nil, 0, nil, nil)
+	unmatchedRoute1, _ := gateway.NewRoute("R1", "/test1", []gateway.Predicate{unMatchedPredicate}, nil, nil, 0, nil, nil)
+	matchedRoute1, _ := gateway.NewRoute("R1", "/test1", []gateway.Predicate{matchedPredicate}, nil, nil, 0, nil, nil)
+	unmatchedRoute2, _ := gateway.NewRoute("R2", "/test1", []gateway.Predicate{unMatchedPredicate}, nil, nil, 0, nil, nil)
+	matchedRoute2, _ := gateway.NewRoute("R2", "/test1", []gateway.Predicate{matchedPredicate}, nil, nil, 0, nil, nil)
 
 	tests := []struct {
 		name          string

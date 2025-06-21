@@ -25,24 +25,21 @@ const gatewayErrMsg = "gateway request for route %s failed: %w"
 
 // Gateway is the gateway struct. It holds the gateway configuration and the http client.
 type Gateway struct {
-	httpClient    HTTPClient
-	globalFilters Filters
+	httpClient HTTPClient
 }
 
 // NewGateway creates a new gateway.
-func NewGateway(globalFilters Filters, client HTTPClient) *Gateway {
+func NewGateway(client HTTPClient) *Gateway {
 	return &Gateway{
-		globalFilters: globalFilters,
-		httpClient:    client,
+		httpClient: client,
 	}
 }
 
-// Do process the gateway request. It will call the global filters, the route filters, and the backend.
+// Do process the gateway request. It will call all pre-process filters, the backend and the post-process filters.
 // It will return an error if the gateway request failed.
 // If the gateway request and filters are successful, it will return nil.
 func (g *Gateway) Do(ctx *Context) error {
-	allFilters := ctx.Route.CombineGlobalFilters(g.globalFilters...)
-	if err := allFilters.PreProcessAll(ctx); err != nil {
+	if err := ctx.Route.Filters.PreProcessAll(ctx); err != nil {
 		return fmt.Errorf(gatewayErrMsg, ctx.Route.ID, err)
 	}
 	backendReq := g.buildProxyRequest(ctx)
@@ -51,21 +48,10 @@ func (g *Gateway) Do(ctx *Context) error {
 		return g.handleBackendError(ctx, err)
 	}
 	ctx.Response = NewGatewayResponse(backendRes)
-	if err = allFilters.PostProcessAll(ctx); err != nil {
+	if err = ctx.Route.Filters.PostProcessAll(ctx); err != nil {
 		return fmt.Errorf(gatewayErrMsg, ctx.Route.ID, err)
 	}
 	return nil
-}
-
-func (g *Gateway) handleBackendError(ctx *Context, err error) error {
-	switch {
-	case errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled):
-		return fmt.Errorf(gatewayErrMsg, ctx.Route.ID, context.DeadlineExceeded)
-	case errors.Is(err, circuitbreaker.ErrOpenState) || errors.Is(err, circuitbreaker.ErrHalfOpenRequestExceeded):
-		return fmt.Errorf(gatewayErrMsg, ctx.Route.ID, fmt.Errorf("%w: %s", ErrCircuitBreaker, err.Error()))
-	default:
-		return fmt.Errorf(gatewayErrMsg, ctx.Route.ID, fmt.Errorf("%w: %s", ErrHTTP, err.Error()))
-	}
 }
 
 func (g *Gateway) buildProxyRequest(ctx *Context) *http.Request {
@@ -77,4 +63,15 @@ func (g *Gateway) buildProxyRequest(ctx *Context) *http.Request {
 		Body:          ctx.Request.BodyReader,
 	}
 	return req.WithContext(ctx)
+}
+
+func (g *Gateway) handleBackendError(ctx *Context, err error) error {
+	switch {
+	case errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled):
+		return fmt.Errorf(gatewayErrMsg, ctx.Route.ID, context.DeadlineExceeded)
+	case errors.Is(err, circuitbreaker.ErrOpenState) || errors.Is(err, circuitbreaker.ErrHalfOpenRequestExceeded):
+		return fmt.Errorf(gatewayErrMsg, ctx.Route.ID, fmt.Errorf("%w: %s", ErrCircuitBreaker, err.Error()))
+	default:
+		return fmt.Errorf(gatewayErrMsg, ctx.Route.ID, fmt.Errorf("%w: %s", ErrHTTP, err.Error()))
+	}
 }

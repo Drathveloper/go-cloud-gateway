@@ -29,6 +29,8 @@ func NewFactory(registry gateway.FilterBuilderRegistry) *Factory {
 // If the filter builder is found and the args are valid, the factory will return a filter.
 //
 // The args are expected to be a map of strings to any.
+//
+//nolint:ireturn
 func (f *Factory) Build(name string, args map[string]any) (gateway.Filter, error) {
 	if f.registry[name] != nil {
 		fi, err := f.registry[name].Build(args)

@@ -427,7 +427,7 @@ func TestGateway_Do(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gw := gateway.NewGateway(tt.globalFilters, tt.httpClient)
+			gw := gateway.NewGateway(tt.httpClient)
 			ctx, _ := gateway.NewGatewayContext(tt.route, tt.request)
 
 			err := gw.Do(ctx)
