@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -24,11 +23,11 @@ func (m *mockGateway) Do(ctx *gateway.Context) error {
 }
 
 type mockErrorHandler struct {
-	handleFunc func(logger *slog.Logger, err error, w http.ResponseWriter)
+	handleFunc func(ctx *gateway.Context, err error, w http.ResponseWriter)
 }
 
-func (m *mockErrorHandler) Handle(logger *slog.Logger, err error, w http.ResponseWriter) {
-	m.handleFunc(logger, err, w)
+func (m *mockErrorHandler) Handle(ctx *gateway.Context, err error, w http.ResponseWriter) {
+	m.handleFunc(ctx, err, w)
 }
 
 func TestGatewayHandler_ServeHTTP(t *testing.T) {
@@ -121,7 +120,7 @@ func TestGatewayHandler_ServeHTTP(t *testing.T) {
 				},
 			}
 			errHandler := &mockErrorHandler{
-				handleFunc: func(_ *slog.Logger, err error, _ http.ResponseWriter) {
+				handleFunc: func(_ *gateway.Context, err error, _ http.ResponseWriter) {
 					if fmt.Sprintf("%s", tt.expectedErr) != fmt.Sprintf("%s", err) {
 						t.Errorf("expected err %s actual %s", tt.expectedErr, err)
 					}
