@@ -48,12 +48,6 @@ func TestBaseErrorHandler(t *testing.T) {
 			expectedErrMsg: "",
 		},
 		{
-			name:               "test base error handler should succeed when error is route not found",
-			expectedStatusCode: http.StatusNotFound,
-			err:                gatewayhandler.ErrRouteNotFound,
-			expectedErrMsg:     "level=INFO msg=\"route not found\"",
-		},
-		{
 			name:               "test base error handler should succeed when error is deadline exceeded",
 			expectedStatusCode: http.StatusBadGateway,
 			err:                context.DeadlineExceeded,
@@ -88,13 +82,16 @@ func TestBaseErrorHandler(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var buf bytes.Buffer
 			logger := slog.New(slog.NewTextHandler(&buf, nil))
+			ctx := &gateway.Context{
+				Logger: logger,
+			}
 			writer := &DummyWriter{
 				CurrHeader:         http.Header{},
 				ExpectedStatusCode: tt.expectedStatusCode,
 				WriteErr:           nil,
 			}
 
-			gatewayhandler.BaseErrorHandler().Handle(logger, tt.err, writer)
+			gatewayhandler.BaseErrorHandler().Handle(ctx, tt.err, writer)
 
 			if !strings.Contains(buf.String(), tt.expectedErrMsg) {
 				t.Errorf("expected error message: %s actual: %s", tt.expectedErrMsg, buf.String())

@@ -3,7 +3,6 @@ package gatewayhandler
 import (
 	"errors"
 	"io"
-	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -43,30 +42,28 @@ func NewGatewayHandler(
 
 // ServeHTTP is the entrypoint for all requests to the gateway.
 func (h *GatewayHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
-	logger := slog.Default()
 	route := h.routes.FindMatching(request)
 	if route == nil {
-		h.errHandler.Handle(logger, ErrRouteNotFound, writer)
+		http.Error(writer, ErrRouteNotFound.Error(), http.StatusNotFound)
 		return
 	}
 	gwRequest := gateway.NewGatewayRequest(request)
 	ctx, cancel := gateway.NewGatewayContext(route, gwRequest)
 	defer cancel()
 	if err := h.gateway.Do(ctx); err != nil {
-		h.errHandler.Handle(ctx.Logger, err, writer)
+		h.errHandler.Handle(ctx, err, writer)
 		return
-	}
-
-	if ctx.Response.BodyReader.Len() == -1 {
-		writer.Header().Set("Transfer-Encoding", "chunked")
-	} else {
-		writer.Header().Set("Content-Length", strconv.FormatInt(ctx.Response.BodyReader.Len(), 10))
 	}
 	h.writeResponse(writer, ctx.Response)
 	gateway.ReleaseGatewayContext(ctx)
 }
 
 func (h *GatewayHandler) writeResponse(writer http.ResponseWriter, response *gateway.Response) {
+	if response.BodyReader.Len() == -1 {
+		writer.Header().Set("Transfer-Encoding", "chunked")
+	} else {
+		writer.Header().Set("Content-Length", strconv.FormatInt(response.BodyReader.Len(), 10))
+	}
 	common.WriteHeader(writer, response.Headers)
 	writer.WriteHeader(response.Status)
 	_, _ = io.Copy(writer, response.BodyReader)

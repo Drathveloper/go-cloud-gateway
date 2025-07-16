@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"io"
-	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -69,7 +68,7 @@ func BenchmarkServeHTTP_RouteNotFound(b *testing.B) {
 	gwHandler := gatewayhandler.NewGatewayHandler(
 		&mockGateway{},
 		gateway.Routes{route},
-		&mockErrorHandler{handleFunc: func(_ *slog.Logger, _ error, _ http.ResponseWriter) {}},
+		&mockErrorHandler{handleFunc: func(_ *gateway.Context, _ error, _ http.ResponseWriter) {}},
 	)
 
 	req := httptest.NewRequest(http.MethodGet, "/not-found", nil)
@@ -99,7 +98,7 @@ func BenchmarkServeHTTP_BackendError(b *testing.B) {
 			},
 		},
 		gateway.Routes{route},
-		&mockErrorHandler{handleFunc: func(_ *slog.Logger, _ error, _ http.ResponseWriter) {}},
+		&mockErrorHandler{handleFunc: func(_ *gateway.Context, _ error, _ http.ResponseWriter) {}},
 	)
 
 	req := httptest.NewRequest(http.MethodGet, "/fail", nil)
@@ -131,7 +130,7 @@ func BenchmarkServeHTTP_LargeBody(b *testing.B) {
 			},
 		},
 		gateway.Routes{route},
-		&mockErrorHandler{handleFunc: func(_ *slog.Logger, _ error, _ http.ResponseWriter) {}},
+		&mockErrorHandler{handleFunc: func(_ *gateway.Context, _ error, _ http.ResponseWriter) {}},
 	)
 
 	b.ResetTimer()
