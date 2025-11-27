@@ -1,4 +1,4 @@
-package common_test
+package shared_test
 
 import (
 	"bytes"
@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/drathveloper/go-cloud-gateway/internal/pkg/common"
+	"github.com/drathveloper/go-cloud-gateway/internal/pkg/shared"
 )
 
 func BenchmarkReadBody(b *testing.B) {
@@ -30,7 +30,7 @@ func BenchmarkReadBody(b *testing.B) {
 
 			b.ResetTimer()
 			for b.Loop() {
-				if _, err = common.ReadBody(readCloser); err != nil {
+				if _, err = shared.ReadBody(readCloser); err != nil {
 					b.Fatalf("ReadBody failed: %v", err)
 				}
 			}
@@ -40,7 +40,7 @@ func BenchmarkReadBody(b *testing.B) {
 
 func BenchmarkReadBody_Nil(b *testing.B) {
 	for b.Loop() {
-		_, err := common.ReadBody(nil)
+		_, err := shared.ReadBody(nil)
 		if err != nil {
 			b.Fatalf("ReadBody failed: %v", err)
 		}
@@ -66,7 +66,7 @@ func BenchmarkWriteHeader(b *testing.B) {
 			rec := httptest.NewRecorder()
 
 			b.ResetTimer()
-			common.WriteHeader(rec, simpleHeader)
+			shared.WriteHeader(rec, simpleHeader)
 		}
 	})
 
@@ -75,7 +75,7 @@ func BenchmarkWriteHeader(b *testing.B) {
 			rec := httptest.NewRecorder()
 
 			b.ResetTimer()
-			common.WriteHeader(rec, multiValueHeader)
+			shared.WriteHeader(rec, multiValueHeader)
 		}
 	})
 }

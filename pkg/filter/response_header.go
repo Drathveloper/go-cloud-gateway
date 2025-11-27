@@ -3,7 +3,7 @@ package filter
 import (
 	"fmt"
 
-	"github.com/drathveloper/go-cloud-gateway/internal/pkg/common"
+	"github.com/drathveloper/go-cloud-gateway/internal/pkg/shared"
 	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 )
 
@@ -35,11 +35,11 @@ func NewAddResponseHeaderFilter(name, value string) *AddResponseHeader {
 // NewAddResponseHeaderBuilder creates a new AddResponseHeaderBuilder.
 func NewAddResponseHeaderBuilder() gateway.FilterBuilderFunc {
 	return func(args map[string]any) (gateway.Filter, error) {
-		name, err := common.ConvertToString(args["name"])
+		name, err := shared.ConvertToString(args["name"])
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert 'name' attribute: %w", err)
 		}
-		value, err := common.ConvertToString(args["value"])
+		value, err := shared.ConvertToString(args["value"])
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert 'value' attribute: %w", err)
 		}
@@ -80,11 +80,11 @@ func NewSetResponseHeaderFilter(name, value string) *SetResponseHeader {
 // NewSetResponseHeaderBuilder creates a new SetResponseHeaderBuilder.
 func NewSetResponseHeaderBuilder() gateway.FilterBuilderFunc {
 	return func(args map[string]any) (gateway.Filter, error) {
-		name, err := common.ConvertToString(args["name"])
+		name, err := shared.ConvertToString(args["name"])
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert 'name' attribute: %w", err)
 		}
-		value, err := common.ConvertToString(args["value"])
+		value, err := shared.ConvertToString(args["value"])
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert 'value' attribute: %w", err)
 		}
@@ -123,7 +123,7 @@ func NewRemoveResponseHeaderFilter(name string) *RemoveResponseHeader {
 // NewRemoveResponseHeaderBuilder creates a new RemoveResponseHeaderBuilder.
 func NewRemoveResponseHeaderBuilder() gateway.FilterBuilderFunc {
 	return func(args map[string]any) (gateway.Filter, error) {
-		name, err := common.ConvertToString(args["name"])
+		name, err := shared.ConvertToString(args["name"])
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert 'name' attribute: %w", err)
 		}

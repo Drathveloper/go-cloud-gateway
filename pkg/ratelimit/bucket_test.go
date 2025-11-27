@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/drathveloper/go-cloud-gateway/internal/pkg/common"
+	"github.com/drathveloper/go-cloud-gateway/internal/pkg/shared"
 	"github.com/drathveloper/go-cloud-gateway/pkg/ratelimit"
 )
 
@@ -20,7 +20,7 @@ func (m *MockTimeProvider) Now() time.Time {
 
 func TestTokenBucket_Allow(t *testing.T) {
 	tests := []struct {
-		timeProvider      common.TimeProvider
+		timeProvider      shared.TimeProvider
 		name              string
 		timesBeforeCheck  int
 		rate              int

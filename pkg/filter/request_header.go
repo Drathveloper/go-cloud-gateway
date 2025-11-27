@@ -3,7 +3,7 @@ package filter
 import (
 	"fmt"
 
-	"github.com/drathveloper/go-cloud-gateway/internal/pkg/common"
+	"github.com/drathveloper/go-cloud-gateway/internal/pkg/shared"
 	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 )
 
@@ -35,11 +35,11 @@ func NewAddRequestHeaderFilter(name, value string) *AddRequestHeader {
 // NewAddRequestHeaderBuilder creates a new AddRequestHeaderBuilder.
 func NewAddRequestHeaderBuilder() gateway.FilterBuilderFunc {
 	return func(args map[string]any) (gateway.Filter, error) {
-		name, err := common.ConvertToString(args["name"])
+		name, err := shared.ConvertToString(args["name"])
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert 'name' attribute: %w", err)
 		}
-		value, err := common.ConvertToString(args["value"])
+		value, err := shared.ConvertToString(args["value"])
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert 'value' attribute: %w", err)
 		}
@@ -72,11 +72,11 @@ type SetRequestHeader struct {
 // NewSetRequestHeaderBuilder creates a new SetRequestHeaderBuilder.
 func NewSetRequestHeaderBuilder() gateway.FilterBuilderFunc {
 	return func(args map[string]any) (gateway.Filter, error) {
-		name, err := common.ConvertToString(args["name"])
+		name, err := shared.ConvertToString(args["name"])
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert 'name' attribute: %w", err)
 		}
-		value, err := common.ConvertToString(args["value"])
+		value, err := shared.ConvertToString(args["value"])
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert 'value' attribute: %w", err)
 		}
@@ -123,7 +123,7 @@ func NewRemoveRequestHeaderFilter(name string) *RemoveRequestHeader {
 // NewRemoveRequestHeaderBuilder creates a new RemoveRequestHeaderBuilder.
 func NewRemoveRequestHeaderBuilder() gateway.FilterBuilderFunc {
 	return func(args map[string]any) (gateway.Filter, error) {
-		name, err := common.ConvertToString(args["name"])
+		name, err := shared.ConvertToString(args["name"])
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert 'name' attribute: %w", err)
 		}

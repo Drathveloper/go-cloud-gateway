@@ -112,7 +112,9 @@ func (cb *CircuitBreaker[T]) Counts() Counts {
 // Otherwise, Execute returns the result of the request.
 // If a panic occurs in the request, the CircuitBreaker handles it as an error
 // and causes the same panic again.
-func (cb *CircuitBreaker[T]) Execute(req func() (T, error)) (T, error) { //nolint:ireturn
+//
+//nolint:ireturn // generic return is required for CircuitBreaker design
+func (cb *CircuitBreaker[T]) Execute(req func() (T, error)) (T, error) {
 	generation, err := cb.beforeRequest()
 	if err != nil {
 		var defaultValue T

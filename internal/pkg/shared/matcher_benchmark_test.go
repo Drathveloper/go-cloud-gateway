@@ -1,10 +1,10 @@
-package common_test
+package shared_test
 
 import (
 	"regexp"
 	"testing"
 
-	"github.com/drathveloper/go-cloud-gateway/internal/pkg/common"
+	"github.com/drathveloper/go-cloud-gateway/internal/pkg/shared"
 )
 
 func BenchmarkPathMatcher(b *testing.B) {
@@ -36,7 +36,7 @@ func BenchmarkPathMatcher(b *testing.B) {
 	for _, c := range cases {
 		b.Run(c.pattern+"_"+c.path, func(b *testing.B) {
 			for b.Loop() {
-				common.PathMatcher(c.pattern, c.path)
+				shared.PathMatcher(c.pattern, c.path)
 			}
 		})
 	}
@@ -56,10 +56,10 @@ func BenchmarkHostMatcher(b *testing.B) {
 	}
 
 	for _, tc := range cases {
-		pattern := regexp.MustCompile(common.ConvertPatternToRegex(tc.pattern))
+		pattern := regexp.MustCompile(shared.ConvertPatternToRegex(tc.pattern))
 		b.Run(tc.pattern+"_"+tc.host, func(b *testing.B) {
 			for b.Loop() {
-				common.HostMatcher(pattern, tc.host)
+				shared.HostMatcher(pattern, tc.host)
 			}
 		})
 	}

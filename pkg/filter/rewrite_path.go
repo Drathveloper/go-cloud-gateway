@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/drathveloper/go-cloud-gateway/internal/pkg/common"
+	"github.com/drathveloper/go-cloud-gateway/internal/pkg/shared"
 	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 )
 
@@ -40,11 +40,11 @@ func NewRewritePathFilter(regexpStr, replacement string) (*RewritePath, error) {
 // NewRewritePathBuilder creates a new RewritePathBuilder.
 func NewRewritePathBuilder() gateway.FilterBuilderFunc {
 	return func(args map[string]any) (gateway.Filter, error) {
-		regex, err := common.ConvertToString(args["regexp"])
+		regex, err := shared.ConvertToString(args["regexp"])
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert 'regexp' attribute: %w", err)
 		}
-		replacement, err := common.ConvertToString(args["replacement"])
+		replacement, err := shared.ConvertToString(args["replacement"])
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert 'replacement' attribute: %w", err)
 		}

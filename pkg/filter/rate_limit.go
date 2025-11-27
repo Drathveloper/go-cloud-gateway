@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/drathveloper/go-cloud-gateway/internal/pkg/common"
+	"github.com/drathveloper/go-cloud-gateway/internal/pkg/shared"
 	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 	"github.com/drathveloper/go-cloud-gateway/pkg/ratelimit"
 )
@@ -49,11 +49,11 @@ func NewRateLimitFilter(limiter ratelimit.RateLimiter, keyFunc ratelimit.KeyFunc
 // implementation details.
 func NewRateLimitBuilder() gateway.FilterBuilderFunc {
 	return func(args map[string]any) (gateway.Filter, error) {
-		rateLimitType, err := common.ConvertToString(args["type"])
+		rateLimitType, err := shared.ConvertToString(args["type"])
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert 'type' attribute: %w", err)
 		}
-		rateLimitKey, err := common.ConvertToString(args["key"])
+		rateLimitKey, err := shared.ConvertToString(args["key"])
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert 'key' attribute: %w", err)
 		}

@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/drathveloper/go-cloud-gateway/internal/pkg/common"
+	"github.com/drathveloper/go-cloud-gateway/internal/pkg/shared"
 	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 )
 
@@ -64,7 +64,7 @@ func (h *GatewayHandler) writeResponse(writer http.ResponseWriter, response *gat
 	} else {
 		writer.Header().Set("Content-Length", strconv.FormatInt(response.BodyReader.Len(), 10))
 	}
-	common.WriteHeader(writer, response.Headers)
+	shared.WriteHeader(writer, response.Headers)
 	writer.WriteHeader(response.Status)
 	_, _ = io.Copy(writer, response.BodyReader)
 	_ = response.BodyReader.Close()

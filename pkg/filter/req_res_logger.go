@@ -4,7 +4,7 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/drathveloper/go-cloud-gateway/internal/pkg/common"
+	"github.com/drathveloper/go-cloud-gateway/internal/pkg/shared"
 	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 )
 
@@ -26,7 +26,7 @@ func NewRequestResponseLoggerFilter(level slog.Level) *RequestResponseLogger {
 // NewRequestResponseLoggerBuilder creates a new RequestResponseLoggerBuilder.
 func NewRequestResponseLoggerBuilder() gateway.FilterBuilderFunc {
 	return func(args map[string]any) (gateway.Filter, error) {
-		level, _ := common.ConvertToString(args["level"])
+		level, _ := shared.ConvertToString(args["level"])
 		switch strings.ToLower(level) {
 		case "debug":
 			return NewRequestResponseLoggerFilter(slog.LevelDebug), nil
@@ -47,7 +47,7 @@ func (f *RequestResponseLogger) PreProcess(ctx *gateway.Context) error {
 	if ctx.Logger.Enabled(ctx, f.level) {
 		var body []byte
 		if err := ctx.Request.BodyReader.Capture(); err == nil {
-			body, _ = common.ReadBody(ctx.Request.BodyReader)
+			body, _ = shared.ReadBody(ctx.Request.BodyReader)
 		}
 		ctx.Logger.Log(ctx, f.level, "Received request",
 			"url", ctx.Request.Method+" "+ctx.Request.URL.String(),
@@ -62,7 +62,7 @@ func (f *RequestResponseLogger) PostProcess(ctx *gateway.Context) error {
 	if ctx.Logger.Enabled(ctx, f.level) {
 		var body []byte
 		if err := ctx.Response.BodyReader.Capture(); err == nil {
-			body, _ = common.ReadBody(ctx.Response.BodyReader)
+			body, _ = shared.ReadBody(ctx.Response.BodyReader)
 		}
 		ctx.Logger.Log(ctx, f.level, "Returned response",
 			"status", ctx.Response.Status,
