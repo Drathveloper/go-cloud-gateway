@@ -19,8 +19,8 @@ var ErrUnmarshalDuration = errors.New("unmarshal duration failed")
 // 2. 30
 // 3. 30.0
 // 4. 30.000000000.
-func (d *Duration) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	var val interface{}
+func (d *Duration) UnmarshalYAML(unmarshal func(any2 any) error) error {
+	var val any
 	if err := unmarshal(&val); err != nil {
 		return ErrUnmarshalDuration
 	}

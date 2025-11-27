@@ -47,7 +47,7 @@ func newDummyContext() *gateway.Context {
 func BenchmarkGatewayDo_Success(b *testing.B) {
 	g := gateway.NewGateway(&dummyHTTPClient{})
 	b.ResetTimer()
-	for range b.N {
+	for b.Loop() {
 		ctx := newDummyContext()
 		_ = g.Do(ctx)
 		gateway.ReleaseGatewayContext(ctx)
@@ -57,7 +57,7 @@ func BenchmarkGatewayDo_Success(b *testing.B) {
 func BenchmarkGatewayDo_HTTPError(b *testing.B) {
 	g := gateway.NewGateway(&dummyHTTPClient{fail: true})
 	b.ResetTimer()
-	for range b.N {
+	for b.Loop() {
 		ctx := newDummyContext()
 		_ = g.Do(ctx)
 		gateway.ReleaseGatewayContext(ctx)
@@ -67,7 +67,7 @@ func BenchmarkGatewayDo_HTTPError(b *testing.B) {
 func BenchmarkGatewayDo_PreFilterError(b *testing.B) {
 	g := gateway.NewGateway(&dummyHTTPClient{})
 	b.ResetTimer()
-	for range b.N {
+	for b.Loop() {
 		ctx := newDummyContext()
 		_ = g.Do(ctx)
 		gateway.ReleaseGatewayContext(ctx)
@@ -77,7 +77,7 @@ func BenchmarkGatewayDo_PreFilterError(b *testing.B) {
 func BenchmarkGatewayDo_PostFilterError(b *testing.B) {
 	g := gateway.NewGateway(&dummyHTTPClient{})
 	b.ResetTimer()
-	for range b.N {
+	for b.Loop() {
 		ctx := newDummyContext()
 		_ = g.Do(ctx)
 		gateway.ReleaseGatewayContext(ctx)

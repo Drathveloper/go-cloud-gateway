@@ -2,6 +2,7 @@ package filter_test
 
 import (
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/drathveloper/go-cloud-gateway/pkg/filter"
@@ -69,7 +70,7 @@ func BenchmarkRewritePath_PreProcess(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 
-			for range b.N {
+			for b.Loop() {
 				_ = rewrite.PreProcess(ctx)
 			}
 		})
@@ -77,9 +78,9 @@ func BenchmarkRewritePath_PreProcess(b *testing.B) {
 }
 
 func generateLongPath(segment string, repeat int) string {
-	full := ""
+	strBuilder := strings.Builder{}
 	for range repeat {
-		full += segment
+		_, _ = strBuilder.WriteString(segment)
 	}
-	return full
+	return strBuilder.String()
 }

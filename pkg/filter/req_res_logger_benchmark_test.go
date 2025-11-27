@@ -37,7 +37,7 @@ func BenchmarkRequestResponseLogger_SilentPreProcess(b *testing.B) {
 	}
 
 	b.ResetTimer()
-	for range b.N {
+	for b.Loop() {
 		_ = f.PreProcess(ctx)
 	}
 }
@@ -55,7 +55,7 @@ func BenchmarkRequestResponseLogger_SilentPostProcess(b *testing.B) {
 	}
 
 	b.ResetTimer()
-	for range b.N {
+	for b.Loop() {
 		_ = f.PostProcess(ctx)
 	}
 }
@@ -76,7 +76,7 @@ func BenchmarkRequestResponseLogger_PreProcess_WithRealLogger(b *testing.B) {
 	}
 
 	b.ResetTimer()
-	for range b.N {
+	for b.Loop() {
 		buf.Reset()
 		_ = f.PreProcess(ctx)
 	}
@@ -97,7 +97,7 @@ func BenchmarkRequestResponseLogger_PostProcess_WithRealLogger(b *testing.B) {
 	}
 
 	b.ResetTimer()
-	for range b.N {
+	for b.Loop() {
 		buf.Reset()
 		_ = f.PostProcess(ctx)
 	}

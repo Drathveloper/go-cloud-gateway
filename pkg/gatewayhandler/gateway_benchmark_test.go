@@ -42,7 +42,7 @@ func BenchmarkServeHTTP_HappyPath(b *testing.B) {
 	)
 
 	reqBody := []byte(`GET /test HTTP/1.1`)
-	for range b.N {
+	for b.Loop() {
 		req := httptest.NewRequest(http.MethodGet, "/test?x=1", bytes.NewReader(reqBody))
 		rec := httptest.NewRecorder()
 
@@ -74,7 +74,7 @@ func BenchmarkServeHTTP_RouteNotFound(b *testing.B) {
 	req := httptest.NewRequest(http.MethodGet, "/not-found", nil)
 
 	b.ResetTimer()
-	for range b.N {
+	for b.Loop() {
 		w := httptest.NewRecorder()
 		gwHandler.ServeHTTP(w, req.Clone(req.Context()))
 	}
@@ -104,7 +104,7 @@ func BenchmarkServeHTTP_BackendError(b *testing.B) {
 	req := httptest.NewRequest(http.MethodGet, "/fail", nil)
 
 	b.ResetTimer()
-	for range b.N {
+	for b.Loop() {
 		w := httptest.NewRecorder()
 		gwHandler.ServeHTTP(w, req.Clone(req.Context()))
 	}
@@ -134,7 +134,7 @@ func BenchmarkServeHTTP_LargeBody(b *testing.B) {
 	)
 
 	b.ResetTimer()
-	for range b.N {
+	for b.Loop() {
 		req := httptest.NewRequest(http.MethodPost, "/big", io.NopCloser(strings.NewReader(largeBody)))
 		w := httptest.NewRecorder()
 		gwHandler.ServeHTTP(w, req.Clone(req.Context()))

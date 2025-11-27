@@ -22,12 +22,13 @@ var contextPool = sync.Pool{
 
 // Context represents the gateway context. It holds the relevant information for the gateway to process the request.
 type Context struct {
-	Request         *Request
-	Response        *Response
-	Route           *Route
-	Logger          *slog.Logger
-	Attributes      map[string]any
 	context.Context //nolint:containedctx
+
+	Request    *Request
+	Response   *Response
+	Route      *Route
+	Logger     *slog.Logger
+	Attributes map[string]any
 }
 
 func clearMap(m map[string]any) {
