@@ -19,7 +19,7 @@ func BenchmarkNewGatewayContext(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for range b.N {
+	for b.Loop() {
 		ctx, cancel := gateway.NewGatewayContext(route, req)
 		cancel()
 		gateway.ReleaseGatewayContext(ctx)

@@ -3,6 +3,7 @@ package predicate
 import (
 	"fmt"
 	"net/http"
+	"slices"
 
 	"github.com/drathveloper/go-cloud-gateway/internal/pkg/common"
 	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
@@ -39,12 +40,7 @@ func NewMethodPredicateBuilder() gateway.PredicateBuilderFunc {
 // If the request method does not match any method, the predicate will return false.
 // If the request method matches at least one method, the predicate will return true.
 func (p *Method) Test(r *http.Request) bool {
-	for _, method := range p.methods {
-		if r.Method == method {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(p.methods, r.Method)
 }
 
 // Name returns the name of the predicate.

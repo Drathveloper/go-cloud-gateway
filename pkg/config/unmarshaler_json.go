@@ -17,7 +17,7 @@ import (
 // 3. 30.0
 // 4. 30.000000000.
 func (d *Duration) UnmarshalJSON(b []byte) error {
-	var val interface{}
+	var val any
 	if err := json.Unmarshal(b, &val); err != nil {
 		return fmt.Errorf("%w: %v", ErrUnmarshalDuration, err.Error())
 	}

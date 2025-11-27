@@ -35,7 +35,7 @@ func BenchmarkPathMatcher(b *testing.B) {
 
 	for _, c := range cases {
 		b.Run(c.pattern+"_"+c.path, func(b *testing.B) {
-			for range b.N {
+			for b.Loop() {
 				common.PathMatcher(c.pattern, c.path)
 			}
 		})
@@ -58,7 +58,7 @@ func BenchmarkHostMatcher(b *testing.B) {
 	for _, tc := range cases {
 		pattern := regexp.MustCompile(common.ConvertPatternToRegex(tc.pattern))
 		b.Run(tc.pattern+"_"+tc.host, func(b *testing.B) {
-			for range b.N {
+			for b.Loop() {
 				common.HostMatcher(pattern, tc.host)
 			}
 		})

@@ -1,0 +1,13 @@
+name: Go Cloud Gateway CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  run-library-ci:
+    name: Run Library CI
+    uses: Drathveloper/go-build-tools/.github/workflows/golang_lib_workflow.yml@feature/add-codecov

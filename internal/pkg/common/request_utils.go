@@ -3,6 +3,7 @@ package common
 import (
 	"bytes"
 	"io"
+	"maps"
 	"net/http"
 	"strings"
 	"sync"
@@ -47,10 +48,7 @@ func ReadBody(readCloser io.ReadCloser) ([]byte, error) {
 
 // WriteHeader writes the header to the response.
 func WriteHeader(w http.ResponseWriter, header http.Header) {
-	dst := w.Header()
-	for k, values := range header {
-		dst[k] = values
-	}
+	maps.Copy(w.Header(), header)
 }
 
 // GetRemoteAddr returns the remote address of the request. It will make the best effort to return the IP address

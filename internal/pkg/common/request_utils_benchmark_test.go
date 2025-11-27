@@ -29,7 +29,7 @@ func BenchmarkReadBody(b *testing.B) {
 			readCloser := io.NopCloser(bytes.NewReader([]byte(tc.input)))
 
 			b.ResetTimer()
-			for range b.N {
+			for b.Loop() {
 				if _, err = common.ReadBody(readCloser); err != nil {
 					b.Fatalf("ReadBody failed: %v", err)
 				}
@@ -39,7 +39,7 @@ func BenchmarkReadBody(b *testing.B) {
 }
 
 func BenchmarkReadBody_Nil(b *testing.B) {
-	for range b.N {
+	for b.Loop() {
 		_, err := common.ReadBody(nil)
 		if err != nil {
 			b.Fatalf("ReadBody failed: %v", err)

@@ -14,7 +14,7 @@ import (
 func BenchmarkNewGatewayRequest(b *testing.B) {
 	body := []byte(`{"message":"hello world"}`)
 	b.ResetTimer()
-	for range b.N {
+	for b.Loop() {
 		req := &http.Request{
 			Method: http.MethodPost,
 			URL:    &url.URL{Scheme: "http", Host: "localhost", Path: "/api"},
@@ -31,7 +31,7 @@ func BenchmarkNewGatewayRequest(b *testing.B) {
 func BenchmarkNewGatewayRequest_LargeBody(b *testing.B) {
 	largeBody := bytes.Repeat([]byte("x"), 10_000) // 10KB
 	b.ResetTimer()
-	for range b.N {
+	for b.Loop() {
 		req := &http.Request{
 			Method: http.MethodPost,
 			URL:    &url.URL{Scheme: "http", Host: "localhost", Path: "/api"},
@@ -49,7 +49,7 @@ func BenchmarkNewGatewayResponse(b *testing.B) {
 	body := []byte(`{"message":"hello world"}`)
 
 	b.ResetTimer()
-	for range b.N {
+	for b.Loop() {
 		res := &http.Response{
 			StatusCode: http.StatusOK,
 			Header:     http.Header{"Content-Type": {"application/json"}},
@@ -67,7 +67,7 @@ func BenchmarkNewGatewayResponse_LargeBody(b *testing.B) {
 	body := bytes.Repeat([]byte("A"), bodySize)
 
 	b.ResetTimer()
-	for range b.N {
+	for b.Loop() {
 		res := &http.Response{
 			StatusCode: http.StatusOK,
 			Header:     http.Header{"Content-Type": {"application/json"}},
@@ -91,7 +91,7 @@ func BenchmarkReplayableBody_Capture(b *testing.B) {
 	for _, size := range sizes {
 		b.Run(strconv.Itoa(size)+"_bytes", func(b *testing.B) {
 			bodyData := bytes.Repeat([]byte("a"), size)
-			for range b.N {
+			for b.Loop() {
 				r := io.NopCloser(bytes.NewReader(bodyData))
 				rb := gateway.NewReplayableBody(r, int64(len(bodyData)))
 				_ = rb.Capture()

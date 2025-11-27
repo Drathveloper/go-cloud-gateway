@@ -39,7 +39,7 @@ func BenchmarkPreProcessAll_NoError(b *testing.B) {
 		filters[i] = &DummyFilter{ID: strconv.Itoa(i)}
 	}
 	b.ResetTimer()
-	for range b.N {
+	for b.Loop() {
 		_ = filters.PreProcessAll(dummyCtx)
 	}
 }
@@ -50,7 +50,7 @@ func BenchmarkPostProcessAll_NoError(b *testing.B) {
 		filters[i] = &DummyBenchFilter{ID: strconv.Itoa(i)}
 	}
 	b.ResetTimer()
-	for range b.N {
+	for b.Loop() {
 		_ = filters.PostProcessAll(dummyCtx)
 	}
 }
@@ -62,7 +62,7 @@ func BenchmarkPreProcessAll_WithError(b *testing.B) {
 		filters[i] = &DummyBenchFilter{ID: strconv.Itoa(i), Fail: fail}
 	}
 	b.ResetTimer()
-	for range b.N {
+	for b.Loop() {
 		_ = filters.PreProcessAll(dummyCtx)
 	}
 }
@@ -74,7 +74,7 @@ func BenchmarkPostProcessAll_WithError(b *testing.B) {
 		filters[i] = &DummyBenchFilter{ID: strconv.Itoa(i), Fail: fail}
 	}
 	b.ResetTimer()
-	for range b.N {
+	for b.Loop() {
 		_ = filters.PostProcessAll(dummyCtx)
 	}
 }
