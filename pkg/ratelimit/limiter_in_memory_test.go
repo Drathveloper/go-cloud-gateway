@@ -6,13 +6,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/drathveloper/go-cloud-gateway/internal/pkg/common"
+	"github.com/drathveloper/go-cloud-gateway/internal/pkg/shared"
 	"github.com/drathveloper/go-cloud-gateway/pkg/ratelimit"
 )
 
 func TestInMemoryRateLimiter_Allow(t *testing.T) {
 	tests := []struct {
-		timeProvider      common.TimeProvider
+		timeProvider      shared.TimeProvider
 		getKey            func() string
 		name              string
 		timesBeforeCheck  int

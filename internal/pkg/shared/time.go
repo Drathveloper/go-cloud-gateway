@@ -1,4 +1,4 @@
-package common //nolint:revive
+package shared
 
 import "time"
 

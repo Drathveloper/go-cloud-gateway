@@ -10,4 +10,4 @@ on:
 jobs:
   run-library-ci:
     name: Run Library CI
-    uses: Drathveloper/go-build-tools/.github/workflows/golang_lib_workflow.yml@feature/add-codecov
+    uses: Drathveloper/go-build-tools/.github/workflows/golang_lib_workflow.yml@master

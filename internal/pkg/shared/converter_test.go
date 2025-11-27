@@ -1,4 +1,4 @@
-package common_test
+package shared_test
 
 import (
 	"errors"
@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/drathveloper/go-cloud-gateway/internal/pkg/common"
+	"github.com/drathveloper/go-cloud-gateway/internal/pkg/shared"
 )
 
 func TestConvertToString(t *testing.T) {
@@ -39,7 +39,7 @@ func TestConvertToString(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := common.ConvertToString(tt.input)
+			result, err := shared.ConvertToString(tt.input)
 
 			if fmt.Sprintf("%s", tt.expectedErr) != fmt.Sprintf("%s", err) {
 				t.Errorf("expected %s actual %s", tt.expectedErr, err)
@@ -91,7 +91,7 @@ func TestConvertToStringSlice(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := common.ConvertToStringSlice(tt.input)
+			result, err := shared.ConvertToStringSlice(tt.input)
 
 			if fmt.Sprintf("%s", tt.expectedErr) != fmt.Sprintf("%s", err) {
 				t.Errorf("expected %s actual %s", tt.expectedErr, err)
@@ -146,7 +146,7 @@ func TestConvertToDateTime(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := common.ConvertToDateTime(tt.input)
+			result, err := shared.ConvertToDateTime(tt.input)
 
 			if fmt.Sprintf("%s", tt.expectedErr) != fmt.Sprintf("%s", err) {
 				t.Errorf("expected err %s actual %s", tt.expectedErr, err)
@@ -204,7 +204,7 @@ func TestConvertToInt(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := common.ConvertToInt(tt.input)
+			result, err := shared.ConvertToInt(tt.input)
 			if fmt.Sprintf("%s", tt.expectedErr) != fmt.Sprintf("%s", err) {
 				t.Errorf("expected err %s actual %s", tt.expectedErr, err)
 			}
@@ -231,25 +231,25 @@ func TestConvertToDuration(t *testing.T) {
 		{
 			name:        "convert nil to duration should return error",
 			input:       nil,
-			expectedErr: common.ErrRequiredValue,
+			expectedErr: shared.ErrRequiredValue,
 			expected:    0,
 		},
 		{
 			name:        "convert non string to duration should return error",
 			input:       false,
-			expectedErr: common.ErrRequiredStringValue,
+			expectedErr: shared.ErrRequiredStringValue,
 			expected:    0,
 		},
 		{
 			name:        "convert invalid string to duration should return error",
 			input:       "pepe",
-			expectedErr: common.ErrRequiredDurationValue,
+			expectedErr: shared.ErrRequiredDurationValue,
 			expected:    0,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := common.ConvertToDuration(tt.input)
+			result, err := shared.ConvertToDuration(tt.input)
 			if fmt.Sprintf("%s", tt.expectedErr) != fmt.Sprintf("%s", err) {
 				t.Errorf("expected err %s actual %s", tt.expectedErr, err)
 			}

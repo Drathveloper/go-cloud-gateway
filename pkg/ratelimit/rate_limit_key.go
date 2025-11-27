@@ -3,7 +3,7 @@ package ratelimit
 import (
 	"fmt"
 
-	"github.com/drathveloper/go-cloud-gateway/internal/pkg/common"
+	"github.com/drathveloper/go-cloud-gateway/internal/pkg/shared"
 	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 )
 
@@ -44,7 +44,7 @@ func NewPathAndMethodKeyFuncBuilder() KeyFuncBuilderFunc {
 // NewHeaderKeyFuncBuilder builds a new header key func builder.
 func NewHeaderKeyFuncBuilder() KeyFuncBuilderFunc {
 	return func(args map[string]any) (KeyFunc, error) {
-		queryParam, err := common.ConvertToString(args["header-name"])
+		queryParam, err := shared.ConvertToString(args["header-name"])
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert 'header-name' attribute: %w", err)
 		}
@@ -55,7 +55,7 @@ func NewHeaderKeyFuncBuilder() KeyFuncBuilderFunc {
 // NewQueryKeyFuncBuilder builds a new query param key func builder.
 func NewQueryKeyFuncBuilder() KeyFuncBuilderFunc {
 	return func(args map[string]any) (KeyFunc, error) {
-		queryParam, err := common.ConvertToString(args["query-param"])
+		queryParam, err := shared.ConvertToString(args["query-param"])
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert 'query-param' attribute: %w", err)
 		}

@@ -1,4 +1,4 @@
-package common_test
+package shared_test
 
 import (
 	"bytes"
@@ -10,7 +10,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/drathveloper/go-cloud-gateway/internal/pkg/common"
+	"github.com/drathveloper/go-cloud-gateway/internal/pkg/shared"
 )
 
 type DummyReadCloser struct {
@@ -60,7 +60,7 @@ func TestReadBody(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			content, err := common.ReadBody(tt.readCloser)
+			content, err := shared.ReadBody(tt.readCloser)
 			if fmt.Sprintf("%s", tt.expectedErr) != fmt.Sprintf("%s", err) {
 				t.Errorf("expected err %s actual %s", tt.expectedErr, err)
 			}
@@ -119,7 +119,7 @@ func TestWriteHeader(t *testing.T) {
 				rr.Header()[k] = append([]string(nil), v...)
 			}
 
-			common.WriteHeader(rr, tt.inputHeaders)
+			shared.WriteHeader(rr, tt.inputHeaders)
 
 			got := rr.Header()
 			if len(got) != len(tt.expected) {
@@ -178,7 +178,7 @@ func TestGetRemoteAddr(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := common.GetRemoteAddr(tt.request); got != tt.expected {
+			if got := shared.GetRemoteAddr(tt.request); got != tt.expected {
 				t.Errorf("GetRemoteAddr() = %v, want %v", got, tt.expected)
 			}
 		})

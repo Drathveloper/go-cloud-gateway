@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"regexp"
 
-	"github.com/drathveloper/go-cloud-gateway/internal/pkg/common"
+	"github.com/drathveloper/go-cloud-gateway/internal/pkg/shared"
 	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 )
 
@@ -41,11 +41,11 @@ func NewCookiePredicate(name, regexpStr string) (*Cookie, error) {
 // NewCookiePredicateBuilder creates a new cookie predicate builder.
 func NewCookiePredicateBuilder() gateway.PredicateBuilderFunc {
 	return func(args map[string]any) (gateway.Predicate, error) {
-		name, err := common.ConvertToString(args["name"])
+		name, err := shared.ConvertToString(args["name"])
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert 'name' attribute: %w", err)
 		}
-		regex, err := common.ConvertToString(args["regexp"])
+		regex, err := shared.ConvertToString(args["regexp"])
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert 'regexp' attribute: %w", err)
 		}

@@ -4,12 +4,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/drathveloper/go-cloud-gateway/internal/pkg/common"
+	"github.com/drathveloper/go-cloud-gateway/internal/pkg/shared"
 )
 
 // TokenBucket is a token bucket.
 type TokenBucket struct {
-	time       common.TimeProvider
+	time       shared.TimeProvider
 	lastUpdate *time.Time
 	tokens     float64
 	rate       int
@@ -21,7 +21,7 @@ type TokenBucket struct {
 //
 // The token bucket will allow the given rate of tokens per second.
 // The token bucket will allow the given burst of tokens.
-func NewTokenBucket(time common.TimeProvider, rate, burst int) *TokenBucket {
+func NewTokenBucket(time shared.TimeProvider, rate, burst int) *TokenBucket {
 	now := time.Now()
 	return &TokenBucket{
 		time:       time,

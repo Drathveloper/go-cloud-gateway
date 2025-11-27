@@ -9,7 +9,7 @@ import (
 	"net/url"
 	"sync"
 
-	"github.com/drathveloper/go-cloud-gateway/internal/pkg/common"
+	"github.com/drathveloper/go-cloud-gateway/internal/pkg/shared"
 )
 
 // ErrCapture represents the error when the captured request body failed.
@@ -38,7 +38,7 @@ type Request struct {
 // NewGatewayRequest creates a new gateway request from an http request.
 func NewGatewayRequest(request *http.Request) *Request {
 	return &Request{
-		RemoteAddr: common.GetRemoteAddr(request),
+		RemoteAddr: shared.GetRemoteAddr(request),
 		URL:        request.URL,
 		Method:     request.Method,
 		Headers:    request.Header,

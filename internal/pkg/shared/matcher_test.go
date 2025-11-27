@@ -1,10 +1,10 @@
-package common_test
+package shared_test
 
 import (
 	"regexp"
 	"testing"
 
-	"github.com/drathveloper/go-cloud-gateway/internal/pkg/common"
+	"github.com/drathveloper/go-cloud-gateway/internal/pkg/shared"
 )
 
 func TestPathMatcher(t *testing.T) {
@@ -95,7 +95,7 @@ func TestPathMatcher(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			actual := common.PathMatcher(tt.pattern, tt.path)
+			actual := shared.PathMatcher(tt.pattern, tt.path)
 			if tt.match != actual {
 				t.Errorf("expected %t actual %t", tt.match, actual)
 			}
@@ -166,9 +166,9 @@ func TestHostMatcher(t *testing.T) {
 			if tt.pattern == "**" {
 				pattern = nil
 			} else {
-				pattern = regexp.MustCompile(common.ConvertPatternToRegex(tt.pattern))
+				pattern = regexp.MustCompile(shared.ConvertPatternToRegex(tt.pattern))
 			}
-			result := common.HostMatcher(pattern, tt.host)
+			result := shared.HostMatcher(pattern, tt.host)
 			if tt.expected != result {
 				t.Errorf("expected %t actual %t", tt.expected, result)
 			}

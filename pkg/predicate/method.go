@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"slices"
 
-	"github.com/drathveloper/go-cloud-gateway/internal/pkg/common"
+	"github.com/drathveloper/go-cloud-gateway/internal/pkg/shared"
 	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 )
 
@@ -27,7 +27,7 @@ func NewMethodPredicate(methods ...string) *Method {
 // NewMethodPredicateBuilder creates a new method predicate builder.
 func NewMethodPredicateBuilder() gateway.PredicateBuilderFunc {
 	return func(args map[string]any) (gateway.Predicate, error) {
-		methods, err := common.ConvertToStringSlice(args["methods"])
+		methods, err := shared.ConvertToStringSlice(args["methods"])
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert 'methods' attribute: %w", err)
 		}

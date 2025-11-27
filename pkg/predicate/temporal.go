@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/drathveloper/go-cloud-gateway/internal/pkg/common"
+	"github.com/drathveloper/go-cloud-gateway/internal/pkg/shared"
 	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 )
 
@@ -21,7 +21,7 @@ const BetweenPredicateName = "Between"
 // After is a predicate that checks if the current time is after a given time.
 type After struct {
 	dateTime     time.Time
-	timeProvider common.TimeProvider
+	timeProvider shared.TimeProvider
 }
 
 // NewAfterPredicate creates a new after predicate.
@@ -30,14 +30,14 @@ type After struct {
 func NewAfterPredicate(dateTime time.Time) *After {
 	return &After{
 		dateTime:     dateTime.UTC(),
-		timeProvider: &common.RealTime{},
+		timeProvider: &shared.RealTime{},
 	}
 }
 
 // NewAfterPredicateTest creates a new after predicate for tests.
 func NewAfterPredicateTest(
 	dateTime time.Time,
-	provider common.TimeProvider) *After {
+	provider shared.TimeProvider) *After {
 	return &After{
 		dateTime:     dateTime.UTC(),
 		timeProvider: provider,
@@ -47,7 +47,7 @@ func NewAfterPredicateTest(
 // NewAfterPredicateBuilder creates a new after predicate builder.
 func NewAfterPredicateBuilder() gateway.PredicateBuilderFunc {
 	return func(args map[string]any) (gateway.Predicate, error) {
-		dateTime, err := common.ConvertToDateTime(args["datetime"])
+		dateTime, err := shared.ConvertToDateTime(args["datetime"])
 		if err != nil {
 			return nil, fmt.Errorf("arg 'datetime' is required to be a valid datetime: %w", err)
 		}
@@ -73,7 +73,7 @@ func (p *After) Name() string {
 // Before is a predicate that checks if the current time is before a given time.
 type Before struct {
 	dateTime     time.Time
-	timeProvider common.TimeProvider
+	timeProvider shared.TimeProvider
 }
 
 // NewBeforePredicate creates a new before predicate.
@@ -82,14 +82,14 @@ type Before struct {
 func NewBeforePredicate(dateTime time.Time) *Before {
 	return &Before{
 		dateTime:     dateTime.UTC(),
-		timeProvider: &common.RealTime{},
+		timeProvider: &shared.RealTime{},
 	}
 }
 
 // NewBeforePredicateTest creates a new before predicate for tests.
 func NewBeforePredicateTest(
 	dateTime time.Time,
-	provider common.TimeProvider) *Before {
+	provider shared.TimeProvider) *Before {
 	return &Before{
 		dateTime:     dateTime.UTC(),
 		timeProvider: provider,
@@ -99,7 +99,7 @@ func NewBeforePredicateTest(
 // NewBeforePredicateBuilder creates a new before predicate builder.
 func NewBeforePredicateBuilder() gateway.PredicateBuilderFunc {
 	return func(args map[string]any) (gateway.Predicate, error) {
-		dateTime, err := common.ConvertToDateTime(args["datetime"])
+		dateTime, err := shared.ConvertToDateTime(args["datetime"])
 		if err != nil {
 			return nil, fmt.Errorf("arg 'datetime' is required to be a valid datetime: %w", err)
 		}
@@ -126,7 +126,7 @@ func (p *Before) Name() string {
 type Between struct {
 	startDateTime time.Time
 	endDateTime   time.Time
-	timeProvider  common.TimeProvider
+	timeProvider  shared.TimeProvider
 }
 
 // NewBetweenPredicate creates a new between predicate.
@@ -136,7 +136,7 @@ func NewBetweenPredicate(startDateTime, endDateTime time.Time) *Between {
 	return &Between{
 		startDateTime: startDateTime.UTC(),
 		endDateTime:   endDateTime.UTC(),
-		timeProvider:  &common.RealTime{},
+		timeProvider:  &shared.RealTime{},
 	}
 }
 
@@ -144,7 +144,7 @@ func NewBetweenPredicate(startDateTime, endDateTime time.Time) *Between {
 func NewBetweenPredicateTest(
 	startDateTime,
 	endDateTime time.Time,
-	provider common.TimeProvider) *Between {
+	provider shared.TimeProvider) *Between {
 	return &Between{
 		startDateTime: startDateTime.UTC(),
 		endDateTime:   endDateTime.UTC(),
@@ -155,11 +155,11 @@ func NewBetweenPredicateTest(
 // NewBetweenPredicateBuilder creates a new between predicate builder.
 func NewBetweenPredicateBuilder() gateway.PredicateBuilderFunc {
 	return func(args map[string]any) (gateway.Predicate, error) {
-		startDateTime, err := common.ConvertToDateTime(args["start"])
+		startDateTime, err := shared.ConvertToDateTime(args["start"])
 		if err != nil {
 			return nil, fmt.Errorf("arg 'start' is required to be a valid datetime: %w", err)
 		}
-		endDateTime, err := common.ConvertToDateTime(args["end"])
+		endDateTime, err := shared.ConvertToDateTime(args["end"])
 		if err != nil {
 			return nil, fmt.Errorf("arg 'end' is required to be a valid datetime: %w", err)
 		}
