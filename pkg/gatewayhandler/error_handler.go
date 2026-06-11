@@ -23,13 +23,17 @@ func (f ErrorHandlerFunc) Handle(ctx *gateway.Context, err error, w http.Respons
 	f(ctx, err, w)
 }
 
+// statusClientClosedRequest is the de facto status code (nginx convention) for requests
+// aborted by the client. The client is gone, so it is only seen in logs and metrics.
+const statusClientClosedRequest = 499
+
 // BaseErrorHandler is the base error handler. It will handle the following errors:
-// 1. ErrRouteNotFound: no route matched the request. It will return a 404 Not Found.
-// 2. context.DeadlineExceeded: the request timeout. It will return a 502 Bad Gateway.
+// 1. context.DeadlineExceeded: the request timeout. It will return a 502 Bad Gateway.
+// 2. context.Canceled: the client closed the request. It will return a 499 Client Closed Request.
 // 3. gateway.ErrHTTP: the gateway http request to backend failed. It will return 502 Bad Gateway.
 // 4. filter.ErrRateLimitExceeded: the rate limit exceeded. It will return 429 Too Many Requests.
-// 4. any other error: unexpected error. It will return a 500 Internal Server Error.
-// If the error is not one of the above, it will log the error and return a 500 Internal Server Error.
+// 5. gateway.ErrCircuitBreaker: the circuit breaker is open. It will return 503 Service Unavailable.
+// 6. any other error: unexpected error. It will return a 500 Internal Server Error.
 // If the error is nil, it will do nothing.
 func BaseErrorHandler() ErrorHandlerFunc {
 	return func(ctx *gateway.Context, err error, writer http.ResponseWriter) {
@@ -40,6 +44,9 @@ func BaseErrorHandler() ErrorHandlerFunc {
 		case errors.Is(err, context.DeadlineExceeded):
 			ctx.Logger.Error("request timeout", "error", err)
 			http.Error(writer, "", http.StatusBadGateway)
+		case errors.Is(err, context.Canceled):
+			ctx.Logger.Warn("client closed request", "error", err)
+			http.Error(writer, "", statusClientClosedRequest)
 		case errors.Is(err, gateway.ErrHTTP):
 			ctx.Logger.Error("http request failed", "error", err)
 			http.Error(writer, "", http.StatusBadGateway)

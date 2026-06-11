@@ -1,9 +1,11 @@
 package httpclient_test
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"reflect"
 	"testing"
@@ -158,5 +160,48 @@ func TestCircuitBreakerHTTPClient_Do(t *testing.T) {
 				t.Errorf("expected err %s actual %s", tt.expectedErr, err)
 			}
 		})
+	}
+}
+
+type closeCountingBody struct {
+	io.Reader
+
+	closes int
+}
+
+func (c *closeCountingBody) Close() error {
+	c.closes++
+	return nil
+}
+
+func TestCircuitBreakerHTTPClient_Do_Closes5xxBody(t *testing.T) {
+	body := &closeCountingBody{Reader: bytes.NewReader([]byte("boom"))}
+	client := &MockHTTPClient{
+		ExpectedResponse: &http.Response{
+			StatusCode: http.StatusInternalServerError,
+			Body:       body,
+		},
+	}
+	ctx := &gateway.Context{
+		Route: &gateway.Route{
+			ID:             "someId",
+			CircuitBreaker: &MockCircuitBreaker[*http.Response]{},
+		},
+		Context: t.Context(),
+	}
+	req := &http.Request{}
+	req = req.WithContext(ctx)
+	cbClient := httpclient.NewCircuitBreakerHTTPClient(client)
+
+	res, err := cbClient.Do(req) //nolint:bodyclose // the test asserts the close count itself
+
+	if !errors.Is(err, httpclient.ErrInternalServer) {
+		t.Errorf("expected err %s actual %s", httpclient.ErrInternalServer, err)
+	}
+	if res != nil {
+		t.Errorf("expected nil response actual %v", res)
+	}
+	if body.closes != 1 {
+		t.Errorf("expected 5xx body closed once, actual %d", body.closes)
 	}
 }

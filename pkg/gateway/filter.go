@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"fmt"
+	"slices"
 )
 
 // Filter represents a gateway filter.
@@ -79,9 +80,9 @@ func (f Filters) PreProcessAll(ctx *Context) error {
 // The order of the filters in the list is important. The first filter in the list is called last. The last filter in
 // the list is called first.
 func (f Filters) PostProcessAll(ctx *Context) error {
-	for i := len(f) - 1; i >= 0; i-- {
-		if err := f[i].PostProcess(ctx); err != nil {
-			name := f[i].Name()
+	for _, filter := range slices.Backward(f) {
+		if err := filter.PostProcess(ctx); err != nil {
+			name := filter.Name()
 			return fmt.Errorf("post-process filters failed with filter %s: %w", name, err)
 		}
 	}

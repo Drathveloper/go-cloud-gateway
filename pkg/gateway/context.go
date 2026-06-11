@@ -9,9 +9,6 @@ import (
 const minAttributesLen = 8
 
 //nolint:gochecknoglobals
-var baseContext = context.Background()
-
-//nolint:gochecknoglobals
 var contextPool = sync.Pool{
 	New: func() any {
 		return &Context{
@@ -37,9 +34,12 @@ func clearMap(m map[string]any) {
 	}
 }
 
-// NewGatewayContext creates a new gateway context.
-func NewGatewayContext(route *Route, req *Request) (*Context, context.CancelFunc) {
-	ctx, cancelFunc := context.WithTimeout(baseContext, route.Timeout)
+// NewGatewayContext creates a new gateway context. The route timeout is applied on top
+// of the given parent context. The parent must be the inbound request context so that
+// client disconnections cancel the proxied backend request instead of letting it run
+// until the route timeout expires.
+func NewGatewayContext(parent context.Context, route *Route, req *Request) (*Context, context.CancelFunc) {
+	ctx, cancelFunc := context.WithTimeout(parent, route.Timeout)
 
 	gctx := contextPool.Get().(*Context) //nolint:forcetypeassert
 	gctx.Request = req

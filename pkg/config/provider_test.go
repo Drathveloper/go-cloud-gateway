@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"reflect"
 	"testing"
@@ -706,6 +707,74 @@ F0WydPKUjl3tmQRxYd9C8zDt6yB/fQbIoM/uGgZ0ZoZ+E5hvLVe+rYk=
 				}
 			} else if client != nil {
 				t.Error("Expected nil client, got non-nil")
+			}
+		})
+	}
+}
+
+func TestNewHTTPClient_DoesNotFollowRedirects(t *testing.T) {
+	followed := false
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/target" {
+			followed = true
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		http.Redirect(w, r, "/target", http.StatusFound)
+	}))
+	defer server.Close()
+
+	tests := []struct {
+		cfg  *config.Config
+		name string
+	}{
+		{
+			name: "default client",
+			cfg:  nil,
+		},
+		{
+			name: "configured client",
+			cfg: &config.Config{
+				Gateway: config.Gateway{
+					HTTPClient: &config.HTTPClient{
+						Pool: &config.Pool{
+							Timeout:             &config.Duration{Duration: 5 * time.Second},
+							MaxIdleConns:        10,
+							MaxIdleConnsPerHost: 10,
+							MaxConnsPerHost:     10,
+							IdleConnTimeout:     &config.Duration{Duration: 90 * time.Second},
+							TLSHandshakeTimeout: &config.Duration{Duration: 5 * time.Second},
+							KeepAlive:           &config.Duration{Duration: 30 * time.Second},
+						},
+					},
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			followed = false
+			client, err := config.NewHTTPClient(tt.cfg)
+			if err != nil {
+				t.Fatalf("NewHTTPClient() error = %v", err)
+			}
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, server.URL+"/redirect", nil)
+			if err != nil {
+				t.Fatalf("failed to build request: %v", err)
+			}
+			res, err := client.Do(req)
+			if err != nil {
+				t.Fatalf("request failed: %v", err)
+			}
+			defer res.Body.Close() //nolint:errcheck
+			if res.StatusCode != http.StatusFound {
+				t.Errorf("expected the redirect to be returned untouched, got status %d", res.StatusCode)
+			}
+			if loc := res.Header.Get("Location"); loc != "/target" {
+				t.Errorf("expected Location header %q, actual %q", "/target", loc)
+			}
+			if followed {
+				t.Error("expected the client to not follow the redirect")
 			}
 		})
 	}

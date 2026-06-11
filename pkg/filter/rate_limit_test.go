@@ -59,7 +59,7 @@ func TestRateLimit_PreProcess(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx, _ := gateway.NewGatewayContext(&gateway.Route{}, &gateway.Request{})
+			ctx, _ := gateway.NewGatewayContext(t.Context(), &gateway.Route{}, &gateway.Request{})
 			f := filter.NewRateLimitFilter(tt.limiter, tt.keyFunc)
 
 			err := f.PreProcess(ctx)

@@ -22,6 +22,12 @@ import (
 // ErrInitializeMTLS is the error returned when the mTLS initialization failed.
 var ErrInitializeMTLS = errors.New("failed to initialize mTLS")
 
+// noFollowRedirects is the redirect policy for the gateway http client: a gateway
+// must forward 3xx responses to the client untouched, never follow them itself.
+func noFollowRedirects(_ *http.Request, _ []*http.Request) error {
+	return http.ErrUseLastResponse
+}
+
 // NewRoutes creates a new gateway route from the given config.
 func NewRoutes(
 	cfg *Config,
@@ -127,8 +133,9 @@ func buildConfiguredHTTPClient(config *Config, tlsConfig *tls.Config) (*http.Cli
 		}
 	}
 	return &http.Client{
-		Transport: transport,
-		Timeout:   config.Gateway.HTTPClient.Pool.Timeout.Duration,
+		Transport:     transport,
+		CheckRedirect: noFollowRedirects,
+		Timeout:       config.Gateway.HTTPClient.Pool.Timeout.Duration,
 	}, nil
 }
 
@@ -148,8 +155,9 @@ func buildDefaultHTTPClient(tlsConfig *tls.Config) *http.Client {
 		ExpectContinueTimeout: ContinueDefaultTimeout,
 	}
 	return &http.Client{
-		Transport: transport,
-		Timeout:   DefaultTimeout,
+		Transport:     transport,
+		CheckRedirect: noFollowRedirects,
+		Timeout:       DefaultTimeout,
 	}
 }
 

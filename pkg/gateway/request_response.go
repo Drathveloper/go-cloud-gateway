@@ -74,6 +74,7 @@ type ReplayableBody struct {
 	reader   *bytes.Reader
 	length   int64
 	captured bool
+	closed   bool
 }
 
 // NewReplayableBody initializes a ReplayableBody allowing multiple reads from the same body by buffering the content.
@@ -115,7 +116,9 @@ func (rb *ReplayableBody) Capture() error {
 		return fmt.Errorf("%w: %s", ErrCapture, err.Error())
 	}
 	rb.length = length
-	rb.reader = bytes.NewReader(buf.Bytes())
+	// The reader must own its bytes: buf returns to the pool and other
+	// requests will overwrite its backing array.
+	rb.reader = bytes.NewReader(bytes.Clone(buf.Bytes()))
 	rb.captured = true
 	return nil
 }
@@ -126,10 +129,13 @@ func (rb *ReplayableBody) Len() int64 {
 }
 
 // Close releases any resources associated with the ReplayableBody and closes the underlying source.
+// It is idempotent: only the first call closes the underlying source.
+// A captured body remains replayable after Close.
 // Returns an error if any.
 func (rb *ReplayableBody) Close() error {
-	if !rb.captured {
-		return rb.original.Close() //nolint:wrapcheck
+	if rb.closed {
+		return nil
 	}
-	return nil
+	rb.closed = true
+	return rb.original.Close() //nolint:wrapcheck
 }

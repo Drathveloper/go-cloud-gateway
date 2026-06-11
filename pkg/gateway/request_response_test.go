@@ -263,6 +263,73 @@ func TestReplayableBody_Capture(t *testing.T) {
 	}
 }
 
+type closeCountingBody struct {
+	io.Reader
+
+	closes int
+}
+
+func (c *closeCountingBody) Close() error {
+	c.closes++
+	return nil
+}
+
+func TestReplayableBody_Close_ClosesOriginalOnce(t *testing.T) {
+	payload := []byte("payload")
+	src := &closeCountingBody{Reader: bytes.NewReader(payload)}
+	rb := gateway.NewReplayableBody(src, int64(len(payload)))
+
+	if err := rb.Capture(); err != nil {
+		t.Fatalf("capture failed: %v", err)
+	}
+	if err := rb.Close(); err != nil {
+		t.Fatalf("close failed: %v", err)
+	}
+	if src.closes != 1 {
+		t.Errorf("expected original closed once, actual %d", src.closes)
+	}
+
+	if err := rb.Close(); err != nil {
+		t.Fatalf("second close failed: %v", err)
+	}
+	if src.closes != 1 {
+		t.Errorf("expected close to be idempotent, original closed %d times", src.closes)
+	}
+
+	got, err := io.ReadAll(rb)
+	if err != nil {
+		t.Fatalf("read after close failed: %v", err)
+	}
+	if !bytes.Equal(got, payload) {
+		t.Errorf("expected captured body to remain replayable after close, got %q want %q", got, payload)
+	}
+}
+
+func TestReplayableBody_Capture_DoesNotAliasPooledBuffer(t *testing.T) {
+	first := bytes.Repeat([]byte("A"), 1024)
+	second := bytes.Repeat([]byte("B"), 1024)
+
+	firstBody := gateway.NewReplayableBody(io.NopCloser(bytes.NewReader(first)), int64(len(first)))
+	if err := firstBody.Capture(); err != nil {
+		t.Fatalf("capture first body failed: %v", err)
+	}
+
+	// Capturing a second body reuses the pooled staging buffer that the first
+	// capture just released; the first body must not observe its contents.
+	secondBody := gateway.NewReplayableBody(io.NopCloser(bytes.NewReader(second)), int64(len(second)))
+	if err := secondBody.Capture(); err != nil {
+		t.Fatalf("capture second body failed: %v", err)
+	}
+
+	got, err := io.ReadAll(firstBody)
+	if err != nil {
+		t.Fatalf("read first body failed: %v", err)
+	}
+	if !bytes.Equal(got, first) {
+		t.Errorf("first captured body was corrupted after pooled buffer reuse: got %q... want %q...", got[:8], first[:8])
+	}
+}
+
 func TestReplayableBody_Close(t *testing.T) {
 	tests := []struct {
 		reader       io.ReadCloser

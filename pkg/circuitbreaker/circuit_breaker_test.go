@@ -237,7 +237,9 @@ func TestCustomCircuitBreaker(t *testing.T) {
 	// StateHalfOpen to StateClosed
 	ch := succeedLater(customCB, time.Duration(100)*time.Millisecond) // 3 consecutive successes
 	time.Sleep(time.Duration(50) * time.Millisecond)
-	assert.Equal(t, Counts{3, 2, 0, 2, 0}, customCB.counts)
+	// the goroutine spawned by succeedLater is still inside Execute: counts
+	// must be read through the mutex-protected accessor.
+	assert.Equal(t, Counts{3, 2, 0, 2, 0}, customCB.Counts())
 	require.Error(t, succeed(customCB)) // over MaxRequests
 	require.NoError(t, <-ch)
 	assert.Equal(t, StateClosed, customCB.State())
@@ -256,11 +258,13 @@ func TestGeneration(t *testing.T) {
 	require.NoError(t, succeed(customCB))
 	ch := succeedLater(customCB, time.Duration(1500)*time.Millisecond)
 	time.Sleep(time.Duration(500) * time.Millisecond)
-	assert.Equal(t, Counts{2, 1, 0, 1, 0}, customCB.counts)
+	// the goroutine spawned by succeedLater is still inside Execute: counts
+	// must be read through the mutex-protected accessor.
+	assert.Equal(t, Counts{2, 1, 0, 1, 0}, customCB.Counts())
 
 	time.Sleep(time.Duration(500) * time.Millisecond) // over Interval
 	assert.Equal(t, StateClosed, customCB.State())
-	assert.Equal(t, Counts{0, 0, 0, 0, 0}, customCB.counts)
+	assert.Equal(t, Counts{0, 0, 0, 0, 0}, customCB.Counts())
 
 	// the request from the previous generation has no effect on customCB.counts
 	require.NoError(t, <-ch)

@@ -54,6 +54,12 @@ func TestBaseErrorHandler(t *testing.T) {
 			expectedErrMsg:     "level=ERROR msg=\"request timeout\" error=\"context deadline exceeded\"",
 		},
 		{
+			name:               "test base error handler should succeed when error is context canceled",
+			expectedStatusCode: 499,
+			err:                context.Canceled,
+			expectedErrMsg:     "level=WARN msg=\"client closed request\" error=\"context canceled\"",
+		},
+		{
 			name:               "test base error handler should succeed when error is generic http error",
 			expectedStatusCode: http.StatusBadGateway,
 			err:                gateway.ErrHTTP,

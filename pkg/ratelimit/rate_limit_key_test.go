@@ -20,7 +20,7 @@ func TestNewIPKeyFuncBuilder(t *testing.T) {
 		t.Error("key func is nil")
 	}
 
-	ctx, _ := gateway.NewGatewayContext(&gateway.Route{}, &gateway.Request{
+	ctx, _ := gateway.NewGatewayContext(t.Context(), &gateway.Route{}, &gateway.Request{
 		RemoteAddr: "127.0.0.1",
 	})
 	key := keyFunc(ctx)
@@ -42,7 +42,7 @@ func TestNewPathKeyFuncBuilder(t *testing.T) {
 		t.Error("key func is nil")
 	}
 
-	ctx, _ := gateway.NewGatewayContext(&gateway.Route{}, &gateway.Request{
+	ctx, _ := gateway.NewGatewayContext(t.Context(), &gateway.Route{}, &gateway.Request{
 		URL: &url.URL{
 			Path: "/test",
 		},
@@ -66,7 +66,7 @@ func TestNewPathAndMethodKeyFuncBuilder(t *testing.T) {
 		t.Error("key func is nil")
 	}
 
-	ctx, _ := gateway.NewGatewayContext(&gateway.Route{}, &gateway.Request{
+	ctx, _ := gateway.NewGatewayContext(t.Context(), &gateway.Route{}, &gateway.Request{
 		URL: &url.URL{
 			Path: "/test",
 		},
@@ -93,7 +93,7 @@ func TestNewHeaderKeyFuncBuilder_ShouldSucceed(t *testing.T) {
 		t.Error("key func is nil")
 	}
 
-	ctx, _ := gateway.NewGatewayContext(&gateway.Route{}, &gateway.Request{
+	ctx, _ := gateway.NewGatewayContext(t.Context(), &gateway.Route{}, &gateway.Request{
 		Headers: map[string][]string{"X-Forwarded-For": {"127.0.0.1"}},
 	})
 	key := keyFunc(ctx)
@@ -134,7 +134,7 @@ func TestNewQueryKeyFuncBuilder_ShouldSucceed(t *testing.T) {
 		t.Error("key func is nil")
 	}
 
-	ctx, _ := gateway.NewGatewayContext(&gateway.Route{}, &gateway.Request{
+	ctx, _ := gateway.NewGatewayContext(t.Context(), &gateway.Route{}, &gateway.Request{
 		URL: &url.URL{
 			RawQuery: "test=abc",
 		},

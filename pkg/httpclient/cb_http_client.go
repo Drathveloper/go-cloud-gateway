@@ -48,6 +48,11 @@ func (c *CircuitBreakerHTTPClient) doWithCircuitBreaker(
 			return nil, fmt.Errorf("wrapped circuit breaker request failed: %w", err)
 		}
 		if resp.StatusCode >= internalServerErrorStatusCode {
+			// The response is discarded in favor of the error: close the body
+			// or its connection leaks on every 5xx.
+			if resp.Body != nil {
+				_ = resp.Body.Close()
+			}
 			return nil, ErrInternalServer
 		}
 		return resp, nil
