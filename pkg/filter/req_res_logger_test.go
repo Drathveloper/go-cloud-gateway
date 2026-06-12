@@ -77,7 +77,7 @@ func TestNewRequestResponseLoggerFilterBuilder(t *testing.T) {
 func TestRequestResponseLogger_Name(t *testing.T) {
 	expected := "RequestResponseLogger"
 
-	f := filter.NewRequestResponseLoggerFilter(slog.LevelInfo)
+	f := filter.NewRequestResponseLoggerFilter(slog.LevelInfo, filter.DefaultMaxLoggedBodyBytes)
 
 	actual := f.Name()
 
@@ -130,13 +130,39 @@ func TestRequestResponseLogger_PreProcess(t *testing.T) {
 			ctx, _ := gateway.NewGatewayContext(t.Context(), &gateway.Route{}, gwReq)
 			ctx.Logger = logger
 
-			f := filter.NewRequestResponseLoggerFilter(slog.LevelInfo)
+			f := filter.NewRequestResponseLoggerFilter(slog.LevelInfo, filter.DefaultMaxLoggedBodyBytes)
 			_ = f.PreProcess(ctx)
 
 			if !strings.Contains(buf.String(), tt.expected) {
 				t.Errorf("expected: %s\nactual: %s", tt.expected, buf.String())
 			}
 		})
+	}
+}
+
+func TestRequestResponseLogger_BodyOverLimitIsForwardedUntouched(t *testing.T) {
+	payload := bytes.Repeat([]byte("a"), 1024)
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&buf, nil))
+	req, _ := http.NewRequestWithContext(t.Context(), http.MethodPost, "https://example.org/test", bytes.NewReader(payload))
+	gwReq := gateway.NewGatewayRequest(req)
+	ctx, _ := gateway.NewGatewayContext(t.Context(), &gateway.Route{}, gwReq)
+	ctx.Logger = logger
+
+	f := filter.NewRequestResponseLoggerFilter(slog.LevelInfo, 16)
+	if err := f.PreProcess(ctx); err != nil {
+		t.Fatalf("pre-process failed: %v", err)
+	}
+
+	if strings.Contains(buf.String(), "aaaaaaaa") {
+		t.Error("expected the over-limit body to be omitted from the log")
+	}
+	got, err := io.ReadAll(ctx.Request.BodyReader)
+	if err != nil {
+		t.Fatalf("reading forwarded body failed: %v", err)
+	}
+	if !bytes.Equal(got, payload) {
+		t.Errorf("expected the body to remain fully forwardable, got %d bytes want %d", len(got), len(payload))
 	}
 }
 
@@ -188,7 +214,7 @@ func TestRequestResponseLogger_PostProcess(t *testing.T) {
 			ctx.Logger = logger
 			ctx.Response = gwRes
 
-			f := filter.NewRequestResponseLoggerFilter(slog.LevelInfo)
+			f := filter.NewRequestResponseLoggerFilter(slog.LevelInfo, filter.DefaultMaxLoggedBodyBytes)
 			_ = f.PostProcess(ctx)
 
 			if !strings.Contains(buf.String(), tt.expected) {

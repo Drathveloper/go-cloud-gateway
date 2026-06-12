@@ -15,6 +15,9 @@ import (
 // ErrCapture represents the error when the captured request body failed.
 var ErrCapture = errors.New("capture body failed")
 
+// ErrCaptureLimitExceeded represents the error when the body is larger than the capture limit.
+var ErrCaptureLimitExceeded = errors.New("capture limit exceeded")
+
 //nolint:gochecknoglobals
 var bytesBufferPool = sync.Pool{
 	New: func() any {
@@ -102,18 +105,45 @@ func (rb *ReplayableBody) Read(output []byte) (int, error) {
 	return rb.original.Read(output) //nolint:wrapcheck
 }
 
-// Capture reads the body content into an internal buffer, enabling it to be replayed multiple times.
+// Capture reads the whole body content into an internal buffer, enabling it to be replayed
+// multiple times, without a size limit. Prefer CaptureWithLimit when the body size is not
+// otherwise bounded: an unlimited capture buffers attacker-sized bodies in memory.
 func (rb *ReplayableBody) Capture() error {
+	return rb.CaptureWithLimit(-1)
+}
+
+// CaptureWithLimit reads at most maxBytes of body content into an internal buffer, enabling
+// it to be replayed multiple times. A negative maxBytes means no limit.
+//
+// When the body is larger than maxBytes it returns an error wrapping ErrCaptureLimitExceeded
+// and the body is not captured, but it remains fully readable as a plain one-shot stream:
+// the prefix consumed while probing is stitched back in front of the remaining data, so the
+// request or response can still be forwarded.
+func (rb *ReplayableBody) CaptureWithLimit(maxBytes int64) error {
 	if rb.captured {
 		return nil
+	}
+	if maxBytes >= 0 && rb.length > maxBytes {
+		// The declared length already exceeds the limit: reject without consuming.
+		return fmt.Errorf("%w: %w", ErrCapture, ErrCaptureLimitExceeded)
 	}
 	buf := bytesBufferPool.Get().(*bytes.Buffer) //nolint:forcetypeassert
 	buf.Reset()
 	defer bytesBufferPool.Put(buf)
 
-	length, err := io.Copy(buf, rb.original)
+	src := io.Reader(rb.original)
+	if maxBytes >= 0 {
+		// One extra byte to distinguish a body of exactly maxBytes from a larger one.
+		src = io.LimitReader(rb.original, maxBytes+1)
+	}
+	length, err := io.Copy(buf, src)
 	if err != nil {
 		return fmt.Errorf("%w: %s", ErrCapture, err.Error())
+	}
+	if maxBytes >= 0 && length > maxBytes {
+		// Hand the consumed prefix back so the body remains forwardable.
+		rb.original = newPrefixedReadCloser(bytes.Clone(buf.Bytes()), rb.original)
+		return fmt.Errorf("%w: %w", ErrCapture, ErrCaptureLimitExceeded)
 	}
 	rb.length = length
 	// The reader must own its bytes: buf returns to the pool and other
@@ -121,6 +151,27 @@ func (rb *ReplayableBody) Capture() error {
 	rb.reader = bytes.NewReader(bytes.Clone(buf.Bytes()))
 	rb.captured = true
 	return nil
+}
+
+// prefixedReadCloser replays an already-consumed prefix before the remaining body data.
+type prefixedReadCloser struct {
+	reader io.Reader
+	closer io.Closer
+}
+
+func newPrefixedReadCloser(prefix []byte, rest io.ReadCloser) *prefixedReadCloser {
+	return &prefixedReadCloser{
+		reader: io.MultiReader(bytes.NewReader(prefix), rest),
+		closer: rest,
+	}
+}
+
+func (p *prefixedReadCloser) Read(output []byte) (int, error) {
+	return p.reader.Read(output) //nolint:wrapcheck
+}
+
+func (p *prefixedReadCloser) Close() error {
+	return p.closer.Close() //nolint:wrapcheck
 }
 
 // Len returns the body length.

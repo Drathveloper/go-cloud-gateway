@@ -376,6 +376,134 @@ func TestGatewayHandler_ServeHTTP_EndToEndTransferEncoding(t *testing.T) {
 	}
 }
 
+func TestGatewayHandler_ServeHTTP_FlushesStreamingResponses(t *testing.T) {
+	tests := []struct {
+		headers     http.Header
+		name        string
+		bodyLen     int64
+		wantFlushed bool
+	}{
+		{
+			name:        "unknown length response is flushed per write",
+			headers:     http.Header{},
+			bodyLen:     -1,
+			wantFlushed: true,
+		},
+		{
+			name:        "server-sent events response is flushed per write",
+			headers:     http.Header{"Content-Type": {"text/event-stream; charset=utf-8"}},
+			bodyLen:     int64(4),
+			wantFlushed: true,
+		},
+		{
+			name:        "known length response is not flushed per write",
+			headers:     http.Header{"Content-Type": {"application/json"}},
+			bodyLen:     int64(4),
+			wantFlushed: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gw := &mockGateway{
+				doFunc: func(ctx *gateway.Context) error {
+					ctx.Response = &gateway.Response{
+						Status:     http.StatusOK,
+						Headers:    tt.headers,
+						BodyReader: gateway.NewReplayableBody(io.NopCloser(bytes.NewBufferString("test")), tt.bodyLen),
+					}
+					return nil
+				},
+			}
+			errHandler := &mockErrorHandler{
+				handleFunc: func(_ *gateway.Context, _ error, _ http.ResponseWriter) {},
+			}
+			routes := gateway.Routes{
+				{
+					ID:      "r1",
+					Timeout: time.Minute,
+					Predicates: gateway.Predicates{
+						predicate.NewMethodPredicate(http.MethodGet),
+					},
+				},
+			}
+			gwHandler := gatewayhandler.NewGatewayHandler(gw, routes, errHandler)
+			recorder := httptest.NewRecorder()
+
+			gwHandler.ServeHTTP(recorder, newTestRequest(t, http.MethodGet, "http://localhost:8080/test", nil))
+
+			if recorder.Flushed != tt.wantFlushed {
+				t.Errorf("expected flushed=%v, actual %v", tt.wantFlushed, recorder.Flushed)
+			}
+		})
+	}
+}
+
+func TestGatewayHandler_ServeHTTP_StreamsServerSentEvents(t *testing.T) {
+	firstEventRead := make(chan struct{})
+	bodyReader, bodyWriter := io.Pipe()
+	go func() {
+		_, _ = bodyWriter.Write([]byte("event: one\n\n"))
+		// The client must receive the first event while the stream is still open.
+		<-firstEventRead
+		_, _ = bodyWriter.Write([]byte("event: two\n\n"))
+		_ = bodyWriter.Close()
+	}()
+	gw := &mockGateway{
+		doFunc: func(ctx *gateway.Context) error {
+			ctx.Response = &gateway.Response{
+				Status:     http.StatusOK,
+				Headers:    http.Header{"Content-Type": {"text/event-stream"}},
+				BodyReader: gateway.NewReplayableBody(bodyReader, -1),
+			}
+			return nil
+		},
+	}
+	errHandler := &mockErrorHandler{
+		handleFunc: func(_ *gateway.Context, _ error, _ http.ResponseWriter) {},
+	}
+	routes := gateway.Routes{
+		{
+			ID:      "r1",
+			Timeout: time.Minute,
+			Logger:  slog.New(slog.DiscardHandler),
+			Predicates: gateway.Predicates{
+				predicate.NewMethodPredicate(http.MethodGet),
+			},
+		},
+	}
+	server := httptest.NewServer(gatewayhandler.NewGatewayHandler(gw, routes, errHandler))
+	defer server.Close()
+
+	reqCtx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	request, err := http.NewRequestWithContext(reqCtx, http.MethodGet, server.URL+"/test", nil)
+	if err != nil {
+		t.Fatalf("failed to build request: %v", err)
+	}
+	res, err := server.Client().Do(request)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer res.Body.Close() //nolint:errcheck
+
+	chunk := make([]byte, 64)
+	n, err := res.Body.Read(chunk)
+	if err != nil {
+		t.Fatalf("expected the first event to arrive while the stream is open, actual error: %v", err)
+	}
+	if !strings.Contains(string(chunk[:n]), "event: one") {
+		t.Fatalf("expected first event, actual %q", chunk[:n])
+	}
+	close(firstEventRead)
+	rest, err := io.ReadAll(res.Body)
+	if err != nil {
+		t.Fatalf("reading rest of stream failed: %v", err)
+	}
+	if !strings.Contains(string(rest), "event: two") {
+		t.Errorf("expected second event, actual %q", rest)
+	}
+}
+
 func TestGatewayHandler_ServeHTTP_AbortsConnectionOnBodyCopyError(t *testing.T) {
 	errBackend := errors.New("backend died mid-stream")
 	gw := &mockGateway{
@@ -416,6 +544,235 @@ func TestGatewayHandler_ServeHTTP_AbortsConnectionOnBodyCopyError(t *testing.T) 
 	defer res.Body.Close() //nolint:errcheck
 	if _, readErr := io.ReadAll(res.Body); readErr == nil {
 		t.Fatal("expected the client to observe the truncation, got a complete-looking response")
+	}
+}
+
+func TestGatewayHandler_ServeHTTP_SetsXForwardedHeaders(t *testing.T) {
+	var seen http.Header
+	gw := &mockGateway{
+		doFunc: func(ctx *gateway.Context) error {
+			seen = ctx.Request.Headers.Clone()
+			ctx.Response = &gateway.Response{
+				Status:     http.StatusOK,
+				Headers:    http.Header{},
+				BodyReader: gateway.NewReplayableBody(nil, 0),
+			}
+			return nil
+		},
+	}
+	errHandler := &mockErrorHandler{
+		handleFunc: func(_ *gateway.Context, _ error, _ http.ResponseWriter) {},
+	}
+	routes := gateway.Routes{
+		{
+			ID:      "r1",
+			Timeout: time.Minute,
+			Predicates: gateway.Predicates{
+				predicate.NewMethodPredicate(http.MethodGet),
+			},
+		},
+	}
+	gwHandler := gatewayhandler.NewGatewayHandler(gw, routes, errHandler)
+	recorder := httptest.NewRecorder()
+	request := newTestRequest(t, http.MethodGet, "http://localhost:8080/test", nil)
+	request.Host = "gw.example.org"
+	request.RemoteAddr = "203.0.113.7:4321"
+	request.Header.Set("X-Forwarded-For", "198.51.100.1")
+
+	gwHandler.ServeHTTP(recorder, request)
+
+	for name, want := range map[string]string{
+		"X-Forwarded-For":   "198.51.100.1, 203.0.113.7",
+		"X-Forwarded-Host":  "gw.example.org",
+		"X-Forwarded-Proto": "http",
+	} {
+		if got := seen.Get(name); got != want {
+			t.Errorf("expected backend to see %s=%q, actual %q", name, want, got)
+		}
+	}
+}
+
+func TestGatewayHandler_ServeHTTP_DefaultNotFound(t *testing.T) {
+	gw := &mockGateway{
+		doFunc: func(_ *gateway.Context) error {
+			t.Error("the gateway must not run when no route matches")
+			return nil
+		},
+	}
+	errHandler := &mockErrorHandler{
+		handleFunc: func(_ *gateway.Context, _ error, _ http.ResponseWriter) {
+			t.Error("the error handler must not run when no route matches")
+		},
+	}
+	routes := gateway.Routes{
+		{
+			ID: "r1",
+			Predicates: gateway.Predicates{
+				predicate.NewMethodPredicate(http.MethodPost),
+			},
+		},
+	}
+	gwHandler := gatewayhandler.NewGatewayHandler(gw, routes, errHandler)
+	recorder := httptest.NewRecorder()
+
+	gwHandler.ServeHTTP(recorder, newTestRequest(t, http.MethodGet, "http://localhost:8080/test", nil))
+
+	if recorder.Code != http.StatusNotFound {
+		t.Errorf("expected status 404, actual %d", recorder.Code)
+	}
+	if !strings.Contains(recorder.Body.String(), "route not found") {
+		t.Errorf("expected default not found body, actual %q", recorder.Body.String())
+	}
+}
+
+func TestGatewayHandler_ServeHTTP_CustomNotFoundHandler(t *testing.T) {
+	gw := &mockGateway{
+		doFunc: func(_ *gateway.Context) error { return nil },
+	}
+	errHandler := &mockErrorHandler{
+		handleFunc: func(_ *gateway.Context, _ error, _ http.ResponseWriter) {},
+	}
+	routes := gateway.Routes{
+		{
+			ID: "r1",
+			Predicates: gateway.Predicates{
+				predicate.NewMethodPredicate(http.MethodPost),
+			},
+		},
+	}
+	var seenPath string
+	notFound := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seenPath = r.URL.Path
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"error":"route not found"}`))
+	})
+	gwHandler := gatewayhandler.NewGatewayHandler(gw, routes, errHandler, gatewayhandler.WithNotFoundHandler(notFound))
+	recorder := httptest.NewRecorder()
+
+	gwHandler.ServeHTTP(recorder, newTestRequest(t, http.MethodGet, "http://localhost:8080/missing", nil))
+
+	if recorder.Code != http.StatusNotFound {
+		t.Errorf("expected status 404, actual %d", recorder.Code)
+	}
+	if seenPath != "/missing" {
+		t.Errorf("expected the custom handler to receive the original request, actual path %q", seenPath)
+	}
+	if got := recorder.Body.String(); got != `{"error":"route not found"}` {
+		t.Errorf("expected custom not found body, actual %q", got)
+	}
+	if got := recorder.Header().Get("Content-Type"); got != "application/json" {
+		t.Errorf("expected custom content type, actual %q", got)
+	}
+}
+
+func TestGatewayHandler_ServeHTTP_RecoversFilterPanics(t *testing.T) {
+	body := &closeCountingBody{Reader: bytes.NewReader([]byte("partial"))}
+	gw := &mockGateway{
+		doFunc: func(ctx *gateway.Context) error {
+			ctx.Response = &gateway.Response{
+				Status:     http.StatusOK,
+				Headers:    http.Header{},
+				BodyReader: gateway.NewReplayableBody(body, int64(len("partial"))),
+			}
+			panic("filter exploded")
+		},
+	}
+	var handledErr error
+	errHandler := &mockErrorHandler{
+		handleFunc: func(_ *gateway.Context, err error, w http.ResponseWriter) {
+			handledErr = err
+			http.Error(w, "", http.StatusInternalServerError)
+		},
+	}
+	routes := gateway.Routes{
+		{
+			ID:      "r1",
+			Timeout: time.Minute,
+			Logger:  slog.New(slog.DiscardHandler),
+			Predicates: gateway.Predicates{
+				predicate.NewMethodPredicate(http.MethodGet),
+			},
+		},
+	}
+	gwHandler := gatewayhandler.NewGatewayHandler(gw, routes, errHandler)
+	recorder := httptest.NewRecorder()
+
+	gwHandler.ServeHTTP(recorder, newTestRequest(t, http.MethodGet, "http://localhost:8080/test", nil))
+
+	if !errors.Is(handledErr, gatewayhandler.ErrPanic) {
+		t.Errorf("expected the recovered panic as ErrPanic, actual %v", handledErr)
+	}
+	if recorder.Code != http.StatusInternalServerError {
+		t.Errorf("expected status 500, actual %d", recorder.Code)
+	}
+	if body.closes != 1 {
+		t.Errorf("expected the response body closed once on the panic path, actual %d", body.closes)
+	}
+}
+
+func TestGatewayHandler_ServeHTTP_PassesAbortPanicsThrough(t *testing.T) {
+	gw := &mockGateway{
+		doFunc: func(_ *gateway.Context) error {
+			panic(http.ErrAbortHandler)
+		},
+	}
+	errHandler := &mockErrorHandler{
+		handleFunc: func(_ *gateway.Context, _ error, _ http.ResponseWriter) {
+			t.Error("the error handler must not run for deliberate aborts")
+		},
+	}
+	routes := gateway.Routes{
+		{
+			ID:      "r1",
+			Timeout: time.Minute,
+			Predicates: gateway.Predicates{
+				predicate.NewMethodPredicate(http.MethodGet),
+			},
+		},
+	}
+	gwHandler := gatewayhandler.NewGatewayHandler(gw, routes, errHandler)
+	recorder := httptest.NewRecorder()
+
+	defer func() {
+		if recovered := recover(); recovered != http.ErrAbortHandler { //nolint:errorlint // sentinel per net/http contract
+			t.Errorf("expected http.ErrAbortHandler to pass through, actual %v", recovered)
+		}
+	}()
+	gwHandler.ServeHTTP(recorder, newTestRequest(t, http.MethodGet, "http://localhost:8080/test", nil))
+}
+
+func TestGatewayHandler_ServeHTTP_FilterPanicStillAnswersOverTheWire(t *testing.T) {
+	gw := &mockGateway{
+		doFunc: func(_ *gateway.Context) error {
+			panic("filter exploded")
+		},
+	}
+	errHandler := &mockErrorHandler{
+		handleFunc: func(_ *gateway.Context, _ error, w http.ResponseWriter) {
+			http.Error(w, "", http.StatusInternalServerError)
+		},
+	}
+	routes := gateway.Routes{
+		{
+			ID:      "r1",
+			Timeout: time.Minute,
+			Logger:  slog.New(slog.DiscardHandler),
+			Predicates: gateway.Predicates{
+				predicate.NewMethodPredicate(http.MethodGet),
+			},
+		},
+	}
+	server := httptest.NewServer(gatewayhandler.NewGatewayHandler(gw, routes, errHandler))
+	defer server.Close()
+
+	res, err := server.Client().Do(newTestRequest(t, http.MethodGet, server.URL+"/test", nil))
+	if err != nil {
+		t.Fatalf("expected a response instead of a dropped connection, actual error: %v", err)
+	}
+	defer res.Body.Close() //nolint:errcheck
+	if res.StatusCode != http.StatusInternalServerError {
+		t.Errorf("expected status 500, actual %d", res.StatusCode)
 	}
 }
 

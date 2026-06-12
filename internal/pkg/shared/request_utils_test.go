@@ -169,11 +169,57 @@ func TestGetRemoteAddr(t *testing.T) {
 			expected: "20.10.10.100",
 		},
 		{
-			name: "get remote address from request should return 127.0.0.1 when local ipv6 is set",
+			name: "get remote address from request should return local ipv6 when local ipv6 is set",
 			request: &http.Request{
 				RemoteAddr: "[::1]:8080",
 			},
-			expected: "127.0.0.1",
+			expected: "::1",
+		},
+		{
+			name: "get remote address from request should return host when remoteAddr is ipv6",
+			request: &http.Request{
+				RemoteAddr: "[2001:db8::1]:5555",
+			},
+			expected: "2001:db8::1",
+		},
+		{
+			name: "get remote address from request should return first client IP when X-Forwarded-For is a list",
+			request: &http.Request{
+				Header: http.Header{
+					"X-Forwarded-For": {" 10.10.10.100 , 10.10.20.100, 10.10.30.100"},
+				},
+				RemoteAddr: "192.0.2.1:1234",
+			},
+			expected: "10.10.10.100",
+		},
+		{
+			name: "get remote address from request should fall back to X-Real-Ip when X-Forwarded-For is not an IP",
+			request: &http.Request{
+				Header: http.Header{
+					"X-Forwarded-For": {"not-an-ip"},
+					"X-Real-Ip":       {"20.10.10.100"},
+				},
+				RemoteAddr: "192.0.2.1:1234",
+			},
+			expected: "20.10.10.100",
+		},
+		{
+			name: "get remote address from request should fall back to remoteAddr when headers are not IPs",
+			request: &http.Request{
+				Header: http.Header{
+					"X-Forwarded-For": {"injected\r\nvalue"},
+					"X-Real-Ip":       {"also-not-an-ip"},
+				},
+				RemoteAddr: "192.0.2.1:1234",
+			},
+			expected: "192.0.2.1",
+		},
+		{
+			name: "get remote address from request should return remoteAddr verbatim when it has no port",
+			request: &http.Request{
+				RemoteAddr: "192.0.2.7",
+			},
+			expected: "192.0.2.7",
 		},
 	}
 	for _, tt := range tests {

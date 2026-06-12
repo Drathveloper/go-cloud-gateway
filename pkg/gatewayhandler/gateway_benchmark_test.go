@@ -20,7 +20,7 @@ func BenchmarkServeHTTP_HappyPath(b *testing.B) {
 	pred := predicate.NewPathPredicate("/test")
 	route := gateway.Route{
 		ID:  "test",
-		URI: uri,
+		URI: *uri,
 		Predicates: []gateway.Predicate{
 			pred,
 		},
@@ -60,7 +60,7 @@ func BenchmarkServeHTTP_RouteNotFound(b *testing.B) {
 	pred := predicate.NewPathPredicate("/test")
 	route := gateway.Route{
 		ID:  "test",
-		URI: uri,
+		URI: *uri,
 		Predicates: []gateway.Predicate{
 			pred,
 		},
@@ -85,7 +85,7 @@ func BenchmarkServeHTTP_BackendError(b *testing.B) {
 	pred := predicate.NewPathPredicate("/test")
 	route := gateway.Route{
 		ID:  "test",
-		URI: uri,
+		URI: *uri,
 		Predicates: []gateway.Predicate{
 			pred,
 		},
@@ -114,7 +114,7 @@ func BenchmarkServeHTTP_LargeBody(b *testing.B) {
 	uri, _ := url.Parse("http://localhost:8080")
 	route := gateway.Route{
 		ID:  "route-large",
-		URI: uri,
+		URI: *uri,
 	}
 	largeBody := strings.Repeat("a", 1024*1024) // 1MB
 	body := []byte(`{"status":"ok"}`)

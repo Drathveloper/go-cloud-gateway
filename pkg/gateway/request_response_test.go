@@ -2,6 +2,7 @@ package gateway_test
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"math/rand"
@@ -303,6 +304,80 @@ func TestReplayableBody_Close_ClosesOriginalOnce(t *testing.T) {
 	if !bytes.Equal(got, payload) {
 		t.Errorf("expected captured body to remain replayable after close, got %q want %q", got, payload)
 	}
+}
+
+func TestReplayableBody_CaptureWithLimit(t *testing.T) {
+	payload := []byte("0123456789")
+
+	t.Run("body within the limit is captured and replayable", func(t *testing.T) {
+		rb := gateway.NewReplayableBody(io.NopCloser(bytes.NewReader(payload)), int64(len(payload)))
+
+		if err := rb.CaptureWithLimit(int64(len(payload))); err != nil {
+			t.Fatalf("capture failed: %v", err)
+		}
+		for range 2 {
+			got, err := io.ReadAll(rb)
+			if err != nil || !bytes.Equal(got, payload) {
+				t.Fatalf("expected replayable body %q, actual %q (err %v)", payload, got, err)
+			}
+		}
+	})
+
+	t.Run("declared length over the limit is rejected without consuming", func(t *testing.T) {
+		src := &closeCountingBody{Reader: bytes.NewReader(payload)}
+		rb := gateway.NewReplayableBody(src, int64(len(payload)))
+
+		err := rb.CaptureWithLimit(int64(len(payload)) - 1)
+		if !errors.Is(err, gateway.ErrCaptureLimitExceeded) {
+			t.Fatalf("expected ErrCaptureLimitExceeded, actual %v", err)
+		}
+		got, err := io.ReadAll(rb)
+		if err != nil || !bytes.Equal(got, payload) {
+			t.Errorf("expected body fully forwardable after rejection, actual %q (err %v)", got, err)
+		}
+	})
+
+	t.Run("unknown length over the limit is rejected and the prefix is stitched back", func(t *testing.T) {
+		rb := gateway.NewReplayableBody(io.NopCloser(bytes.NewReader(payload)), -1)
+
+		err := rb.CaptureWithLimit(4)
+		if !errors.Is(err, gateway.ErrCaptureLimitExceeded) {
+			t.Fatalf("expected ErrCaptureLimitExceeded, actual %v", err)
+		}
+		got, readErr := io.ReadAll(rb)
+		if readErr != nil || !bytes.Equal(got, payload) {
+			t.Errorf("expected body fully forwardable after rejection, actual %q (err %v)", got, readErr)
+		}
+		if rb.Len() != -1 {
+			t.Errorf("expected declared length untouched after rejection, actual %d", rb.Len())
+		}
+	})
+
+	t.Run("negative limit means unlimited", func(t *testing.T) {
+		rb := gateway.NewReplayableBody(io.NopCloser(bytes.NewReader(payload)), -1)
+
+		if err := rb.CaptureWithLimit(-1); err != nil {
+			t.Fatalf("capture failed: %v", err)
+		}
+		if rb.Len() != int64(len(payload)) {
+			t.Errorf("expected length %d, actual %d", len(payload), rb.Len())
+		}
+	})
+
+	t.Run("close after rejection closes the original once", func(t *testing.T) {
+		src := &closeCountingBody{Reader: bytes.NewReader(payload)}
+		rb := gateway.NewReplayableBody(src, -1)
+
+		if err := rb.CaptureWithLimit(4); !errors.Is(err, gateway.ErrCaptureLimitExceeded) {
+			t.Fatalf("expected ErrCaptureLimitExceeded, actual %v", err)
+		}
+		if err := rb.Close(); err != nil {
+			t.Fatalf("close failed: %v", err)
+		}
+		if src.closes != 1 {
+			t.Errorf("expected original closed once, actual %d", src.closes)
+		}
+	})
 }
 
 func TestReplayableBody_Capture_DoesNotAliasPooledBuffer(t *testing.T) {

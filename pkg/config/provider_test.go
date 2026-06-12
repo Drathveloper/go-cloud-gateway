@@ -1,8 +1,10 @@
 package config_test
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -19,7 +21,7 @@ import (
 	"github.com/drathveloper/go-cloud-gateway/pkg/predicate"
 )
 
-//nolint:bodyclose,gocognit
+//nolint:bodyclose
 func TestNewRoutes(t *testing.T) {
 	logger := slog.Default()
 	tests := []struct {
@@ -61,7 +63,7 @@ func TestNewRoutes(t *testing.T) {
 			expected: gateway.Routes{
 				{
 					ID: "r1",
-					URI: &url.URL{
+					URI: url.URL{
 						Scheme: "https",
 						Host:   "example.com",
 					},
@@ -120,7 +122,7 @@ func TestNewRoutes(t *testing.T) {
 			expected: gateway.Routes{
 				{
 					ID: "r1",
-					URI: &url.URL{
+					URI: url.URL{
 						Scheme: "https",
 						Host:   "example.com",
 					},
@@ -273,7 +275,7 @@ func TestNewRoutes(t *testing.T) {
 			expected: gateway.Routes{
 				{
 					ID: "r1",
-					URI: &url.URL{
+					URI: url.URL{
 						Scheme: "https",
 						Host:   "example.com",
 					},
@@ -335,7 +337,7 @@ func TestNewRoutes(t *testing.T) {
 			expected: gateway.Routes{
 				{
 					ID: "r1",
-					URI: &url.URL{
+					URI: url.URL{
 						Scheme: "https",
 						Host:   "example.com",
 					},
@@ -555,7 +557,8 @@ F0WydPKUjl3tmQRxYd9C8zDt6yB/fQbIoM/uGgZ0ZoZ+E5hvLVe+rYk=
 			checkClient: func(c gateway.HTTPClient) bool {
 				switch client := c.(type) {
 				case *http.Client:
-					return client.Timeout == config.DefaultTimeout
+					// the per-route context deadline bounds requests, not the client
+					return client.Timeout == 0
 				default:
 					return false
 				}
@@ -569,7 +572,8 @@ F0WydPKUjl3tmQRxYd9C8zDt6yB/fQbIoM/uGgZ0ZoZ+E5hvLVe+rYk=
 			checkClient: func(c gateway.HTTPClient) bool {
 				switch client := c.(type) {
 				case *http.Client:
-					return client.Timeout == config.DefaultTimeout
+					// the per-route context deadline bounds requests, not the client
+					return client.Timeout == 0
 				default:
 					return false
 				}
@@ -597,7 +601,39 @@ F0WydPKUjl3tmQRxYd9C8zDt6yB/fQbIoM/uGgZ0ZoZ+E5hvLVe+rYk=
 			checkClient: func(c gateway.HTTPClient) bool {
 				switch client := c.(type) {
 				case *http.Client:
-					return client.Timeout == 30*time.Second
+					transport := client.Transport.(*http.Transport)
+					// pool.timeout only bounds dialing: no client-wide timeout
+					return client.Timeout == 0 && transport.ResponseHeaderTimeout == 0
+				default:
+					return false
+				}
+			},
+		},
+		{
+			name: "response header timeout configured",
+			cfg: &config.Config{
+				Gateway: config.Gateway{
+					HTTPClient: &config.HTTPClient{
+						Pool: &config.Pool{
+							Timeout:               &config.Duration{Duration: 30 * time.Second},
+							MaxIdleConns:          100,
+							MaxIdleConnsPerHost:   20,
+							MaxConnsPerHost:       50,
+							IdleConnTimeout:       &config.Duration{Duration: 90 * time.Second},
+							TLSHandshakeTimeout:   &config.Duration{Duration: 15 * time.Second},
+							KeepAlive:             &config.Duration{Duration: 30 * time.Second},
+							ResponseHeaderTimeout: &config.Duration{Duration: 7 * time.Second},
+						},
+					},
+				},
+			},
+			wantClient: true,
+			wantErr:    false,
+			checkClient: func(c gateway.HTTPClient) bool {
+				switch client := c.(type) {
+				case *http.Client:
+					transport := client.Transport.(*http.Transport)
+					return transport.ResponseHeaderTimeout == 7*time.Second
 				default:
 					return false
 				}
@@ -709,6 +745,122 @@ F0WydPKUjl3tmQRxYd9C8zDt6yB/fQbIoM/uGgZ0ZoZ+E5hvLVe+rYk=
 				t.Error("Expected nil client, got non-nil")
 			}
 		})
+	}
+}
+
+func newCircuitBreakerRoute(t *testing.T) gateway.Routes {
+	t.Helper()
+	cfg := &config.Config{
+		Gateway: config.Gateway{
+			Routes: []config.Route{
+				{
+					ID:  "r1",
+					URI: "https://example.com",
+					Predicates: []config.ParameterizedItem{
+						{
+							Name: "Method",
+							Args: map[string]any{"methods": []any{"GET"}},
+						},
+					},
+					CircuitBreaker: config.CircuitBreaker{
+						Enabled:                 true,
+						Interval:                config.Duration{Duration: time.Minute},
+						FailureRateThreshold:    50,
+						NumAllowedHalfOpenCalls: 1,
+						WaitDurationInOpenState: config.Duration{Duration: time.Minute},
+						MinRequestsThreshold:    3,
+					},
+				},
+			},
+		},
+	}
+	routes, err := config.NewRoutes(
+		cfg,
+		predicate.NewFactory(predicate.BuilderRegistry),
+		filter.NewFactory(filter.BuilderRegistry),
+		slog.Default())
+	if err != nil {
+		t.Fatalf("NewRoutes() error = %v", err)
+	}
+	return routes
+}
+
+func TestNewRoutes_CircuitBreakerOpensOnNetworkErrors(t *testing.T) {
+	routes := newCircuitBreakerRoute(t)
+	breaker := routes[0].CircuitBreaker
+
+	for range 5 {
+		_, _ = breaker.Execute(func() (*http.Response, error) { //nolint:bodyclose // the callback returns no response
+			return nil, errors.New("dial tcp 10.0.0.1:443: connect: connection refused")
+		})
+	}
+
+	if breaker.State() != circuitbreaker.StateOpen {
+		t.Errorf("expected the breaker to open on repeated network errors, actual state %s", breaker.State())
+	}
+}
+
+func TestNewRoutes_CircuitBreakerIgnoresClientCancellations(t *testing.T) {
+	routes := newCircuitBreakerRoute(t)
+	breaker := routes[0].CircuitBreaker
+
+	for range 5 {
+		_, _ = breaker.Execute(func() (*http.Response, error) { //nolint:bodyclose // the callback returns no response
+			return nil, fmt.Errorf("request failed: %w", context.Canceled)
+		})
+	}
+
+	if breaker.State() != circuitbreaker.StateClosed {
+		t.Errorf("expected client cancellations to leave the breaker closed, actual state %s", breaker.State())
+	}
+}
+
+func TestNewHTTPClient_PoolTimeoutDoesNotCutSlowBodies(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		controller := http.NewResponseController(w)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("first"))
+		_ = controller.Flush()
+		// Longer than pool.timeout: only dialing is bound by it, not the body read.
+		time.Sleep(300 * time.Millisecond)
+		_, _ = w.Write([]byte("second"))
+	}))
+	defer server.Close()
+
+	cfg := &config.Config{
+		Gateway: config.Gateway{
+			HTTPClient: &config.HTTPClient{
+				Pool: &config.Pool{
+					Timeout:             &config.Duration{Duration: 100 * time.Millisecond},
+					MaxIdleConns:        10,
+					MaxIdleConnsPerHost: 10,
+					MaxConnsPerHost:     10,
+					IdleConnTimeout:     &config.Duration{Duration: 90 * time.Second},
+					TLSHandshakeTimeout: &config.Duration{Duration: 5 * time.Second},
+					KeepAlive:           &config.Duration{Duration: 30 * time.Second},
+				},
+			},
+		},
+	}
+	client, err := config.NewHTTPClient(cfg)
+	if err != nil {
+		t.Fatalf("NewHTTPClient() error = %v", err)
+	}
+	request, err := http.NewRequestWithContext(t.Context(), http.MethodGet, server.URL, nil)
+	if err != nil {
+		t.Fatalf("failed to build request: %v", err)
+	}
+	res, err := client.Do(request)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer res.Body.Close() //nolint:errcheck
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		t.Fatalf("expected the slow body to be read in full, actual error: %v", err)
+	}
+	if string(body) != "firstsecond" {
+		t.Errorf("expected body %q, actual %q", "firstsecond", body)
 	}
 }
 

@@ -24,7 +24,7 @@ func newSilentLogger() *slog.Logger {
 }
 
 func BenchmarkRequestResponseLogger_SilentPreProcess(b *testing.B) {
-	f := filter.NewRequestResponseLoggerFilter(slog.LevelInfo)
+	f := filter.NewRequestResponseLoggerFilter(slog.LevelInfo, filter.DefaultMaxLoggedBodyBytes)
 	body := []byte(`request body`)
 	ctx := &gateway.Context{
 		Logger: newSilentLogger(),
@@ -43,7 +43,7 @@ func BenchmarkRequestResponseLogger_SilentPreProcess(b *testing.B) {
 }
 
 func BenchmarkRequestResponseLogger_SilentPostProcess(b *testing.B) {
-	f := filter.NewRequestResponseLoggerFilter(slog.LevelInfo)
+	f := filter.NewRequestResponseLoggerFilter(slog.LevelInfo, filter.DefaultMaxLoggedBodyBytes)
 	body := []byte(`{"status":"ok"}`)
 	ctx := &gateway.Context{
 		Logger: newSilentLogger(),
@@ -61,7 +61,7 @@ func BenchmarkRequestResponseLogger_SilentPostProcess(b *testing.B) {
 }
 
 func BenchmarkRequestResponseLogger_PreProcess_WithRealLogger(b *testing.B) {
-	f := filter.NewRequestResponseLoggerFilter(slog.LevelInfo)
+	f := filter.NewRequestResponseLoggerFilter(slog.LevelInfo, filter.DefaultMaxLoggedBodyBytes)
 	var buf bytes.Buffer
 	logger := newBufferedLogger(&buf)
 	body := []byte(`{"key":"value"}`)
@@ -83,7 +83,7 @@ func BenchmarkRequestResponseLogger_PreProcess_WithRealLogger(b *testing.B) {
 }
 
 func BenchmarkRequestResponseLogger_PostProcess_WithRealLogger(b *testing.B) {
-	f := filter.NewRequestResponseLoggerFilter(slog.LevelInfo)
+	f := filter.NewRequestResponseLoggerFilter(slog.LevelInfo, filter.DefaultMaxLoggedBodyBytes)
 	var buf bytes.Buffer
 	logger := newBufferedLogger(&buf)
 	body := []byte(`{"success":true}`)

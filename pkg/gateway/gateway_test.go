@@ -59,7 +59,7 @@ func TestGateway_Do(t *testing.T) {
 			},
 			route: &gateway.Route{
 				ID: "r1",
-				URI: &url.URL{
+				URI: url.URL{
 					Scheme: "https",
 					Host:   "example.org",
 				},
@@ -105,7 +105,7 @@ func TestGateway_Do(t *testing.T) {
 			},
 			route: &gateway.Route{
 				ID: "r1",
-				URI: &url.URL{
+				URI: url.URL{
 					Scheme: "https",
 					Host:   "example.org",
 				},
@@ -151,7 +151,7 @@ func TestGateway_Do(t *testing.T) {
 			},
 			route: &gateway.Route{
 				ID: "r1",
-				URI: &url.URL{
+				URI: url.URL{
 					Scheme: "https",
 					Host:   "example.org",
 				},
@@ -193,7 +193,7 @@ func TestGateway_Do(t *testing.T) {
 			},
 			route: &gateway.Route{
 				ID: "r1",
-				URI: &url.URL{
+				URI: url.URL{
 					Scheme: "https",
 					Host:   "example.org",
 				},
@@ -235,7 +235,7 @@ func TestGateway_Do(t *testing.T) {
 			},
 			route: &gateway.Route{
 				ID: "r1",
-				URI: &url.URL{
+				URI: url.URL{
 					Scheme: "https",
 					Host:   "example.org",
 				},
@@ -277,7 +277,7 @@ func TestGateway_Do(t *testing.T) {
 			},
 			route: &gateway.Route{
 				ID: "r1",
-				URI: &url.URL{
+				URI: url.URL{
 					Scheme: "https",
 					Host:   "example.org",
 				},
@@ -317,7 +317,7 @@ func TestGateway_Do(t *testing.T) {
 			},
 			route: &gateway.Route{
 				ID: "r1",
-				URI: &url.URL{
+				URI: url.URL{
 					Scheme: "https",
 					Host:   "example.org",
 				},
@@ -357,7 +357,7 @@ func TestGateway_Do(t *testing.T) {
 			},
 			route: &gateway.Route{
 				ID: "r1",
-				URI: &url.URL{
+				URI: url.URL{
 					Scheme: "https",
 					Host:   "example.org",
 				},
@@ -401,7 +401,7 @@ func TestGateway_Do(t *testing.T) {
 			},
 			route: &gateway.Route{
 				ID: "r1",
-				URI: &url.URL{
+				URI: url.URL{
 					Scheme: "https",
 					Host:   "example.org",
 				},
@@ -493,7 +493,7 @@ func TestGateway_Do_EmptyBodyIsNilForTransportRetries(t *testing.T) {
 			client := &captureHTTPClient{response: &http.Response{StatusCode: http.StatusOK}}
 			route := &gateway.Route{
 				ID:      "r1",
-				URI:     &url.URL{Scheme: "https", Host: "example.org"},
+				URI:     url.URL{Scheme: "https", Host: "example.org"},
 				Timeout: time.Minute,
 			}
 			request := &gateway.Request{
@@ -523,7 +523,7 @@ func TestGateway_Do_StripsHopByHopRequestHeaders(t *testing.T) {
 	client := &captureHTTPClient{response: &http.Response{StatusCode: http.StatusOK}}
 	route := &gateway.Route{
 		ID:      "r1",
-		URI:     &url.URL{Scheme: "https", Host: "example.org"},
+		URI:     url.URL{Scheme: "https", Host: "example.org"},
 		Timeout: time.Minute,
 	}
 	request := &gateway.Request{
@@ -569,7 +569,7 @@ func TestGateway_Do_ClosesBackendBodyOnPostProcessError(t *testing.T) {
 	}
 	route := &gateway.Route{
 		ID:  "r1",
-		URI: &url.URL{Scheme: "https", Host: "example.org"},
+		URI: url.URL{Scheme: "https", Host: "example.org"},
 		Filters: gateway.Filters{
 			&DummyFilter{
 				PostProcessErr: io.EOF,

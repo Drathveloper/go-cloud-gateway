@@ -28,7 +28,7 @@ func (f ErrorHandlerFunc) Handle(ctx *gateway.Context, err error, w http.Respons
 const statusClientClosedRequest = 499
 
 // BaseErrorHandler is the base error handler. It will handle the following errors:
-// 1. context.DeadlineExceeded: the request timeout. It will return a 502 Bad Gateway.
+// 1. context.DeadlineExceeded: the request timeout. It will return a 504 Gateway Timeout.
 // 2. context.Canceled: the client closed the request. It will return a 499 Client Closed Request.
 // 3. gateway.ErrHTTP: the gateway http request to backend failed. It will return 502 Bad Gateway.
 // 4. filter.ErrRateLimitExceeded: the rate limit exceeded. It will return 429 Too Many Requests.
@@ -43,7 +43,7 @@ func BaseErrorHandler() ErrorHandlerFunc {
 		switch {
 		case errors.Is(err, context.DeadlineExceeded):
 			ctx.Logger.Error("request timeout", "error", err)
-			http.Error(writer, "", http.StatusBadGateway)
+			http.Error(writer, "", http.StatusGatewayTimeout)
 		case errors.Is(err, context.Canceled):
 			ctx.Logger.Warn("client closed request", "error", err)
 			http.Error(writer, "", statusClientClosedRequest)

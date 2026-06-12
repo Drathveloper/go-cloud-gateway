@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
@@ -125,6 +126,7 @@ func buildConfiguredHTTPClient(config *Config, tlsConfig *tls.Config) (*http.Cli
 		MaxConnsPerHost:       config.Gateway.HTTPClient.Pool.MaxConnsPerHost,
 		IdleConnTimeout:       config.Gateway.HTTPClient.Pool.IdleConnTimeout.Duration,
 		TLSHandshakeTimeout:   config.Gateway.HTTPClient.Pool.TLSHandshakeTimeout.Duration,
+		ResponseHeaderTimeout: responseHeaderTimeout(config.Gateway.HTTPClient.Pool),
 		ExpectContinueTimeout: ContinueDefaultTimeout,
 	}
 	if config.Gateway.HTTPClient.EnableHTTP2 {
@@ -132,11 +134,20 @@ func buildConfiguredHTTPClient(config *Config, tlsConfig *tls.Config) (*http.Cli
 			return nil, fmt.Errorf("failed to configure http2 transport: %w", err)
 		}
 	}
+	// No http.Client Timeout: it would cap the whole exchange including the body
+	// copy, cutting long downloads and streams. Each request is bounded by the
+	// per-route context deadline instead; pool.timeout only bounds dialing.
 	return &http.Client{
 		Transport:     transport,
 		CheckRedirect: noFollowRedirects,
-		Timeout:       config.Gateway.HTTPClient.Pool.Timeout.Duration,
 	}, nil
+}
+
+func responseHeaderTimeout(pool *Pool) time.Duration {
+	if pool.ResponseHeaderTimeout != nil {
+		return pool.ResponseHeaderTimeout.Duration
+	}
+	return 0
 }
 
 func buildDefaultHTTPClient(tlsConfig *tls.Config) *http.Client {
@@ -154,10 +165,10 @@ func buildDefaultHTTPClient(tlsConfig *tls.Config) *http.Client {
 		TLSHandshakeTimeout:   DefaultTimeout,
 		ExpectContinueTimeout: ContinueDefaultTimeout,
 	}
+	// No http.Client Timeout: see buildConfiguredHTTPClient.
 	return &http.Client{
 		Transport:     transport,
 		CheckRedirect: noFollowRedirects,
-		Timeout:       DefaultTimeout,
 	}
 }
 
@@ -231,6 +242,15 @@ func mapFiltersFromConfigToGateway(
 	return out, nil
 }
 
+// isRequestSuccessful is the circuit breaker success policy for gateway routes: any
+// error counts as a failure, since backend 5xx responses (ErrInternalServer), network
+// errors and timeouts all signal an unhealthy backend. The exception is the client
+// cancelling its own request, which says nothing about backend health and would
+// otherwise let a burst of client disconnections trip the breaker.
+func isRequestSuccessful(err error) bool {
+	return err == nil || errors.Is(err, context.Canceled)
+}
+
 //nolint:bodyclose
 func mapCircuitBreakerFromConfigToGateway(
 	name string, circuitBreaker CircuitBreaker) gateway.CircuitBreaker[*http.Response] {
@@ -245,7 +265,7 @@ func mapCircuitBreakerFromConfigToGateway(
 		ReadyToTrip: circuitbreaker.DefaultReadyToTrip(
 			circuitBreaker.MinRequestsThreshold, circuitBreaker.FailureRateThreshold),
 		OnStateChange: func(_ string, _, _ circuitbreaker.State) {},
-		IsSuccessful:  circuitbreaker.DefaultIsSuccessful(httpclient.ErrInternalServer),
+		IsSuccessful:  isRequestSuccessful,
 	}
 	return circuitbreaker.NewCircuitBreaker[*http.Response](settings)
 }
