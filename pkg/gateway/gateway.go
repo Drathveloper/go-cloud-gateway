@@ -77,7 +77,11 @@ func (g *Gateway) buildProxyRequest(ctx *Context) *http.Request {
 		// chunked-body probe on every bodyless request.
 		req.Body = nil
 	}
-	return req.WithContext(ctx)
+	// The transport holds the request context in goroutines that outlive this
+	// request (queued dials, tracing). It must never see the pooled gateway
+	// context, whose fields are reset and reused: it gets the per-request timeout
+	// context plus an immutable snapshot of the route instead.
+	return req.WithContext(context.WithValue(ctx.Context, routeContextKey{}, ctx.Route))
 }
 
 func (g *Gateway) handleBackendError(ctx *Context, err error) error {

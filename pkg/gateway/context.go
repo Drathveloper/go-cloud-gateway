@@ -53,6 +53,11 @@ type routeContextKey struct{}
 // context has been wrapped by other contexts.
 func (c *Context) Value(key any) any {
 	if _, ok := key.(routeContextKey); ok {
+		if c.Route == nil {
+			// untyped nil: a typed nil *Route inside a non-nil any would defeat
+			// the nil checks of direct Value callers.
+			return nil
+		}
 		return c.Route
 	}
 	return c.Context.Value(key)

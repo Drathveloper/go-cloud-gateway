@@ -519,6 +519,51 @@ func TestGateway_Do_EmptyBodyIsNilForTransportRetries(t *testing.T) {
 	}
 }
 
+func TestGateway_Do_BackendContextSurvivesContextRelease(t *testing.T) {
+	client := &captureHTTPClient{response: &http.Response{StatusCode: http.StatusOK}}
+	route := &gateway.Route{
+		ID:      "r1",
+		URI:     url.URL{Scheme: "https", Host: "example.org"},
+		Timeout: time.Minute,
+	}
+	request := &gateway.Request{
+		URL:        &url.URL{Scheme: "https", Host: "example.org", Path: "/test"},
+		Method:     http.MethodGet,
+		Headers:    http.Header{},
+		BodyReader: gateway.NewReplayableBody(nil, 0),
+	}
+	gw := gateway.NewGateway(client)
+	ctx, cancel := gateway.NewGatewayContext(t.Context(), route, request)
+	defer cancel()
+	if err := gw.Do(ctx); err != nil {
+		t.Fatalf("Do failed: %v", err)
+	}
+
+	backendCtx := client.captured.Context()
+	if _, isPooled := backendCtx.(*gateway.Context); isPooled {
+		t.Fatal("expected the backend request to not carry the pooled gateway context")
+	}
+	if got := gateway.RouteFromContext(backendCtx); got == nil || got.ID != "r1" {
+		t.Fatalf("expected the backend context to carry the route, actual %v", got)
+	}
+	if _, hasDeadline := backendCtx.Deadline(); !hasDeadline {
+		t.Error("expected the backend context to carry the route deadline")
+	}
+
+	gateway.ReleaseGatewayContext(ctx)
+
+	// The transport may keep the backend context in goroutines that outlive the
+	// request (queued dials, tracing): lookups after the pooled gateway context
+	// has been released must neither panic nor observe another request.
+	type foreignKey struct{}
+	if got := backendCtx.Value(foreignKey{}); got != nil {
+		t.Errorf("expected nil for foreign keys after release, actual %v", got)
+	}
+	if got := gateway.RouteFromContext(backendCtx); got == nil || got.ID != "r1" {
+		t.Errorf("expected the route snapshot to survive the release, actual %v", got)
+	}
+}
+
 func TestGateway_Do_StripsHopByHopRequestHeaders(t *testing.T) {
 	client := &captureHTTPClient{response: &http.Response{StatusCode: http.StatusOK}}
 	route := &gateway.Route{
