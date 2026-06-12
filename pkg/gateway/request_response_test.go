@@ -467,3 +467,61 @@ func TestReplayableBody_Len(t *testing.T) {
 		t.Errorf("expected body length %d actual %d", originalLength, body.Len())
 	}
 }
+
+func TestReplayableBody_Bytes(t *testing.T) {
+	content := []byte("hello world")
+	rb := gateway.NewReplayableBody(io.NopCloser(bytes.NewReader(content)), int64(len(content)))
+
+	if rb.Bytes() != nil {
+		t.Errorf("expected nil bytes before capture, got %q", rb.Bytes())
+	}
+
+	if err := rb.Capture(); err != nil {
+		t.Fatalf("capture failed: %v", err)
+	}
+	if !bytes.Equal(rb.Bytes(), content) {
+		t.Errorf("expected %q actual %q", content, rb.Bytes())
+	}
+
+	// The body must remain fully replayable after Bytes.
+	got, err := io.ReadAll(rb)
+	if err != nil {
+		t.Fatalf("reading captured body failed: %v", err)
+	}
+	if !bytes.Equal(got, content) {
+		t.Errorf("expected replayable body %q actual %q", content, got)
+	}
+}
+
+func TestReplayableBody_WriteTo(t *testing.T) {
+	content := []byte("hello world")
+
+	t.Run("captured body writes from buffer and stays replayable", func(t *testing.T) {
+		rb := gateway.NewReplayableBody(io.NopCloser(bytes.NewReader(content)), int64(len(content)))
+		if err := rb.Capture(); err != nil {
+			t.Fatalf("capture failed: %v", err)
+		}
+		var first, second bytes.Buffer
+		if _, err := io.Copy(&first, rb); err != nil {
+			t.Fatalf("first copy failed: %v", err)
+		}
+		if _, err := io.Copy(&second, rb); err != nil {
+			t.Fatalf("second copy failed: %v", err)
+		}
+		if !bytes.Equal(first.Bytes(), content) || !bytes.Equal(second.Bytes(), content) {
+			t.Errorf("expected %q on both copies, got %q and %q", content, first.Bytes(), second.Bytes())
+		}
+	})
+
+	t.Run("non-captured body streams once", func(t *testing.T) {
+		rb := gateway.NewReplayableBody(io.NopCloser(bytes.NewReader(content)), int64(len(content)))
+		var out bytes.Buffer
+		written, err := rb.WriteTo(&out)
+		if err != nil {
+			t.Fatalf("write-to failed: %v", err)
+		}
+		if written != int64(len(content)) || !bytes.Equal(out.Bytes(), content) {
+			t.Errorf("expected %q (%d bytes), got %q (%d bytes)", content, len(content), out.Bytes(), written)
+		}
+	})
+}

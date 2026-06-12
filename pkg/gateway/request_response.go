@@ -25,6 +25,17 @@ var bytesBufferPool = sync.Pool{
 	},
 }
 
+// copyBufSize matches the io.Copy internal buffer size.
+const copyBufSize = 32 * 1024
+
+//nolint:gochecknoglobals
+var copyBufPool = sync.Pool{
+	New: func() any {
+		buf := make([]byte, copyBufSize)
+		return &buf
+	},
+}
+
 // Request represents a gateway request.
 //
 // The body of the request is read into memory and stored in the body field.
@@ -75,6 +86,7 @@ func NewGatewayResponse(response *http.Response) *Response {
 type ReplayableBody struct {
 	original io.ReadCloser
 	reader   *bytes.Reader
+	data     []byte
 	length   int64
 	captured bool
 	closed   bool
@@ -148,9 +160,42 @@ func (rb *ReplayableBody) CaptureWithLimit(maxBytes int64) error {
 	rb.length = length
 	// The reader must own its bytes: buf returns to the pool and other
 	// requests will overwrite its backing array.
-	rb.reader = bytes.NewReader(bytes.Clone(buf.Bytes()))
+	rb.data = bytes.Clone(buf.Bytes())
+	rb.reader = bytes.NewReader(rb.data)
 	rb.captured = true
 	return nil
+}
+
+// Bytes returns the captured body content, or nil when the body has not been
+// captured. The slice is the backing array of the replay reader: callers must
+// treat it as read-only.
+func (rb *ReplayableBody) Bytes() []byte {
+	return rb.data
+}
+
+// WriteTo writes the remaining body to w. A captured body is written straight
+// from the capture buffer and rewinds afterwards, mirroring the Read replay
+// behavior; a non-captured body streams through a pooled buffer.
+//
+// Implementing io.WriterTo keeps io.Copy off the ResponseWriter ReadFrom
+// fallback of net/http, which allocates a fresh 32KB buffer per response.
+func (rb *ReplayableBody) WriteTo(writer io.Writer) (int64, error) {
+	if rb.captured {
+		written, err := rb.reader.WriteTo(writer)
+		_, _ = rb.reader.Seek(0, io.SeekStart)
+		return written, err //nolint:wrapcheck
+	}
+	bufPtr := copyBufPool.Get().(*[]byte) //nolint:forcetypeassert
+	// The writer-only wrapper hides any ReaderFrom on w from io.CopyBuffer,
+	// which would otherwise delegate to it and ignore the pooled buffer.
+	written, err := io.CopyBuffer(writerOnly{writer}, rb.original, *bufPtr)
+	copyBufPool.Put(bufPtr)
+	return written, err //nolint:wrapcheck
+}
+
+// writerOnly hides every interface of the wrapped writer except io.Writer.
+type writerOnly struct {
+	io.Writer
 }
 
 // prefixedReadCloser replays an already-consumed prefix before the remaining body data.

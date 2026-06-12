@@ -2,6 +2,7 @@ package filter_test
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -59,6 +60,20 @@ func TestNewRequestResponseLoggerFilterBuilder(t *testing.T) {
 			},
 			expectedErr: nil,
 		},
+		{
+			name: "build should succeed when log-bodies is present and is bool",
+			args: map[string]any{
+				"log-bodies": false,
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "build should fail when log-bodies is present and is not bool",
+			args: map[string]any{
+				"log-bodies": 42,
+			},
+			expectedErr: errors.New("failed to convert 'log-bodies' attribute: value is required to be a valid bool"),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -77,7 +92,7 @@ func TestNewRequestResponseLoggerFilterBuilder(t *testing.T) {
 func TestRequestResponseLogger_Name(t *testing.T) {
 	expected := "RequestResponseLogger"
 
-	f := filter.NewRequestResponseLoggerFilter(slog.LevelInfo, filter.DefaultMaxLoggedBodyBytes)
+	f := filter.NewRequestResponseLoggerFilter(slog.LevelInfo, filter.DefaultMaxLoggedBodyBytes, false)
 
 	actual := f.Name()
 
@@ -130,7 +145,7 @@ func TestRequestResponseLogger_PreProcess(t *testing.T) {
 			ctx, _ := gateway.NewGatewayContext(t.Context(), &gateway.Route{}, gwReq)
 			ctx.Logger = logger
 
-			f := filter.NewRequestResponseLoggerFilter(slog.LevelInfo, filter.DefaultMaxLoggedBodyBytes)
+			f := filter.NewRequestResponseLoggerFilter(slog.LevelInfo, filter.DefaultMaxLoggedBodyBytes, true)
 			_ = f.PreProcess(ctx)
 
 			if !strings.Contains(buf.String(), tt.expected) {
@@ -149,7 +164,7 @@ func TestRequestResponseLogger_BodyOverLimitIsForwardedUntouched(t *testing.T) {
 	ctx, _ := gateway.NewGatewayContext(t.Context(), &gateway.Route{}, gwReq)
 	ctx.Logger = logger
 
-	f := filter.NewRequestResponseLoggerFilter(slog.LevelInfo, 16)
+	f := filter.NewRequestResponseLoggerFilter(slog.LevelInfo, 16, false)
 	if err := f.PreProcess(ctx); err != nil {
 		t.Fatalf("pre-process failed: %v", err)
 	}
@@ -163,6 +178,56 @@ func TestRequestResponseLogger_BodyOverLimitIsForwardedUntouched(t *testing.T) {
 	}
 	if !bytes.Equal(got, payload) {
 		t.Errorf("expected the body to remain fully forwardable, got %d bytes want %d", len(got), len(payload))
+	}
+}
+
+func TestRequestResponseLogger_HeadersOnlySkipsBodies(t *testing.T) {
+	payload := []byte("{\"k1\":\"abc\"}")
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&buf, nil))
+	req, _ := http.NewRequestWithContext(t.Context(), http.MethodPost, "https://example.org/test", bytes.NewReader(payload))
+	gwReq := gateway.NewGatewayRequest(req)
+	ctx, _ := gateway.NewGatewayContext(t.Context(), &gateway.Route{}, gwReq)
+	ctx.Logger = logger
+	res := &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     map[string][]string{"Content-Type": {"application/json"}},
+		Body:       io.NopCloser(bytes.NewReader(payload)),
+	}
+	ctx.Response = gateway.NewGatewayResponse(res)
+
+	f := filter.NewHeadersOnlyRequestResponseLoggerFilter(slog.LevelInfo)
+	if err := f.PreProcess(ctx); err != nil {
+		t.Fatalf("pre-process failed: %v", err)
+	}
+	if err := f.PostProcess(ctx); err != nil {
+		t.Fatalf("post-process failed: %v", err)
+	}
+
+	logged := buf.String()
+	if !strings.Contains(logged, "Received request") || !strings.Contains(logged, "Returned response") {
+		t.Fatalf("expected both log lines, got: %s", logged)
+	}
+	if strings.Contains(logged, "body=") {
+		t.Errorf("expected no body attribute in headers-only mode, got: %s", logged)
+	}
+	if strings.Contains(logged, "k1") {
+		t.Errorf("expected body content to be absent from the log, got: %s", logged)
+	}
+	// The bodies must not have been captured: both must remain readable as streams.
+	gotReq, err := io.ReadAll(ctx.Request.BodyReader)
+	if err != nil {
+		t.Fatalf("reading request body failed: %v", err)
+	}
+	if !bytes.Equal(gotReq, payload) {
+		t.Errorf("expected request body to remain forwardable, got %q", gotReq)
+	}
+	gotRes, err := io.ReadAll(ctx.Response.BodyReader)
+	if err != nil {
+		t.Fatalf("reading response body failed: %v", err)
+	}
+	if !bytes.Equal(gotRes, payload) {
+		t.Errorf("expected response body to remain forwardable, got %q", gotRes)
 	}
 }
 
@@ -214,7 +279,7 @@ func TestRequestResponseLogger_PostProcess(t *testing.T) {
 			ctx.Logger = logger
 			ctx.Response = gwRes
 
-			f := filter.NewRequestResponseLoggerFilter(slog.LevelInfo, filter.DefaultMaxLoggedBodyBytes)
+			f := filter.NewRequestResponseLoggerFilter(slog.LevelInfo, filter.DefaultMaxLoggedBodyBytes, true)
 			_ = f.PostProcess(ctx)
 
 			if !strings.Contains(buf.String(), tt.expected) {

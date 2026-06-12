@@ -23,12 +23,6 @@ import (
 // ErrInitializeMTLS is the error returned when the mTLS initialization failed.
 var ErrInitializeMTLS = errors.New("failed to initialize mTLS")
 
-// noFollowRedirects is the redirect policy for the gateway http client: a gateway
-// must forward 3xx responses to the client untouched, never follow them itself.
-func noFollowRedirects(_ *http.Request, _ []*http.Request) error {
-	return http.ErrUseLastResponse
-}
-
 // NewRoutes creates a new gateway route from the given config.
 func NewRoutes(
 	cfg *Config,
@@ -58,7 +52,8 @@ func NewHTTPClient(cfg *Config) (gateway.HTTPClient, error) {
 	return httpClient, nil
 }
 
-func buildHTTPClient(cfg *Config) (*http.Client, error) {
+//nolint:ireturn
+func buildHTTPClient(cfg *Config) (gateway.HTTPClient, error) {
 	tlsConfig, err := buildTLSConfig(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build TLS config: %w", err)
@@ -66,7 +61,7 @@ func buildHTTPClient(cfg *Config) (*http.Client, error) {
 	if cfg != nil && cfg.Gateway.HTTPClient != nil && cfg.Gateway.HTTPClient.Pool != nil {
 		return buildConfiguredHTTPClient(cfg, tlsConfig)
 	}
-	return buildDefaultHTTPClient(tlsConfig), nil
+	return buildDefaultHTTPClient(tlsConfig, isDisableCompression(cfg)), nil
 }
 
 func buildTLSConfig(cfg *Config) (*tls.Config, error) {
@@ -113,7 +108,14 @@ func isInsecureSkipVerify(cfg *Config) bool {
 	return false
 }
 
-func buildConfiguredHTTPClient(config *Config, tlsConfig *tls.Config) (*http.Client, error) {
+func isDisableCompression(cfg *Config) bool {
+	if cfg != nil && cfg.Gateway.HTTPClient != nil {
+		return cfg.Gateway.HTTPClient.DisableCompression
+	}
+	return false
+}
+
+func buildConfiguredHTTPClient(config *Config, tlsConfig *tls.Config) (*httpclient.TransportHTTPClient, error) {
 	transport := &http.Transport{
 		Proxy:           http.ProxyFromEnvironment,
 		TLSClientConfig: tlsConfig,
@@ -128,19 +130,18 @@ func buildConfiguredHTTPClient(config *Config, tlsConfig *tls.Config) (*http.Cli
 		TLSHandshakeTimeout:   config.Gateway.HTTPClient.Pool.TLSHandshakeTimeout.Duration,
 		ResponseHeaderTimeout: responseHeaderTimeout(config.Gateway.HTTPClient.Pool),
 		ExpectContinueTimeout: ContinueDefaultTimeout,
+		DisableCompression:    config.Gateway.HTTPClient.DisableCompression,
 	}
 	if config.Gateway.HTTPClient.EnableHTTP2 {
 		if err := http2.ConfigureTransport(transport); err != nil {
 			return nil, fmt.Errorf("failed to configure http2 transport: %w", err)
 		}
 	}
-	// No http.Client Timeout: it would cap the whole exchange including the body
-	// copy, cutting long downloads and streams. Each request is bounded by the
-	// per-route context deadline instead; pool.timeout only bounds dialing.
-	return &http.Client{
-		Transport:     transport,
-		CheckRedirect: noFollowRedirects,
-	}, nil
+	// No client-wide timeout exists on this path: it would cap the whole exchange
+	// including the body copy, cutting long downloads and streams. Each request is
+	// bounded by the per-route context deadline instead; pool.timeout only bounds
+	// dialing.
+	return httpclient.NewTransportHTTPClient(transport), nil
 }
 
 func responseHeaderTimeout(pool *Pool) time.Duration {
@@ -150,7 +151,7 @@ func responseHeaderTimeout(pool *Pool) time.Duration {
 	return 0
 }
 
-func buildDefaultHTTPClient(tlsConfig *tls.Config) *http.Client {
+func buildDefaultHTTPClient(tlsConfig *tls.Config, disableCompression bool) *httpclient.TransportHTTPClient {
 	transport := &http.Transport{
 		Proxy:           http.ProxyFromEnvironment,
 		TLSClientConfig: tlsConfig,
@@ -164,12 +165,10 @@ func buildDefaultHTTPClient(tlsConfig *tls.Config) *http.Client {
 		IdleConnTimeout:       DefaultIdleConnTimeout,
 		TLSHandshakeTimeout:   DefaultTimeout,
 		ExpectContinueTimeout: ContinueDefaultTimeout,
+		DisableCompression:    disableCompression,
 	}
-	// No http.Client Timeout: see buildConfiguredHTTPClient.
-	return &http.Client{
-		Transport:     transport,
-		CheckRedirect: noFollowRedirects,
-	}
+	// No client-wide timeout: see buildConfiguredHTTPClient.
+	return httpclient.NewTransportHTTPClient(transport)
 }
 
 //nolint:bodyclose

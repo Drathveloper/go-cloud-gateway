@@ -18,6 +18,7 @@ import (
 	"github.com/drathveloper/go-cloud-gateway/pkg/config"
 	"github.com/drathveloper/go-cloud-gateway/pkg/filter"
 	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
+	"github.com/drathveloper/go-cloud-gateway/pkg/httpclient"
 	"github.com/drathveloper/go-cloud-gateway/pkg/predicate"
 )
 
@@ -556,9 +557,9 @@ F0WydPKUjl3tmQRxYd9C8zDt6yB/fQbIoM/uGgZ0ZoZ+E5hvLVe+rYk=
 			wantErr:    false,
 			checkClient: func(c gateway.HTTPClient) bool {
 				switch client := c.(type) {
-				case *http.Client:
+				case *httpclient.TransportHTTPClient:
 					// the per-route context deadline bounds requests, not the client
-					return client.Timeout == 0
+					return client.Transport != nil
 				default:
 					return false
 				}
@@ -571,9 +572,9 @@ F0WydPKUjl3tmQRxYd9C8zDt6yB/fQbIoM/uGgZ0ZoZ+E5hvLVe+rYk=
 			wantErr:    false,
 			checkClient: func(c gateway.HTTPClient) bool {
 				switch client := c.(type) {
-				case *http.Client:
+				case *httpclient.TransportHTTPClient:
 					// the per-route context deadline bounds requests, not the client
-					return client.Timeout == 0
+					return client.Transport != nil
 				default:
 					return false
 				}
@@ -600,10 +601,10 @@ F0WydPKUjl3tmQRxYd9C8zDt6yB/fQbIoM/uGgZ0ZoZ+E5hvLVe+rYk=
 			wantErr:    false,
 			checkClient: func(c gateway.HTTPClient) bool {
 				switch client := c.(type) {
-				case *http.Client:
+				case *httpclient.TransportHTTPClient:
 					transport := client.Transport.(*http.Transport)
 					// pool.timeout only bounds dialing: no client-wide timeout
-					return client.Timeout == 0 && transport.ResponseHeaderTimeout == 0
+					return transport.ResponseHeaderTimeout == 0
 				default:
 					return false
 				}
@@ -631,7 +632,7 @@ F0WydPKUjl3tmQRxYd9C8zDt6yB/fQbIoM/uGgZ0ZoZ+E5hvLVe+rYk=
 			wantErr:    false,
 			checkClient: func(c gateway.HTTPClient) bool {
 				switch client := c.(type) {
-				case *http.Client:
+				case *httpclient.TransportHTTPClient:
 					transport := client.Transport.(*http.Transport)
 					return transport.ResponseHeaderTimeout == 7*time.Second
 				default:
@@ -652,9 +653,75 @@ F0WydPKUjl3tmQRxYd9C8zDt6yB/fQbIoM/uGgZ0ZoZ+E5hvLVe+rYk=
 			wantErr:    false,
 			checkClient: func(c gateway.HTTPClient) bool {
 				switch client := c.(type) {
-				case *http.Client:
+				case *httpclient.TransportHTTPClient:
 					transport := client.Transport.(*http.Transport)
 					return transport.TLSClientConfig.InsecureSkipVerify
+				default:
+					return false
+				}
+			},
+		},
+		{
+			name: "disable compression on default client",
+			cfg: &config.Config{
+				Gateway: config.Gateway{
+					HTTPClient: &config.HTTPClient{
+						DisableCompression: true,
+					},
+				},
+			},
+			wantClient: true,
+			wantErr:    false,
+			checkClient: func(c gateway.HTTPClient) bool {
+				switch client := c.(type) {
+				case *httpclient.TransportHTTPClient:
+					transport := client.Transport.(*http.Transport)
+					return transport.DisableCompression
+				default:
+					return false
+				}
+			},
+		},
+		{
+			name: "disable compression on configured pool client",
+			cfg: &config.Config{
+				Gateway: config.Gateway{
+					HTTPClient: &config.HTTPClient{
+						DisableCompression: true,
+						Pool: &config.Pool{
+							Timeout:             &config.Duration{Duration: 30 * time.Second},
+							MaxIdleConns:        100,
+							MaxIdleConnsPerHost: 20,
+							MaxConnsPerHost:     50,
+							IdleConnTimeout:     &config.Duration{Duration: 90 * time.Second},
+							TLSHandshakeTimeout: &config.Duration{Duration: 15 * time.Second},
+							KeepAlive:           &config.Duration{Duration: 30 * time.Second},
+						},
+					},
+				},
+			},
+			wantClient: true,
+			wantErr:    false,
+			checkClient: func(c gateway.HTTPClient) bool {
+				switch client := c.(type) {
+				case *httpclient.TransportHTTPClient:
+					transport := client.Transport.(*http.Transport)
+					return transport.DisableCompression
+				default:
+					return false
+				}
+			},
+		},
+		{
+			name:       "compression enabled by default",
+			cfg:        &config.Config{},
+			wantClient: true,
+			wantErr:    false,
+			checkClient: func(c gateway.HTTPClient) bool {
+				switch client := c.(type) {
+				case *httpclient.TransportHTTPClient:
+					transport := client.Transport.(*http.Transport)
+					return !transport.DisableCompression
 				default:
 					return false
 				}
@@ -678,7 +745,7 @@ F0WydPKUjl3tmQRxYd9C8zDt6yB/fQbIoM/uGgZ0ZoZ+E5hvLVe+rYk=
 			wantErr:    false,
 			checkClient: func(c gateway.HTTPClient) bool {
 				switch client := c.(type) {
-				case *http.Client:
+				case *httpclient.TransportHTTPClient:
 					transport := client.Transport.(*http.Transport)
 					return len(transport.TLSClientConfig.Certificates) > 0 &&
 						transport.TLSClientConfig.RootCAs != nil

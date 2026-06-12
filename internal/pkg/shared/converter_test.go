@@ -215,6 +215,57 @@ func TestConvertToInt(t *testing.T) {
 	}
 }
 
+func TestConvertToBool(t *testing.T) {
+	tests := []struct {
+		input       any
+		expectedErr error
+		name        string
+		expected    bool
+	}{
+		{
+			name:        "convert bool to bool should succeed",
+			input:       true,
+			expected:    true,
+			expectedErr: nil,
+		},
+		{
+			name:        "convert string to bool should succeed",
+			input:       "false",
+			expected:    false,
+			expectedErr: nil,
+		},
+		{
+			name:        "convert nil to bool should return error",
+			input:       nil,
+			expected:    false,
+			expectedErr: shared.ErrRequiredValue,
+		},
+		{
+			name:        "convert int to bool should return error",
+			input:       1,
+			expected:    false,
+			expectedErr: shared.ErrRequiredBoolValue,
+		},
+		{
+			name:        "convert non bool string to bool should return error",
+			input:       "potato",
+			expected:    false,
+			expectedErr: shared.ErrRequiredBoolValue,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := shared.ConvertToBool(tt.input)
+			if fmt.Sprintf("%s", tt.expectedErr) != fmt.Sprintf("%s", err) {
+				t.Errorf("expected err %s actual %s", tt.expectedErr, err)
+			}
+			if tt.expected != result {
+				t.Errorf("expected %t actual %t", tt.expected, result)
+			}
+		})
+	}
+}
+
 func TestConvertToDuration(t *testing.T) {
 	tests := []struct {
 		input       any

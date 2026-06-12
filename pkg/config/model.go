@@ -52,10 +52,11 @@ type ParameterizedItem struct {
 
 // HTTPClient represents the gateway http client config.
 type HTTPClient struct {
-	MTLS              *MTLS `json:"mtls"                yaml:"mtls"`
-	Pool              *Pool `json:"pool"                yaml:"pool"`
-	InsecureTLSVerify bool  `json:"insecure-tls-verify" yaml:"insecure-tls-verify"`
-	EnableHTTP2       bool  `json:"enable-http2"        yaml:"enable-http2"`
+	MTLS               *MTLS `json:"mtls"                yaml:"mtls"`
+	Pool               *Pool `json:"pool"                yaml:"pool"`
+	InsecureTLSVerify  bool  `json:"insecure-tls-verify" yaml:"insecure-tls-verify"`
+	EnableHTTP2        bool  `json:"enable-http2"        yaml:"enable-http2"`
+	DisableCompression bool  `json:"disable-compression" yaml:"disable-compression"`
 }
 
 // Pool represents the gateway http client pool config.

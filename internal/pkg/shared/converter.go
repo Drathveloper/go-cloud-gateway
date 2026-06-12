@@ -22,6 +22,28 @@ var ErrRequiredSliceValue = errors.New("value is required to be a valid slice")
 // ErrRequiredDurationValue is returned when a value is required to be a duration but is not.
 var ErrRequiredDurationValue = errors.New("value is required to be a valid duration")
 
+// ErrRequiredBoolValue is returned when a value is required to be a bool but is not.
+var ErrRequiredBoolValue = errors.New("value is required to be a valid bool")
+
+// ConvertToBool converts the given value to a bool.
+func ConvertToBool(val any) (bool, error) {
+	if val == nil {
+		return false, ErrRequiredValue
+	}
+	switch value := val.(type) {
+	case bool:
+		return value, nil
+	case string:
+		parsed, err := strconv.ParseBool(value)
+		if err != nil {
+			return false, ErrRequiredBoolValue
+		}
+		return parsed, nil
+	default:
+		return false, ErrRequiredBoolValue
+	}
+}
+
 // ConvertToString converts the given value to a string.
 func ConvertToString(val any) (string, error) {
 	if val == nil {
