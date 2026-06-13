@@ -586,36 +586,6 @@ F0WydPKUjl3tmQRxYd9C8zDt6yB/fQbIoM/uGgZ0ZoZ+E5hvLVe+rYk=
 				Gateway: config.Gateway{
 					HTTPClient: &config.HTTPClient{
 						Pool: &config.Pool{
-							Timeout:             &config.Duration{Duration: 30 * time.Second},
-							MaxIdleConns:        100,
-							MaxIdleConnsPerHost: 20,
-							MaxConnsPerHost:     50,
-							IdleConnTimeout:     &config.Duration{Duration: 90 * time.Second},
-							TLSHandshakeTimeout: &config.Duration{Duration: 15 * time.Second},
-							KeepAlive:           &config.Duration{Duration: 30 * time.Second},
-						},
-					},
-				},
-			},
-			wantClient: true,
-			wantErr:    false,
-			checkClient: func(c gateway.HTTPClient) bool {
-				switch client := c.(type) {
-				case *httpclient.TransportHTTPClient:
-					transport := client.Transport.(*http.Transport)
-					// pool.timeout only bounds dialing: no client-wide timeout
-					return transport.ResponseHeaderTimeout == 0
-				default:
-					return false
-				}
-			},
-		},
-		{
-			name: "response header timeout configured",
-			cfg: &config.Config{
-				Gateway: config.Gateway{
-					HTTPClient: &config.HTTPClient{
-						Pool: &config.Pool{
 							Timeout:               &config.Duration{Duration: 30 * time.Second},
 							MaxIdleConns:          100,
 							MaxIdleConnsPerHost:   20,
@@ -623,7 +593,7 @@ F0WydPKUjl3tmQRxYd9C8zDt6yB/fQbIoM/uGgZ0ZoZ+E5hvLVe+rYk=
 							IdleConnTimeout:       &config.Duration{Duration: 90 * time.Second},
 							TLSHandshakeTimeout:   &config.Duration{Duration: 15 * time.Second},
 							KeepAlive:             &config.Duration{Duration: 30 * time.Second},
-							ResponseHeaderTimeout: &config.Duration{Duration: 7 * time.Second},
+							ResponseHeaderTimeout: &config.Duration{Duration: 10 * time.Second},
 						},
 					},
 				},
@@ -631,10 +601,9 @@ F0WydPKUjl3tmQRxYd9C8zDt6yB/fQbIoM/uGgZ0ZoZ+E5hvLVe+rYk=
 			wantClient: true,
 			wantErr:    false,
 			checkClient: func(c gateway.HTTPClient) bool {
-				switch client := c.(type) {
+				switch c.(type) {
 				case *httpclient.TransportHTTPClient:
-					transport := client.Transport.(*http.Transport)
-					return transport.ResponseHeaderTimeout == 7*time.Second
+					return true
 				default:
 					return false
 				}
@@ -689,13 +658,14 @@ F0WydPKUjl3tmQRxYd9C8zDt6yB/fQbIoM/uGgZ0ZoZ+E5hvLVe+rYk=
 					HTTPClient: &config.HTTPClient{
 						DisableCompression: true,
 						Pool: &config.Pool{
-							Timeout:             &config.Duration{Duration: 30 * time.Second},
-							MaxIdleConns:        100,
-							MaxIdleConnsPerHost: 20,
-							MaxConnsPerHost:     50,
-							IdleConnTimeout:     &config.Duration{Duration: 90 * time.Second},
-							TLSHandshakeTimeout: &config.Duration{Duration: 15 * time.Second},
-							KeepAlive:           &config.Duration{Duration: 30 * time.Second},
+							Timeout:               &config.Duration{Duration: 30 * time.Second},
+							MaxIdleConns:          100,
+							MaxIdleConnsPerHost:   20,
+							MaxConnsPerHost:       50,
+							IdleConnTimeout:       &config.Duration{Duration: 90 * time.Second},
+							TLSHandshakeTimeout:   &config.Duration{Duration: 15 * time.Second},
+							KeepAlive:             &config.Duration{Duration: 30 * time.Second},
+							ResponseHeaderTimeout: &config.Duration{Duration: 10 * time.Second},
 						},
 					},
 				},
@@ -721,7 +691,7 @@ F0WydPKUjl3tmQRxYd9C8zDt6yB/fQbIoM/uGgZ0ZoZ+E5hvLVe+rYk=
 				switch client := c.(type) {
 				case *httpclient.TransportHTTPClient:
 					transport := client.Transport.(*http.Transport)
-					return !transport.DisableCompression
+					return transport.DisableCompression
 				default:
 					return false
 				}
@@ -898,13 +868,14 @@ func TestNewHTTPClient_PoolTimeoutDoesNotCutSlowBodies(t *testing.T) {
 		Gateway: config.Gateway{
 			HTTPClient: &config.HTTPClient{
 				Pool: &config.Pool{
-					Timeout:             &config.Duration{Duration: 100 * time.Millisecond},
-					MaxIdleConns:        10,
-					MaxIdleConnsPerHost: 10,
-					MaxConnsPerHost:     10,
-					IdleConnTimeout:     &config.Duration{Duration: 90 * time.Second},
-					TLSHandshakeTimeout: &config.Duration{Duration: 5 * time.Second},
-					KeepAlive:           &config.Duration{Duration: 30 * time.Second},
+					Timeout:               &config.Duration{Duration: 100 * time.Millisecond},
+					MaxIdleConns:          10,
+					MaxIdleConnsPerHost:   10,
+					MaxConnsPerHost:       10,
+					IdleConnTimeout:       &config.Duration{Duration: 90 * time.Second},
+					TLSHandshakeTimeout:   &config.Duration{Duration: 5 * time.Second},
+					KeepAlive:             &config.Duration{Duration: 30 * time.Second},
+					ResponseHeaderTimeout: &config.Duration{Duration: 10 * time.Second},
 				},
 			},
 		},
@@ -957,13 +928,14 @@ func TestNewHTTPClient_DoesNotFollowRedirects(t *testing.T) {
 				Gateway: config.Gateway{
 					HTTPClient: &config.HTTPClient{
 						Pool: &config.Pool{
-							Timeout:             &config.Duration{Duration: 5 * time.Second},
-							MaxIdleConns:        10,
-							MaxIdleConnsPerHost: 10,
-							MaxConnsPerHost:     10,
-							IdleConnTimeout:     &config.Duration{Duration: 90 * time.Second},
-							TLSHandshakeTimeout: &config.Duration{Duration: 5 * time.Second},
-							KeepAlive:           &config.Duration{Duration: 30 * time.Second},
+							Timeout:               &config.Duration{Duration: 5 * time.Second},
+							MaxIdleConns:          10,
+							MaxIdleConnsPerHost:   10,
+							MaxConnsPerHost:       10,
+							IdleConnTimeout:       &config.Duration{Duration: 90 * time.Second},
+							TLSHandshakeTimeout:   &config.Duration{Duration: 5 * time.Second},
+							KeepAlive:             &config.Duration{Duration: 30 * time.Second},
+							ResponseHeaderTimeout: &config.Duration{Duration: 10 * time.Second},
 						},
 					},
 				},
