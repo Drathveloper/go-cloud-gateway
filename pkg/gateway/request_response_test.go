@@ -2,6 +2,7 @@ package gateway_test
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"math/rand"
@@ -263,6 +264,147 @@ func TestReplayableBody_Capture(t *testing.T) {
 	}
 }
 
+type closeCountingBody struct {
+	io.Reader
+
+	closes int
+}
+
+func (c *closeCountingBody) Close() error {
+	c.closes++
+	return nil
+}
+
+func TestReplayableBody_Close_ClosesOriginalOnce(t *testing.T) {
+	payload := []byte("payload")
+	src := &closeCountingBody{Reader: bytes.NewReader(payload)}
+	rb := gateway.NewReplayableBody(src, int64(len(payload)))
+
+	if err := rb.Capture(); err != nil {
+		t.Fatalf("capture failed: %v", err)
+	}
+	if err := rb.Close(); err != nil {
+		t.Fatalf("close failed: %v", err)
+	}
+	if src.closes != 1 {
+		t.Errorf("expected original closed once, actual %d", src.closes)
+	}
+
+	if err := rb.Close(); err != nil {
+		t.Fatalf("second close failed: %v", err)
+	}
+	if src.closes != 1 {
+		t.Errorf("expected close to be idempotent, original closed %d times", src.closes)
+	}
+
+	got, err := io.ReadAll(rb)
+	if err != nil {
+		t.Fatalf("read after close failed: %v", err)
+	}
+	if !bytes.Equal(got, payload) {
+		t.Errorf("expected captured body to remain replayable after close, got %q want %q", got, payload)
+	}
+}
+
+func TestReplayableBody_CaptureWithLimit(t *testing.T) {
+	payload := []byte("0123456789")
+
+	t.Run("body within the limit is captured and replayable", func(t *testing.T) {
+		rb := gateway.NewReplayableBody(io.NopCloser(bytes.NewReader(payload)), int64(len(payload)))
+
+		if err := rb.CaptureWithLimit(int64(len(payload))); err != nil {
+			t.Fatalf("capture failed: %v", err)
+		}
+		for range 2 {
+			got, err := io.ReadAll(rb)
+			if err != nil || !bytes.Equal(got, payload) {
+				t.Fatalf("expected replayable body %q, actual %q (err %v)", payload, got, err)
+			}
+		}
+	})
+
+	t.Run("declared length over the limit is rejected without consuming", func(t *testing.T) {
+		src := &closeCountingBody{Reader: bytes.NewReader(payload)}
+		rb := gateway.NewReplayableBody(src, int64(len(payload)))
+
+		err := rb.CaptureWithLimit(int64(len(payload)) - 1)
+		if !errors.Is(err, gateway.ErrCaptureLimitExceeded) {
+			t.Fatalf("expected ErrCaptureLimitExceeded, actual %v", err)
+		}
+		got, err := io.ReadAll(rb)
+		if err != nil || !bytes.Equal(got, payload) {
+			t.Errorf("expected body fully forwardable after rejection, actual %q (err %v)", got, err)
+		}
+	})
+
+	t.Run("unknown length over the limit is rejected and the prefix is stitched back", func(t *testing.T) {
+		rb := gateway.NewReplayableBody(io.NopCloser(bytes.NewReader(payload)), -1)
+
+		err := rb.CaptureWithLimit(4)
+		if !errors.Is(err, gateway.ErrCaptureLimitExceeded) {
+			t.Fatalf("expected ErrCaptureLimitExceeded, actual %v", err)
+		}
+		got, readErr := io.ReadAll(rb)
+		if readErr != nil || !bytes.Equal(got, payload) {
+			t.Errorf("expected body fully forwardable after rejection, actual %q (err %v)", got, readErr)
+		}
+		if rb.Len() != -1 {
+			t.Errorf("expected declared length untouched after rejection, actual %d", rb.Len())
+		}
+	})
+
+	t.Run("negative limit means unlimited", func(t *testing.T) {
+		rb := gateway.NewReplayableBody(io.NopCloser(bytes.NewReader(payload)), -1)
+
+		if err := rb.CaptureWithLimit(-1); err != nil {
+			t.Fatalf("capture failed: %v", err)
+		}
+		if rb.Len() != int64(len(payload)) {
+			t.Errorf("expected length %d, actual %d", len(payload), rb.Len())
+		}
+	})
+
+	t.Run("close after rejection closes the original once", func(t *testing.T) {
+		src := &closeCountingBody{Reader: bytes.NewReader(payload)}
+		rb := gateway.NewReplayableBody(src, -1)
+
+		if err := rb.CaptureWithLimit(4); !errors.Is(err, gateway.ErrCaptureLimitExceeded) {
+			t.Fatalf("expected ErrCaptureLimitExceeded, actual %v", err)
+		}
+		if err := rb.Close(); err != nil {
+			t.Fatalf("close failed: %v", err)
+		}
+		if src.closes != 1 {
+			t.Errorf("expected original closed once, actual %d", src.closes)
+		}
+	})
+}
+
+func TestReplayableBody_Capture_DoesNotAliasPooledBuffer(t *testing.T) {
+	first := bytes.Repeat([]byte("A"), 1024)
+	second := bytes.Repeat([]byte("B"), 1024)
+
+	firstBody := gateway.NewReplayableBody(io.NopCloser(bytes.NewReader(first)), int64(len(first)))
+	if err := firstBody.Capture(); err != nil {
+		t.Fatalf("capture first body failed: %v", err)
+	}
+
+	// Capturing a second body reuses the pooled staging buffer that the first
+	// capture just released; the first body must not observe its contents.
+	secondBody := gateway.NewReplayableBody(io.NopCloser(bytes.NewReader(second)), int64(len(second)))
+	if err := secondBody.Capture(); err != nil {
+		t.Fatalf("capture second body failed: %v", err)
+	}
+
+	got, err := io.ReadAll(firstBody)
+	if err != nil {
+		t.Fatalf("read first body failed: %v", err)
+	}
+	if !bytes.Equal(got, first) {
+		t.Errorf("first captured body was corrupted after pooled buffer reuse: got %q... want %q...", got[:8], first[:8])
+	}
+}
+
 func TestReplayableBody_Close(t *testing.T) {
 	tests := []struct {
 		reader       io.ReadCloser
@@ -324,4 +466,62 @@ func TestReplayableBody_Len(t *testing.T) {
 	if body.Len() != originalLength {
 		t.Errorf("expected body length %d actual %d", originalLength, body.Len())
 	}
+}
+
+func TestReplayableBody_Bytes(t *testing.T) {
+	content := []byte("hello world")
+	rb := gateway.NewReplayableBody(io.NopCloser(bytes.NewReader(content)), int64(len(content)))
+
+	if rb.Bytes() != nil {
+		t.Errorf("expected nil bytes before capture, got %q", rb.Bytes())
+	}
+
+	if err := rb.Capture(); err != nil {
+		t.Fatalf("capture failed: %v", err)
+	}
+	if !bytes.Equal(rb.Bytes(), content) {
+		t.Errorf("expected %q actual %q", content, rb.Bytes())
+	}
+
+	// The body must remain fully replayable after Bytes.
+	got, err := io.ReadAll(rb)
+	if err != nil {
+		t.Fatalf("reading captured body failed: %v", err)
+	}
+	if !bytes.Equal(got, content) {
+		t.Errorf("expected replayable body %q actual %q", content, got)
+	}
+}
+
+func TestReplayableBody_WriteTo(t *testing.T) {
+	content := []byte("hello world")
+
+	t.Run("captured body writes from buffer and stays replayable", func(t *testing.T) {
+		rb := gateway.NewReplayableBody(io.NopCloser(bytes.NewReader(content)), int64(len(content)))
+		if err := rb.Capture(); err != nil {
+			t.Fatalf("capture failed: %v", err)
+		}
+		var first, second bytes.Buffer
+		if _, err := io.Copy(&first, rb); err != nil {
+			t.Fatalf("first copy failed: %v", err)
+		}
+		if _, err := io.Copy(&second, rb); err != nil {
+			t.Fatalf("second copy failed: %v", err)
+		}
+		if !bytes.Equal(first.Bytes(), content) || !bytes.Equal(second.Bytes(), content) {
+			t.Errorf("expected %q on both copies, got %q and %q", content, first.Bytes(), second.Bytes())
+		}
+	})
+
+	t.Run("non-captured body streams once", func(t *testing.T) {
+		rb := gateway.NewReplayableBody(io.NopCloser(bytes.NewReader(content)), int64(len(content)))
+		var out bytes.Buffer
+		written, err := rb.WriteTo(&out)
+		if err != nil {
+			t.Fatalf("write-to failed: %v", err)
+		}
+		if written != int64(len(content)) || !bytes.Equal(out.Bytes(), content) {
+			t.Errorf("expected %q (%d bytes), got %q (%d bytes)", content, len(content), out.Bytes(), written)
+		}
+	})
 }

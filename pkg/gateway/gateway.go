@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/drathveloper/go-cloud-gateway/internal/pkg/shared"
 	"github.com/drathveloper/go-cloud-gateway/pkg/circuitbreaker"
 )
 
@@ -49,12 +50,14 @@ func (g *Gateway) Do(ctx *Context) error {
 	}
 	ctx.Response = NewGatewayResponse(backendRes)
 	if err = ctx.Route.Filters.PostProcessAll(ctx); err != nil {
+		_ = ctx.Response.BodyReader.Close()
 		return fmt.Errorf(gatewayErrMsg, ctx.Route.ID, err)
 	}
 	return nil
 }
 
 func (g *Gateway) buildProxyRequest(ctx *Context) *http.Request {
+	shared.RemoveHopByHopHeaders(ctx.Request.Headers)
 	req := &http.Request{
 		ContentLength: ctx.Request.BodyReader.Len(),
 		Method:        ctx.Request.Method,
@@ -62,13 +65,18 @@ func (g *Gateway) buildProxyRequest(ctx *Context) *http.Request {
 		Header:        ctx.Request.Headers,
 		Body:          ctx.Request.BodyReader,
 	}
-	return req.WithContext(ctx)
+	if req.ContentLength == 0 {
+		req.Body = nil
+	}
+	return req.WithContext(context.WithValue(ctx.Context, routeContextKey{}, ctx.Route))
 }
 
 func (g *Gateway) handleBackendError(ctx *Context, err error) error {
 	switch {
-	case errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled):
+	case errors.Is(err, context.DeadlineExceeded):
 		return fmt.Errorf(gatewayErrMsg, ctx.Route.ID, context.DeadlineExceeded)
+	case errors.Is(err, context.Canceled):
+		return fmt.Errorf(gatewayErrMsg, ctx.Route.ID, context.Canceled)
 	case errors.Is(err, circuitbreaker.ErrOpenState) || errors.Is(err, circuitbreaker.ErrHalfOpenRequestExceeded):
 		return fmt.Errorf(gatewayErrMsg, ctx.Route.ID, fmt.Errorf("%w: %s", ErrCircuitBreaker, err.Error()))
 	default:

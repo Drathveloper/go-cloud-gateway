@@ -22,9 +22,12 @@ type CircuitBreaker[T any] interface {
 }
 
 // Route represents a gateway route.
+//
+// URI is a value on purpose: the shallow copy FindMatching hands to each request
+// covers it, so a filter mutating it cannot corrupt the shared route table.
 type Route struct {
 	CircuitBreaker CircuitBreaker[*http.Response]
-	URI            *url.URL
+	URI            url.URL
 	Logger         *slog.Logger
 	ID             string
 	Predicates     Predicates
@@ -48,7 +51,7 @@ func NewRoute(
 	}
 	return &Route{
 		ID:             routeID,
-		URI:            routeURI,
+		URI:            *routeURI,
 		Predicates:     predicates,
 		Filters:        append(globalFilters, routeFilters...),
 		Timeout:        timeout,
@@ -83,10 +86,17 @@ type Routes []Route
 // If multiple matching routes are found, the first one is returned.
 //
 // The order of the routes in the list is important.
+//
+// The returned route is a shallow copy: a filter that mutates its value fields
+// (ID, Timeout, URI) by mistake corrupts only its own request, never the shared
+// route table. Pointer fields (Logger, CircuitBreaker, the predicate and filter
+// slices) are still shared across all requests and must be treated as read-only.
 func (r Routes) FindMatching(req *http.Request) *Route {
-	for _, route := range r {
-		if route.Predicates.TestAll(req) {
-			return &route
+	for i := range r {
+		if r[i].Predicates.TestAll(req) {
+			// only the matched route is copied, not every scanned candidate
+			route := r[i]
+			return new(route)
 		}
 	}
 	return nil

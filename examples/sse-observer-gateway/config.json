@@ -1,0 +1,25 @@
+{
+  "gateway": {
+    "routes": [
+      {
+        "id": "sse_route",
+        "uri": "http://localhost:8001",
+        "predicates": [
+          {
+            "name": "Path",
+            "args": {
+              "patterns": [
+                "/**"
+              ]
+            }
+          }
+        ],
+        "filters": [
+          {
+            "name": "SSEUsageLogger"
+          }
+        ]
+      }
+    ]
+  }
+}

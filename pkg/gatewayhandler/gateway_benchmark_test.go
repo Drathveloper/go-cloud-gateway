@@ -20,7 +20,7 @@ func BenchmarkServeHTTP_HappyPath(b *testing.B) {
 	pred := predicate.NewPathPredicate("/test")
 	route := gateway.Route{
 		ID:  "test",
-		URI: uri,
+		URI: *uri,
 		Predicates: []gateway.Predicate{
 			pred,
 		},
@@ -43,7 +43,7 @@ func BenchmarkServeHTTP_HappyPath(b *testing.B) {
 
 	reqBody := []byte(`GET /test HTTP/1.1`)
 	for b.Loop() {
-		req := httptest.NewRequest(http.MethodGet, "/test?x=1", bytes.NewReader(reqBody))
+		req := newTestRequest(b, http.MethodGet, "/test?x=1", bytes.NewReader(reqBody))
 		rec := httptest.NewRecorder()
 
 		handler.ServeHTTP(rec, req)
@@ -60,7 +60,7 @@ func BenchmarkServeHTTP_RouteNotFound(b *testing.B) {
 	pred := predicate.NewPathPredicate("/test")
 	route := gateway.Route{
 		ID:  "test",
-		URI: uri,
+		URI: *uri,
 		Predicates: []gateway.Predicate{
 			pred,
 		},
@@ -71,7 +71,7 @@ func BenchmarkServeHTTP_RouteNotFound(b *testing.B) {
 		&mockErrorHandler{handleFunc: func(_ *gateway.Context, _ error, _ http.ResponseWriter) {}},
 	)
 
-	req := httptest.NewRequest(http.MethodGet, "/not-found", nil)
+	req := newTestRequest(b, http.MethodGet, "/not-found", nil)
 
 	b.ResetTimer()
 	for b.Loop() {
@@ -85,7 +85,7 @@ func BenchmarkServeHTTP_BackendError(b *testing.B) {
 	pred := predicate.NewPathPredicate("/test")
 	route := gateway.Route{
 		ID:  "test",
-		URI: uri,
+		URI: *uri,
 		Predicates: []gateway.Predicate{
 			pred,
 		},
@@ -101,7 +101,7 @@ func BenchmarkServeHTTP_BackendError(b *testing.B) {
 		&mockErrorHandler{handleFunc: func(_ *gateway.Context, _ error, _ http.ResponseWriter) {}},
 	)
 
-	req := httptest.NewRequest(http.MethodGet, "/fail", nil)
+	req := newTestRequest(b, http.MethodGet, "/fail", nil)
 
 	b.ResetTimer()
 	for b.Loop() {
@@ -114,7 +114,7 @@ func BenchmarkServeHTTP_LargeBody(b *testing.B) {
 	uri, _ := url.Parse("http://localhost:8080")
 	route := gateway.Route{
 		ID:  "route-large",
-		URI: uri,
+		URI: *uri,
 	}
 	largeBody := strings.Repeat("a", 1024*1024) // 1MB
 	body := []byte(`{"status":"ok"}`)
@@ -135,7 +135,7 @@ func BenchmarkServeHTTP_LargeBody(b *testing.B) {
 
 	b.ResetTimer()
 	for b.Loop() {
-		req := httptest.NewRequest(http.MethodPost, "/big", io.NopCloser(strings.NewReader(largeBody)))
+		req := newTestRequest(b, http.MethodPost, "/big", strings.NewReader(largeBody))
 		w := httptest.NewRecorder()
 		gwHandler.ServeHTTP(w, req.Clone(req.Context()))
 	}

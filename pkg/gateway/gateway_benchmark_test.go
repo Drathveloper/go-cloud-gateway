@@ -2,6 +2,7 @@ package gateway_test
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"io"
 	"net/http"
@@ -38,9 +39,9 @@ func newDummyContext() *gateway.Context {
 	route := &gateway.Route{
 		ID:      "route-1",
 		Timeout: 1000000000, // 1s
-		URI:     routeURL,
+		URI:     *routeURL,
 	}
-	ctx, _ := gateway.NewGatewayContext(route, req)
+	ctx, _ := gateway.NewGatewayContext(context.Background(), route, req)
 	return ctx
 }
 

@@ -47,6 +47,7 @@ linters:
     - tagliatelle
     - nlreturn
     - exhaustruct
+    - gomodguard
   exclusions:
     generated: lax
     rules:
@@ -61,8 +62,10 @@ linters:
           - gochecknoglobals
           - err113
           - dupl
+          - goconst
           - maintidx
           - cyclop
+          - gocognit
       - linters:
           - gosec
         text: 'G104:'

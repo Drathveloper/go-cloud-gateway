@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 )
@@ -40,6 +41,34 @@ func TestRoute_GetDestinationURL(t *testing.T) {
 				t.Errorf("expected url %s actual %s", tt.expectedURL, actual)
 			}
 		})
+	}
+}
+
+func TestRoutes_FindMatching_ReturnsACopy(t *testing.T) {
+	routes := gateway.Routes{
+		{
+			ID:         "r1",
+			URI:        url.URL{Scheme: "https", Host: "backend.internal"},
+			Timeout:    time.Minute,
+			Predicates: gateway.Predicates{DummyPredicate{true}},
+		},
+	}
+
+	matched := routes.FindMatching(&http.Request{})
+	if matched == nil {
+		t.Fatal("expected a match")
+	}
+	// A filter mutating the matched route by mistake must corrupt its own copy,
+	// never the shared route table.
+	matched.ID = "mutated"
+	matched.Timeout = 0
+	matched.URI.Host = "evil.example.org"
+
+	if routes[0].ID != "r1" || routes[0].Timeout != time.Minute {
+		t.Errorf("expected the route table to be untouched, actual %+v", routes[0])
+	}
+	if routes[0].URI.Host != "backend.internal" {
+		t.Errorf("expected the route URI to be untouched, actual %s", routes[0].URI.Host)
 	}
 }
 

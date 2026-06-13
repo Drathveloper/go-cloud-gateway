@@ -1,10 +1,13 @@
 package config_test
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"reflect"
 	"testing"
@@ -15,10 +18,11 @@ import (
 	"github.com/drathveloper/go-cloud-gateway/pkg/config"
 	"github.com/drathveloper/go-cloud-gateway/pkg/filter"
 	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
+	"github.com/drathveloper/go-cloud-gateway/pkg/httpclient"
 	"github.com/drathveloper/go-cloud-gateway/pkg/predicate"
 )
 
-//nolint:bodyclose,gocognit
+//nolint:bodyclose
 func TestNewRoutes(t *testing.T) {
 	logger := slog.Default()
 	tests := []struct {
@@ -60,7 +64,7 @@ func TestNewRoutes(t *testing.T) {
 			expected: gateway.Routes{
 				{
 					ID: "r1",
-					URI: &url.URL{
+					URI: url.URL{
 						Scheme: "https",
 						Host:   "example.com",
 					},
@@ -119,7 +123,7 @@ func TestNewRoutes(t *testing.T) {
 			expected: gateway.Routes{
 				{
 					ID: "r1",
-					URI: &url.URL{
+					URI: url.URL{
 						Scheme: "https",
 						Host:   "example.com",
 					},
@@ -272,7 +276,7 @@ func TestNewRoutes(t *testing.T) {
 			expected: gateway.Routes{
 				{
 					ID: "r1",
-					URI: &url.URL{
+					URI: url.URL{
 						Scheme: "https",
 						Host:   "example.com",
 					},
@@ -334,7 +338,7 @@ func TestNewRoutes(t *testing.T) {
 			expected: gateway.Routes{
 				{
 					ID: "r1",
-					URI: &url.URL{
+					URI: url.URL{
 						Scheme: "https",
 						Host:   "example.com",
 					},
@@ -553,8 +557,9 @@ F0WydPKUjl3tmQRxYd9C8zDt6yB/fQbIoM/uGgZ0ZoZ+E5hvLVe+rYk=
 			wantErr:    false,
 			checkClient: func(c gateway.HTTPClient) bool {
 				switch client := c.(type) {
-				case *http.Client:
-					return client.Timeout == config.DefaultTimeout
+				case *httpclient.TransportHTTPClient:
+					// the per-route context deadline bounds requests, not the client
+					return client.Transport != nil
 				default:
 					return false
 				}
@@ -567,8 +572,9 @@ F0WydPKUjl3tmQRxYd9C8zDt6yB/fQbIoM/uGgZ0ZoZ+E5hvLVe+rYk=
 			wantErr:    false,
 			checkClient: func(c gateway.HTTPClient) bool {
 				switch client := c.(type) {
-				case *http.Client:
-					return client.Timeout == config.DefaultTimeout
+				case *httpclient.TransportHTTPClient:
+					// the per-route context deadline bounds requests, not the client
+					return client.Transport != nil
 				default:
 					return false
 				}
@@ -580,13 +586,14 @@ F0WydPKUjl3tmQRxYd9C8zDt6yB/fQbIoM/uGgZ0ZoZ+E5hvLVe+rYk=
 				Gateway: config.Gateway{
 					HTTPClient: &config.HTTPClient{
 						Pool: &config.Pool{
-							Timeout:             &config.Duration{Duration: 30 * time.Second},
-							MaxIdleConns:        100,
-							MaxIdleConnsPerHost: 20,
-							MaxConnsPerHost:     50,
-							IdleConnTimeout:     &config.Duration{Duration: 90 * time.Second},
-							TLSHandshakeTimeout: &config.Duration{Duration: 15 * time.Second},
-							KeepAlive:           &config.Duration{Duration: 30 * time.Second},
+							Timeout:               &config.Duration{Duration: 30 * time.Second},
+							MaxIdleConns:          100,
+							MaxIdleConnsPerHost:   20,
+							MaxConnsPerHost:       50,
+							IdleConnTimeout:       &config.Duration{Duration: 90 * time.Second},
+							TLSHandshakeTimeout:   &config.Duration{Duration: 15 * time.Second},
+							KeepAlive:             &config.Duration{Duration: 30 * time.Second},
+							ResponseHeaderTimeout: &config.Duration{Duration: 10 * time.Second},
 						},
 					},
 				},
@@ -594,9 +601,9 @@ F0WydPKUjl3tmQRxYd9C8zDt6yB/fQbIoM/uGgZ0ZoZ+E5hvLVe+rYk=
 			wantClient: true,
 			wantErr:    false,
 			checkClient: func(c gateway.HTTPClient) bool {
-				switch client := c.(type) {
-				case *http.Client:
-					return client.Timeout == 30*time.Second
+				switch c.(type) {
+				case *httpclient.TransportHTTPClient:
+					return true
 				default:
 					return false
 				}
@@ -615,9 +622,76 @@ F0WydPKUjl3tmQRxYd9C8zDt6yB/fQbIoM/uGgZ0ZoZ+E5hvLVe+rYk=
 			wantErr:    false,
 			checkClient: func(c gateway.HTTPClient) bool {
 				switch client := c.(type) {
-				case *http.Client:
+				case *httpclient.TransportHTTPClient:
 					transport := client.Transport.(*http.Transport)
 					return transport.TLSClientConfig.InsecureSkipVerify
+				default:
+					return false
+				}
+			},
+		},
+		{
+			name: "disable compression on default client",
+			cfg: &config.Config{
+				Gateway: config.Gateway{
+					HTTPClient: &config.HTTPClient{
+						DisableCompression: true,
+					},
+				},
+			},
+			wantClient: true,
+			wantErr:    false,
+			checkClient: func(c gateway.HTTPClient) bool {
+				switch client := c.(type) {
+				case *httpclient.TransportHTTPClient:
+					transport := client.Transport.(*http.Transport)
+					return transport.DisableCompression
+				default:
+					return false
+				}
+			},
+		},
+		{
+			name: "disable compression on configured pool client",
+			cfg: &config.Config{
+				Gateway: config.Gateway{
+					HTTPClient: &config.HTTPClient{
+						DisableCompression: true,
+						Pool: &config.Pool{
+							Timeout:               &config.Duration{Duration: 30 * time.Second},
+							MaxIdleConns:          100,
+							MaxIdleConnsPerHost:   20,
+							MaxConnsPerHost:       50,
+							IdleConnTimeout:       &config.Duration{Duration: 90 * time.Second},
+							TLSHandshakeTimeout:   &config.Duration{Duration: 15 * time.Second},
+							KeepAlive:             &config.Duration{Duration: 30 * time.Second},
+							ResponseHeaderTimeout: &config.Duration{Duration: 10 * time.Second},
+						},
+					},
+				},
+			},
+			wantClient: true,
+			wantErr:    false,
+			checkClient: func(c gateway.HTTPClient) bool {
+				switch client := c.(type) {
+				case *httpclient.TransportHTTPClient:
+					transport := client.Transport.(*http.Transport)
+					return transport.DisableCompression
+				default:
+					return false
+				}
+			},
+		},
+		{
+			name:       "compression enabled by default",
+			cfg:        &config.Config{},
+			wantClient: true,
+			wantErr:    false,
+			checkClient: func(c gateway.HTTPClient) bool {
+				switch client := c.(type) {
+				case *httpclient.TransportHTTPClient:
+					transport := client.Transport.(*http.Transport)
+					return transport.DisableCompression
 				default:
 					return false
 				}
@@ -641,7 +715,7 @@ F0WydPKUjl3tmQRxYd9C8zDt6yB/fQbIoM/uGgZ0ZoZ+E5hvLVe+rYk=
 			wantErr:    false,
 			checkClient: func(c gateway.HTTPClient) bool {
 				switch client := c.(type) {
-				case *http.Client:
+				case *httpclient.TransportHTTPClient:
 					transport := client.Transport.(*http.Transport)
 					return len(transport.TLSClientConfig.Certificates) > 0 &&
 						transport.TLSClientConfig.RootCAs != nil
@@ -706,6 +780,192 @@ F0WydPKUjl3tmQRxYd9C8zDt6yB/fQbIoM/uGgZ0ZoZ+E5hvLVe+rYk=
 				}
 			} else if client != nil {
 				t.Error("Expected nil client, got non-nil")
+			}
+		})
+	}
+}
+
+func newCircuitBreakerRoute(t *testing.T) gateway.Routes {
+	t.Helper()
+	cfg := &config.Config{
+		Gateway: config.Gateway{
+			Routes: []config.Route{
+				{
+					ID:  "r1",
+					URI: "https://example.com",
+					Predicates: []config.ParameterizedItem{
+						{
+							Name: "Method",
+							Args: map[string]any{"methods": []any{"GET"}},
+						},
+					},
+					CircuitBreaker: config.CircuitBreaker{
+						Enabled:                 true,
+						Interval:                config.Duration{Duration: time.Minute},
+						FailureRateThreshold:    50,
+						NumAllowedHalfOpenCalls: 1,
+						WaitDurationInOpenState: config.Duration{Duration: time.Minute},
+						MinRequestsThreshold:    3,
+					},
+				},
+			},
+		},
+	}
+	routes, err := config.NewRoutes(
+		cfg,
+		predicate.NewFactory(predicate.BuilderRegistry),
+		filter.NewFactory(filter.BuilderRegistry),
+		slog.Default())
+	if err != nil {
+		t.Fatalf("NewRoutes() error = %v", err)
+	}
+	return routes
+}
+
+func TestNewRoutes_CircuitBreakerOpensOnNetworkErrors(t *testing.T) {
+	routes := newCircuitBreakerRoute(t)
+	breaker := routes[0].CircuitBreaker
+
+	for range 5 {
+		_, _ = breaker.Execute(func() (*http.Response, error) { //nolint:bodyclose // the callback returns no response
+			return nil, errors.New("dial tcp 10.0.0.1:443: connect: connection refused")
+		})
+	}
+
+	if breaker.State() != circuitbreaker.StateOpen {
+		t.Errorf("expected the breaker to open on repeated network errors, actual state %s", breaker.State())
+	}
+}
+
+func TestNewRoutes_CircuitBreakerIgnoresClientCancellations(t *testing.T) {
+	routes := newCircuitBreakerRoute(t)
+	breaker := routes[0].CircuitBreaker
+
+	for range 5 {
+		_, _ = breaker.Execute(func() (*http.Response, error) { //nolint:bodyclose // the callback returns no response
+			return nil, fmt.Errorf("request failed: %w", context.Canceled)
+		})
+	}
+
+	if breaker.State() != circuitbreaker.StateClosed {
+		t.Errorf("expected client cancellations to leave the breaker closed, actual state %s", breaker.State())
+	}
+}
+
+func TestNewHTTPClient_PoolTimeoutDoesNotCutSlowBodies(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		controller := http.NewResponseController(w)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("first"))
+		_ = controller.Flush()
+		// Longer than pool.timeout: only dialing is bound by it, not the body read.
+		time.Sleep(300 * time.Millisecond)
+		_, _ = w.Write([]byte("second"))
+	}))
+	defer server.Close()
+
+	cfg := &config.Config{
+		Gateway: config.Gateway{
+			HTTPClient: &config.HTTPClient{
+				Pool: &config.Pool{
+					Timeout:               &config.Duration{Duration: 100 * time.Millisecond},
+					MaxIdleConns:          10,
+					MaxIdleConnsPerHost:   10,
+					MaxConnsPerHost:       10,
+					IdleConnTimeout:       &config.Duration{Duration: 90 * time.Second},
+					TLSHandshakeTimeout:   &config.Duration{Duration: 5 * time.Second},
+					KeepAlive:             &config.Duration{Duration: 30 * time.Second},
+					ResponseHeaderTimeout: &config.Duration{Duration: 10 * time.Second},
+				},
+			},
+		},
+	}
+	client, err := config.NewHTTPClient(cfg)
+	if err != nil {
+		t.Fatalf("NewHTTPClient() error = %v", err)
+	}
+	request, err := http.NewRequestWithContext(t.Context(), http.MethodGet, server.URL, nil)
+	if err != nil {
+		t.Fatalf("failed to build request: %v", err)
+	}
+	res, err := client.Do(request)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer res.Body.Close() //nolint:errcheck
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		t.Fatalf("expected the slow body to be read in full, actual error: %v", err)
+	}
+	if string(body) != "firstsecond" {
+		t.Errorf("expected body %q, actual %q", "firstsecond", body)
+	}
+}
+
+func TestNewHTTPClient_DoesNotFollowRedirects(t *testing.T) {
+	followed := false
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/target" {
+			followed = true
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		http.Redirect(w, r, "/target", http.StatusFound)
+	}))
+	defer server.Close()
+
+	tests := []struct {
+		cfg  *config.Config
+		name string
+	}{
+		{
+			name: "default client",
+			cfg:  nil,
+		},
+		{
+			name: "configured client",
+			cfg: &config.Config{
+				Gateway: config.Gateway{
+					HTTPClient: &config.HTTPClient{
+						Pool: &config.Pool{
+							Timeout:               &config.Duration{Duration: 5 * time.Second},
+							MaxIdleConns:          10,
+							MaxIdleConnsPerHost:   10,
+							MaxConnsPerHost:       10,
+							IdleConnTimeout:       &config.Duration{Duration: 90 * time.Second},
+							TLSHandshakeTimeout:   &config.Duration{Duration: 5 * time.Second},
+							KeepAlive:             &config.Duration{Duration: 30 * time.Second},
+							ResponseHeaderTimeout: &config.Duration{Duration: 10 * time.Second},
+						},
+					},
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			followed = false
+			client, err := config.NewHTTPClient(tt.cfg)
+			if err != nil {
+				t.Fatalf("NewHTTPClient() error = %v", err)
+			}
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, server.URL+"/redirect", nil)
+			if err != nil {
+				t.Fatalf("failed to build request: %v", err)
+			}
+			res, err := client.Do(req)
+			if err != nil {
+				t.Fatalf("request failed: %v", err)
+			}
+			defer res.Body.Close() //nolint:errcheck
+			if res.StatusCode != http.StatusFound {
+				t.Errorf("expected the redirect to be returned untouched, got status %d", res.StatusCode)
+			}
+			if loc := res.Header.Get("Location"); loc != "/target" {
+				t.Errorf("expected Location header %q, actual %q", "/target", loc)
+			}
+			if followed {
+				t.Error("expected the client to not follow the redirect")
 			}
 		})
 	}

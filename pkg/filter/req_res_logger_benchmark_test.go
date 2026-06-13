@@ -24,7 +24,7 @@ func newSilentLogger() *slog.Logger {
 }
 
 func BenchmarkRequestResponseLogger_SilentPreProcess(b *testing.B) {
-	f := filter.NewRequestResponseLoggerFilter(slog.LevelInfo)
+	f := filter.NewRequestResponseLoggerFilter(slog.LevelInfo, filter.DefaultMaxLoggedBodyBytes, true)
 	body := []byte(`request body`)
 	ctx := &gateway.Context{
 		Logger: newSilentLogger(),
@@ -43,7 +43,7 @@ func BenchmarkRequestResponseLogger_SilentPreProcess(b *testing.B) {
 }
 
 func BenchmarkRequestResponseLogger_SilentPostProcess(b *testing.B) {
-	f := filter.NewRequestResponseLoggerFilter(slog.LevelInfo)
+	f := filter.NewRequestResponseLoggerFilter(slog.LevelInfo, filter.DefaultMaxLoggedBodyBytes, true)
 	body := []byte(`{"status":"ok"}`)
 	ctx := &gateway.Context{
 		Logger: newSilentLogger(),
@@ -61,7 +61,7 @@ func BenchmarkRequestResponseLogger_SilentPostProcess(b *testing.B) {
 }
 
 func BenchmarkRequestResponseLogger_PreProcess_WithRealLogger(b *testing.B) {
-	f := filter.NewRequestResponseLoggerFilter(slog.LevelInfo)
+	f := filter.NewRequestResponseLoggerFilter(slog.LevelInfo, filter.DefaultMaxLoggedBodyBytes, true)
 	var buf bytes.Buffer
 	logger := newBufferedLogger(&buf)
 	body := []byte(`{"key":"value"}`)
@@ -83,23 +83,27 @@ func BenchmarkRequestResponseLogger_PreProcess_WithRealLogger(b *testing.B) {
 }
 
 func BenchmarkRequestResponseLogger_PostProcess_WithRealLogger(b *testing.B) {
-	f := filter.NewRequestResponseLoggerFilter(slog.LevelInfo)
+	f := filter.NewRequestResponseLoggerFilter(slog.LevelInfo, filter.DefaultMaxLoggedBodyBytes, true)
 	var buf bytes.Buffer
 	logger := newBufferedLogger(&buf)
 	body := []byte(`{"success":true}`)
-	ctx := &gateway.Context{
-		Logger: logger,
-		Response: &gateway.Response{
-			Status:     201,
-			Headers:    map[string][]string{"Content-Type": {"application/json"}},
-			BodyReader: gateway.NewReplayableBody(io.NopCloser(bytes.NewBuffer(body)), int64(len(body))),
-		},
-	}
 
 	b.ResetTimer()
 	for b.Loop() {
 		buf.Reset()
+		// A fresh body per iteration: PostProcess now registers a stream observer that
+		// logs when the body finishes streaming, so the cost is registration plus the
+		// observed drain that follows.
+		ctx := &gateway.Context{
+			Logger: logger,
+			Response: &gateway.Response{
+				Status:     201,
+				Headers:    map[string][]string{"Content-Type": {"application/json"}},
+				BodyReader: gateway.NewReplayableBody(io.NopCloser(bytes.NewReader(body)), int64(len(body))),
+			},
+		}
 		_ = f.PostProcess(ctx)
+		_, _ = io.Copy(io.Discard, ctx.Response.BodyReader)
 	}
 }
 

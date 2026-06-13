@@ -94,6 +94,52 @@ The gateway's architecture allows for easy extension:
 
 This design enables dynamic creation and application of filters and predicates based on configuration, promoting flexibility and testability.
 
+### Observing streamed bodies
+
+Post-process filters run once, after the backend headers arrive but **before** the body
+streams to the client. The only way for a filter to read the body at that point is
+`Capture`, which buffers the whole body in memory and defeats streaming — unacceptable for
+Server-Sent Events or any long-lived response.
+
+`ReplayableBody.ObserveStream` is the streaming-friendly alternative. It registers
+callbacks invoked as the body flows from its source, without buffering it, so a filter can
+meter token usage, count SSE events, or measure stream size and duration while the client
+still receives the bytes incrementally:
+
+```go
+func (f *SSEUsageLogger) PostProcess(ctx *gateway.Context) error {
+    // Capture the logger by value, never the *Context: response-side callbacks run on
+    // the handler goroutine while the context is valid, but it returns to a pool after.
+    logger := ctx.Logger
+    start := time.Now()
+    var events int
+    ctx.Response.BodyReader.ObserveStream(
+        func(chunk []byte) { events += bytes.Count(chunk, []byte("\n\n")) },
+        func(total int64, err error) {
+            logger.Info("sse stream finished", "events", events, "bytes", total,
+                "duration", time.Since(start), "error", err)
+        },
+    )
+    return nil
+}
+```
+
+Contract:
+
+* **The chunk slice is only valid during the `onChunk` call** — it aliases a reused read
+  buffer. Copy anything that must outlive the callback.
+* **Chunks are transport-sized reads, not application messages.** An SSE consumer must
+  reassemble events from the chunk stream itself.
+* **`onDone` fires exactly once**: a `nil` error on clean EOF, the read error on a
+  mid-stream failure, or `ErrStreamTruncated` when the body is closed before EOF (client
+  disconnect, pipeline error, or a discarded response).
+* **Request-side callbacks may run on a transport goroutine.** Observers on the request
+  body must be safe for that and must not retain the `*Context`.
+
+See [`examples/sse-observer-gateway`](examples/sse-observer-gateway) for a runnable
+gateway that logs the event count, byte total, duration and final usage event of a
+streamed SSE backend.
+
 ## Dependencies
 
 Key external libraries are used:

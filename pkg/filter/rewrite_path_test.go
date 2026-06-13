@@ -92,7 +92,7 @@ func TestRewritePathFilter_PreProcess(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, "https://example.org"+tt.path, nil)
 			gwReq := gateway.NewGatewayRequest(req)
-			ctx, _ := gateway.NewGatewayContext(&gateway.Route{}, gwReq)
+			ctx, _ := gateway.NewGatewayContext(t.Context(), &gateway.Route{}, gwReq)
 			f, _ := filter.NewRewritePathFilter(tt.pattern, tt.replacement)
 
 			_ = f.PreProcess(ctx)
