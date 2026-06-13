@@ -50,8 +50,6 @@ func (g *Gateway) Do(ctx *Context) error {
 	}
 	ctx.Response = NewGatewayResponse(backendRes)
 	if err = ctx.Route.Filters.PostProcessAll(ctx); err != nil {
-		// The response never reaches the handler on error: the backend body
-		// must be closed here or its connection leaks.
 		_ = ctx.Response.BodyReader.Close()
 		return fmt.Errorf(gatewayErrMsg, ctx.Route.ID, err)
 	}
@@ -59,9 +57,6 @@ func (g *Gateway) Do(ctx *Context) error {
 }
 
 func (g *Gateway) buildProxyRequest(ctx *Context) *http.Request {
-	// In place on the shared inbound map: the gateway owns the inbound request for
-	// its whole lifetime and the server never re-reads its headers, so a per-request
-	// clone would only buy allocations.
 	shared.RemoveHopByHopHeaders(ctx.Request.Headers)
 	req := &http.Request{
 		ContentLength: ctx.Request.BodyReader.Len(),
@@ -71,16 +66,8 @@ func (g *Gateway) buildProxyRequest(ctx *Context) *http.Request {
 		Body:          ctx.Request.BodyReader,
 	}
 	if req.ContentLength == 0 {
-		// A declared-empty body must be nil: the Transport only retries a request
-		// transparently on a connection the backend closed while idle when the
-		// body is nil (golang/go#16036), and a nil body also skips the Transport
-		// chunked-body probe on every bodyless request.
 		req.Body = nil
 	}
-	// The transport holds the request context in goroutines that outlive this
-	// request (queued dials, tracing). It must never see the pooled gateway
-	// context, whose fields are reset and reused: it gets the per-request timeout
-	// context plus an immutable snapshot of the route instead.
 	return req.WithContext(context.WithValue(ctx.Context, routeContextKey{}, ctx.Route))
 }
 

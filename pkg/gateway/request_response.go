@@ -158,8 +158,6 @@ func (rb *ReplayableBody) CaptureWithLimit(maxBytes int64) error {
 		return fmt.Errorf("%w: %w", ErrCapture, ErrCaptureLimitExceeded)
 	}
 	rb.length = length
-	// The reader must own its bytes: buf returns to the pool and other
-	// requests will overwrite its backing array.
 	rb.data = bytes.Clone(buf.Bytes())
 	rb.reader = bytes.NewReader(rb.data)
 	rb.captured = true
@@ -186,8 +184,6 @@ func (rb *ReplayableBody) WriteTo(writer io.Writer) (int64, error) {
 		return written, err //nolint:wrapcheck
 	}
 	bufPtr := copyBufPool.Get().(*[]byte) //nolint:forcetypeassert
-	// The writer-only wrapper hides any ReaderFrom on w from io.CopyBuffer,
-	// which would otherwise delegate to it and ignore the pooled buffer.
 	written, err := io.CopyBuffer(writerOnly{writer}, rb.original, *bufPtr)
 	copyBufPool.Put(bufPtr)
 	return written, err //nolint:wrapcheck

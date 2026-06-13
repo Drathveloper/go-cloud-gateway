@@ -61,7 +61,7 @@ func buildHTTPClient(cfg *Config) (gateway.HTTPClient, error) {
 	if cfg != nil && cfg.Gateway.HTTPClient != nil && cfg.Gateway.HTTPClient.Pool != nil {
 		return buildConfiguredHTTPClient(cfg, tlsConfig)
 	}
-	return buildDefaultHTTPClient(tlsConfig, isDisableCompression(cfg)), nil
+	return buildDefaultHTTPClient(tlsConfig), nil
 }
 
 func buildTLSConfig(cfg *Config) (*tls.Config, error) {
@@ -108,13 +108,6 @@ func isInsecureSkipVerify(cfg *Config) bool {
 	return false
 }
 
-func isDisableCompression(cfg *Config) bool {
-	if cfg != nil && cfg.Gateway.HTTPClient != nil {
-		return cfg.Gateway.HTTPClient.DisableCompression
-	}
-	return false
-}
-
 func buildConfiguredHTTPClient(config *Config, tlsConfig *tls.Config) (*httpclient.TransportHTTPClient, error) {
 	transport := &http.Transport{
 		Proxy:           http.ProxyFromEnvironment,
@@ -128,7 +121,7 @@ func buildConfiguredHTTPClient(config *Config, tlsConfig *tls.Config) (*httpclie
 		MaxConnsPerHost:       config.Gateway.HTTPClient.Pool.MaxConnsPerHost,
 		IdleConnTimeout:       config.Gateway.HTTPClient.Pool.IdleConnTimeout.Duration,
 		TLSHandshakeTimeout:   config.Gateway.HTTPClient.Pool.TLSHandshakeTimeout.Duration,
-		ResponseHeaderTimeout: responseHeaderTimeout(config.Gateway.HTTPClient.Pool),
+		ResponseHeaderTimeout: config.Gateway.HTTPClient.Pool.ResponseHeaderTimeout.Duration,
 		ExpectContinueTimeout: ContinueDefaultTimeout,
 		DisableCompression:    config.Gateway.HTTPClient.DisableCompression,
 	}
@@ -144,14 +137,7 @@ func buildConfiguredHTTPClient(config *Config, tlsConfig *tls.Config) (*httpclie
 	return httpclient.NewTransportHTTPClient(transport), nil
 }
 
-func responseHeaderTimeout(pool *Pool) time.Duration {
-	if pool.ResponseHeaderTimeout != nil {
-		return pool.ResponseHeaderTimeout.Duration
-	}
-	return 0
-}
-
-func buildDefaultHTTPClient(tlsConfig *tls.Config, disableCompression bool) *httpclient.TransportHTTPClient {
+func buildDefaultHTTPClient(tlsConfig *tls.Config) *httpclient.TransportHTTPClient {
 	transport := &http.Transport{
 		Proxy:           http.ProxyFromEnvironment,
 		TLSClientConfig: tlsConfig,
@@ -165,7 +151,7 @@ func buildDefaultHTTPClient(tlsConfig *tls.Config, disableCompression bool) *htt
 		IdleConnTimeout:       DefaultIdleConnTimeout,
 		TLSHandshakeTimeout:   DefaultTimeout,
 		ExpectContinueTimeout: ContinueDefaultTimeout,
-		DisableCompression:    disableCompression,
+		DisableCompression:    true,
 	}
 	// No client-wide timeout: see buildConfiguredHTTPClient.
 	return httpclient.NewTransportHTTPClient(transport)

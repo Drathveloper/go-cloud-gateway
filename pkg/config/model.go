@@ -67,7 +67,7 @@ type Pool struct {
 	KeepAlive             *Duration `json:"keep-alive"              yaml:"keep-alive"              validate:"required"`
 	IdleConnTimeout       *Duration `json:"idle-conn-timeout"       yaml:"idle-conn-timeout"       validate:"required"`
 	TLSHandshakeTimeout   *Duration `json:"tls-handshake-timeout"   yaml:"tls-handshake-timeout"   validate:"required"`
-	ResponseHeaderTimeout *Duration `json:"response-header-timeout" yaml:"response-header-timeout"`
+	ResponseHeaderTimeout *Duration `json:"response-header-timeout" yaml:"response-header-timeout" validate:"required"`
 	MaxIdleConns          int       `json:"max-idle-conns"          yaml:"max-idle-conns"          validate:"required"`
 	MaxIdleConnsPerHost   int       `json:"max-idle-conns-per-host" yaml:"max-idle-conns-per-host" validate:"required"`
 	MaxConnsPerHost       int       `json:"max-conns-per-host"      yaml:"max-conns-per-host"      validate:"required"`
