@@ -79,21 +79,14 @@ func (h *GatewayHandler) ServeHTTP(writer http.ResponseWriter, request *http.Req
 		h.notFound.ServeHTTP(writer, request)
 		return
 	}
-	// After route matching, so predicates evaluate the request as the client sent
-	// it, and before the gateway request is built, so filters and the backend see
-	// the same forwarding headers.
 	shared.SetXForwardedHeaders(request)
 	gwRequest := gateway.NewGatewayRequest(request)
 	ctx, cancel := gateway.NewGatewayContext(request.Context(), route, gwRequest)
-	// LIFO: cancel signals any in-flight work watching this context before the
-	// context object is pooled for reuse. Deferring both covers the error path
-	// and the abort panic from writeResponse.
 	defer gateway.ReleaseGatewayContext(ctx)
 	defer cancel()
+	defer gwRequest.BodyReader.Close() //nolint:errcheck
 	if err := h.doWithRecover(ctx); err != nil {
 		h.errHandler.Handle(ctx, err, writer)
-		// Last-resort close: a Gateway implementation may have left the
-		// backend body open when returning an error.
 		if ctx.Response != nil && ctx.Response.BodyReader != nil {
 			_ = ctx.Response.BodyReader.Close()
 		}
@@ -128,14 +121,8 @@ func (h *GatewayHandler) doWithRecover(ctx *gateway.Context) (err error) {
 func (h *GatewayHandler) writeResponse(writer http.ResponseWriter, ctx *gateway.Context) {
 	response := ctx.Response
 	defer response.BodyReader.Close() //nolint:errcheck
-	// The backend hop-by-hop headers belong to the gateway-backend connection:
-	// forwarding e.g. its "Connection: close" would tear down the client keep-alive.
 	shared.RemoveHopByHopHeaders(response.Headers)
 	shared.WriteHeader(writer, response.Headers)
-	// Set after copying the backend headers: filters may have changed the body, so
-	// the buffered length is authoritative over any backend Content-Length. With an
-	// unknown length the server picks the transfer encoding itself (chunked on
-	// HTTP/1.1); setting Transfer-Encoding by hand is invalid on HTTP/2.
 	if length := response.BodyReader.Len(); length >= 0 {
 		writer.Header().Set("Content-Length", strconv.FormatInt(length, 10))
 	} else {

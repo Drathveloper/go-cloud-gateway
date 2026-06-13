@@ -122,17 +122,43 @@ func (f *RequestResponseLogger) PostProcess(ctx *gateway.Context) error {
 			"headers", ctx.Response.Headers)
 		return nil
 	}
+	// Snapshot everything logged from onDone now: the callback fires later, from
+	// writeResponse, after the hop-by-hop headers have been stripped from the live map
+	// and while the only safe references are the ones captured here.
+	logger := ctx.Logger
+	status := ctx.Response.Status
+	headers := ctx.Response.Headers.Clone()
 	var body []byte
-	if err := ctx.Response.BodyReader.CaptureWithLimit(f.maxBodyBytes); err == nil {
-		// The captured buffer is logged as-is: re-reading the body here would
-		// copy it twice more for no benefit.
-		body = ctx.Response.BodyReader.Bytes()
-	}
-	ctx.Logger.Log(ctx, f.level, "Returned response",
-		"status", ctx.Response.Status,
-		"headers", ctx.Response.Headers,
-		"body", body)
+	ctx.Response.BodyReader.ObserveStream(
+		func(chunk []byte) {
+			body = appendUpToLimit(body, chunk, f.maxBodyBytes)
+		},
+		func(total int64, err error) {
+			attrs := []any{"status", status, "headers", headers, "body", body, "bytes", total}
+			if err != nil {
+				attrs = append(attrs, "error", err)
+			}
+			logger.Log(ctx, f.level, "Returned response", attrs...)
+		},
+	)
 	return nil
+}
+
+// appendUpToLimit appends chunk to body, capping the total at maxBytes bytes. A negative
+// maxBytes means no cap. It keeps the logged prefix bounded while the full body still
+// streams to the client untouched.
+func appendUpToLimit(body, chunk []byte, maxBytes int64) []byte {
+	if maxBytes < 0 {
+		return append(body, chunk...)
+	}
+	remaining := maxBytes - int64(len(body))
+	if remaining <= 0 {
+		return body
+	}
+	if int64(len(chunk)) > remaining {
+		chunk = chunk[:remaining]
+	}
+	return append(body, chunk...)
 }
 
 // Name returns the name of the filter.

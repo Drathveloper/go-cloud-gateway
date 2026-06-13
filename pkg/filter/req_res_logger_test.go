@@ -266,13 +266,16 @@ func TestRequestResponseLogger_PostProcess(t *testing.T) {
 			var buf bytes.Buffer
 			logger := slog.New(slog.NewTextHandler(&buf, nil))
 			var bodyBytes io.ReadCloser
+			contentLength := int64(0)
 			if tt.body != nil {
 				bodyBytes = io.NopCloser(bytes.NewBuffer(tt.body))
+				contentLength = int64(len(tt.body))
 			}
 			res := &http.Response{
-				StatusCode: tt.status,
-				Header:     tt.headers,
-				Body:       bodyBytes,
+				StatusCode:    tt.status,
+				Header:        tt.headers,
+				Body:          bodyBytes,
+				ContentLength: contentLength,
 			}
 			gwRes := gateway.NewGatewayResponse(res)
 			ctx, _ := gateway.NewGatewayContext(t.Context(), &gateway.Route{}, nil)
@@ -281,10 +284,112 @@ func TestRequestResponseLogger_PostProcess(t *testing.T) {
 
 			f := filter.NewRequestResponseLoggerFilter(slog.LevelInfo, filter.DefaultMaxLoggedBodyBytes, true)
 			_ = f.PostProcess(ctx)
+			// The response is logged when its body finishes streaming to the client:
+			// drain it as writeResponse would to trigger the log line.
+			if _, err := io.Copy(io.Discard, ctx.Response.BodyReader); err != nil {
+				t.Fatalf("draining response body failed: %v", err)
+			}
 
 			if !strings.Contains(buf.String(), tt.expected) {
 				t.Errorf("expected: %s\nactual: %s", tt.expected, buf.String())
 			}
 		})
+	}
+}
+
+func newLoggedResponseContext(t *testing.T, buf *bytes.Buffer, body []byte, length int64) *gateway.Context {
+	t.Helper()
+	logger := slog.New(slog.NewTextHandler(buf, nil))
+	res := gateway.NewReplayableBody(io.NopCloser(bytes.NewReader(body)), length)
+	ctx, _ := gateway.NewGatewayContext(t.Context(), &gateway.Route{}, nil)
+	ctx.Logger = logger
+	ctx.Response = &gateway.Response{
+		Status:     http.StatusOK,
+		Headers:    http.Header{"Content-Type": {"text/event-stream"}},
+		BodyReader: res,
+	}
+	return ctx
+}
+
+func TestRequestResponseLogger_PostProcess_DoesNotBufferStream(t *testing.T) {
+	payload := []byte("event: one\n\nevent: two\n\n")
+	var buf bytes.Buffer
+	ctx := newLoggedResponseContext(t, &buf, payload, -1)
+
+	f := filter.NewRequestResponseLoggerFilter(slog.LevelInfo, filter.DefaultMaxLoggedBodyBytes, true)
+	if err := f.PostProcess(ctx); err != nil {
+		t.Fatalf("post-process failed: %v", err)
+	}
+	// The body has not streamed yet, so nothing is logged: PostProcess did not buffer it.
+	if strings.Contains(buf.String(), "Returned response") {
+		t.Fatalf("expected no response log before the body streamed, got: %s", buf.String())
+	}
+	// Streaming to the client both forwards the body untouched and triggers the log.
+	got, err := io.ReadAll(ctx.Response.BodyReader)
+	if err != nil {
+		t.Fatalf("streaming response body failed: %v", err)
+	}
+	if !bytes.Equal(got, payload) {
+		t.Errorf("expected body to remain fully forwardable, got %q", got)
+	}
+	logged := buf.String()
+	if !strings.Contains(logged, "Returned response") || !strings.Contains(logged, "event: one") {
+		t.Errorf("expected the response logged with its body after streaming, got: %s", logged)
+	}
+	if !strings.Contains(logged, "bytes=24") {
+		t.Errorf("expected the total byte count logged, got: %s", logged)
+	}
+}
+
+func TestRequestResponseLogger_PostProcess_BodyOverLimitLogsTruncatedPrefix(t *testing.T) {
+	payload := bytes.Repeat([]byte("a"), 1024)
+	var buf bytes.Buffer
+	ctx := newLoggedResponseContext(t, &buf, payload, int64(len(payload)))
+
+	f := filter.NewRequestResponseLoggerFilter(slog.LevelInfo, 16, true)
+	if err := f.PostProcess(ctx); err != nil {
+		t.Fatalf("post-process failed: %v", err)
+	}
+	got, err := io.ReadAll(ctx.Response.BodyReader)
+	if err != nil {
+		t.Fatalf("streaming response body failed: %v", err)
+	}
+	if !bytes.Equal(got, payload) {
+		t.Errorf("expected over-limit body to remain fully forwardable, got %d bytes want %d", len(got), len(payload))
+	}
+	logged := buf.String()
+	// The logged prefix is capped at the limit, but the true size is reported.
+	if !strings.Contains(logged, `body="aaaaaaaaaaaaaaaa"`) {
+		t.Errorf("expected a 16-byte truncated prefix logged, got: %s", logged)
+	}
+	if strings.Contains(logged, strings.Repeat("a", 17)) {
+		t.Errorf("expected the logged body capped at 16 bytes, got: %s", logged)
+	}
+	if !strings.Contains(logged, "bytes=1024") {
+		t.Errorf("expected the true byte count logged, got: %s", logged)
+	}
+}
+
+func TestRequestResponseLogger_PostProcess_TruncatedStreamLogsError(t *testing.T) {
+	var buf bytes.Buffer
+	ctx := newLoggedResponseContext(t, &buf, []byte("partial event"), -1)
+
+	f := filter.NewRequestResponseLoggerFilter(slog.LevelInfo, filter.DefaultMaxLoggedBodyBytes, true)
+	if err := f.PostProcess(ctx); err != nil {
+		t.Fatalf("post-process failed: %v", err)
+	}
+	// Read part of the stream, then close it before EOF (client disconnect / pipeline error).
+	if _, err := ctx.Response.BodyReader.Read(make([]byte, 4)); err != nil {
+		t.Fatalf("partial read failed: %v", err)
+	}
+	if err := ctx.Response.BodyReader.Close(); err != nil {
+		t.Fatalf("close failed: %v", err)
+	}
+	logged := buf.String()
+	if !strings.Contains(logged, "Returned response") {
+		t.Fatalf("expected the response logged on truncation, got: %s", logged)
+	}
+	if !strings.Contains(logged, "body stream closed before EOF") {
+		t.Errorf("expected the truncation error logged, got: %s", logged)
 	}
 }
