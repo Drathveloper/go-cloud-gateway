@@ -85,6 +85,9 @@ gateway:
 * **Global Filters**: Filters applied to all incoming requests.
 * **Settings**: Global settings such as timeouts and client configurations.
 
+Durations are strings with a unit, such as `30s`, `1m30s` or `250ms`. A bare number like
+`30` is rejected when the configuration is read.
+
 ### Timeouts and streaming routes
 
 Every route has a timeout: its own `timeout`, else `global-timeout`, else 10 seconds. It

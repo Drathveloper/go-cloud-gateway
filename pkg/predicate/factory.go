@@ -35,7 +35,8 @@ func (f *Factory) Build(name string, args map[string]any) (gateway.Predicate, er
 	if f.registry[name] != nil {
 		fi, err := f.registry[name].Build(args)
 		if err != nil {
-			return nil, fmt.Errorf("%w: name %s and args %v", ErrInvalidPredicate, name, args)
+			// the cause is wrapped too: it is the only part that says what is wrong with the args
+			return nil, fmt.Errorf("%w: name %s and args %v: %w", ErrInvalidPredicate, name, args, err)
 		}
 		return fi, nil
 	}
