@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -10,6 +11,9 @@ import (
 
 	"github.com/drathveloper/go-cloud-gateway/pkg/circuitbreaker"
 )
+
+// ErrInvalidRouteURI is returned when the route uri is not an http or https url with a host.
+var ErrInvalidRouteURI = errors.New("invalid route uri")
 
 // CircuitBreaker is a circuit breaker.
 //
@@ -41,6 +45,9 @@ type Route struct {
 }
 
 // NewRoute creates a new route.
+//
+// The uri must be an http or https url with a host, such as http://localhost:8080.
+// Anything else returns an error wrapping ErrInvalidRouteURI.
 func NewRoute(
 	routeID string,
 	uri string,
@@ -52,7 +59,14 @@ func NewRoute(
 	logger *slog.Logger) (*Route, error) {
 	routeURI, err := url.Parse(uri)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse route uri: %w", err)
+		return nil, fmt.Errorf("%w: %w", ErrInvalidRouteURI, err)
+	}
+	// url.Parse also accepts host:port, a bare name or a path. Those build a route that
+	// can never reach a backend, so they are rejected here instead of failing every
+	// request once the gateway is running.
+	if (routeURI.Scheme != "http" && routeURI.Scheme != "https") || routeURI.Host == "" {
+		return nil, fmt.Errorf(
+			"%w %q: expected an http or https url with a host, such as http://localhost:8080", ErrInvalidRouteURI, uri)
 	}
 	return &Route{
 		ID:             routeID,

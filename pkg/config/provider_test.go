@@ -178,7 +178,7 @@ func TestNewRoutes(t *testing.T) {
 					Routes: []config.Route{
 						{
 							ID:  "r1",
-							URI: "someUri",
+							URI: "https://example.com",
 							Predicates: []config.ParameterizedItem{
 								{
 									Name: "Method",
@@ -212,7 +212,7 @@ func TestNewRoutes(t *testing.T) {
 					Routes: []config.Route{
 						{
 							ID:  "r1",
-							URI: "someUri",
+							URI: "https://example.com",
 							Predicates: []config.ParameterizedItem{
 								{
 									Name: "Method",
@@ -229,6 +229,72 @@ func TestNewRoutes(t *testing.T) {
 			},
 			expected:    nil,
 			expectedErr: errors.New("map routes from config to gateway failed: parse filters failed: filter builder failed: filter builder not found for filter Invent"),
+		},
+		{
+			name: "new routes should return error with the cause when predicate args are not valid",
+			config: &config.Config{
+				Gateway: config.Gateway{
+					Routes: []config.Route{
+						{
+							ID:  "r1",
+							URI: "https://example.com",
+							Predicates: []config.ParameterizedItem{
+								{
+									Name: "Cookie",
+									Args: map[string]any{
+										"name":   "session",
+										"regexp": "(",
+									},
+								},
+							},
+							Timeout: config.Duration{},
+						},
+					},
+				},
+			},
+			expected:    nil,
+			expectedErr: errors.New("map routes from config to gateway failed: parse predicates failed: invalid predicate args: name Cookie and args map[name:session regexp:(]: invalid cookie regexp: error parsing regexp: missing closing ): `(`"),
+		},
+		{
+			name: "new routes should return error with the cause when filter args are not valid",
+			config: &config.Config{
+				Gateway: config.Gateway{
+					Routes: []config.Route{
+						{
+							ID:  "r1",
+							URI: "https://example.com",
+							Filters: []config.ParameterizedItem{
+								{
+									Name: "RewritePath",
+									Args: map[string]any{
+										"regexp":      "(",
+										"replacement": "/x",
+									},
+								},
+							},
+							Timeout: config.Duration{},
+						},
+					},
+				},
+			},
+			expected:    nil,
+			expectedErr: errors.New("map routes from config to gateway failed: parse filters failed: filter builder failed: filter RewritePath and args map[regexp:( replacement:/x]: failed to build rewrite path filter: error parsing regexp: missing closing ): `(`"),
+		},
+		{
+			name: "new routes should return error when route uri has no scheme",
+			config: &config.Config{
+				Gateway: config.Gateway{
+					Routes: []config.Route{
+						{
+							ID:      "r1",
+							URI:     "localhost:8080",
+							Timeout: config.Duration{},
+						},
+					},
+				},
+			},
+			expected:    nil,
+			expectedErr: errors.New("map routes from config to gateway failed: invalid route uri \"localhost:8080\": expected an http or https url with a host, such as http://localhost:8080"),
 		},
 		{
 			name: "new routes should return empty when predicates are not valid",
@@ -369,7 +435,8 @@ func TestNewRoutes(t *testing.T) {
 				filter.NewFactory(filter.BuilderRegistry),
 				logger)
 			if len(routes) != len(tt.expected) {
-				t.Errorf("expected len %v actual len %v", tt.expected, routes)
+				// fatal: the comparisons below index both slices
+				t.Fatalf("expected len %v actual len %v, err %v", tt.expected, routes, err)
 			}
 			for i := range routes {
 				if !reflect.DeepEqual(routes[i].Timeout, tt.expected[i].Timeout) {
@@ -691,7 +758,7 @@ F0WydPKUjl3tmQRxYd9C8zDt6yB/fQbIoM/uGgZ0ZoZ+E5hvLVe+rYk=
 				switch client := c.(type) {
 				case *httpclient.TransportHTTPClient:
 					transport := client.Transport.(*http.Transport)
-					return transport.DisableCompression
+					return !transport.DisableCompression
 				default:
 					return false
 				}
@@ -780,6 +847,168 @@ F0WydPKUjl3tmQRxYd9C8zDt6yB/fQbIoM/uGgZ0ZoZ+E5hvLVe+rYk=
 				}
 			} else if client != nil {
 				t.Error("Expected nil client, got non-nil")
+			}
+		})
+	}
+}
+
+// transportSettings are the settings of a transport that the http client config drives
+// and that can be read back from it.
+type transportSettings struct {
+	idleConnTimeout       time.Duration
+	tlsHandshakeTimeout   time.Duration
+	responseHeaderTimeout time.Duration
+	maxIdleConns          int
+	maxIdleConnsPerHost   int
+	maxConnsPerHost       int
+	disableCompression    bool
+	http2                 bool
+}
+
+func newTransportSettings(transport *http.Transport) transportSettings {
+	return transportSettings{
+		idleConnTimeout:       transport.IdleConnTimeout,
+		tlsHandshakeTimeout:   transport.TLSHandshakeTimeout,
+		responseHeaderTimeout: transport.ResponseHeaderTimeout,
+		maxIdleConns:          transport.MaxIdleConns,
+		maxIdleConnsPerHost:   transport.MaxIdleConnsPerHost,
+		maxConnsPerHost:       transport.MaxConnsPerHost,
+		disableCompression:    transport.DisableCompression,
+		// configuring HTTP/2 on a transport leaves it among its protocols
+		http2: transport.Protocols != nil && transport.Protocols.HTTP2(),
+	}
+}
+
+func TestNewHTTPClient_TransportSettings(t *testing.T) {
+	newPool := func() *config.Pool {
+		return &config.Pool{
+			Timeout:               &config.Duration{Duration: 30 * time.Second},
+			MaxIdleConns:          100,
+			MaxIdleConnsPerHost:   20,
+			MaxConnsPerHost:       50,
+			IdleConnTimeout:       &config.Duration{Duration: 90 * time.Second},
+			TLSHandshakeTimeout:   &config.Duration{Duration: 15 * time.Second},
+			KeepAlive:             &config.Duration{Duration: 30 * time.Second},
+			ResponseHeaderTimeout: &config.Duration{Duration: 10 * time.Second},
+		}
+	}
+	defaultSettings := transportSettings{
+		idleConnTimeout:       config.DefaultIdleConnTimeout,
+		tlsHandshakeTimeout:   config.DefaultTimeout,
+		responseHeaderTimeout: 0,
+		maxIdleConns:          config.DefaultConns,
+		maxIdleConnsPerHost:   config.DefaultConns,
+		maxConnsPerHost:       config.DefaultConns,
+		disableCompression:    false,
+		http2:                 false,
+	}
+	tests := []struct {
+		cfg      *config.Config
+		name     string
+		expected transportSettings
+	}{
+		{
+			name:     "new http client should use defaults when config is nil",
+			cfg:      nil,
+			expected: defaultSettings,
+		},
+		{
+			name:     "new http client should use defaults when http client section is absent",
+			cfg:      &config.Config{},
+			expected: defaultSettings,
+		},
+		{
+			name: "new http client should use defaults when http client section is empty",
+			cfg: &config.Config{
+				Gateway: config.Gateway{
+					HTTPClient: &config.HTTPClient{},
+				},
+			},
+			expected: defaultSettings,
+		},
+		{
+			name: "new http client should apply http2 and compression settings when pool is absent",
+			cfg: &config.Config{
+				Gateway: config.Gateway{
+					HTTPClient: &config.HTTPClient{
+						EnableHTTP2:        true,
+						DisableCompression: true,
+					},
+				},
+			},
+			expected: transportSettings{
+				idleConnTimeout:       config.DefaultIdleConnTimeout,
+				tlsHandshakeTimeout:   config.DefaultTimeout,
+				responseHeaderTimeout: 0,
+				maxIdleConns:          config.DefaultConns,
+				maxIdleConnsPerHost:   config.DefaultConns,
+				maxConnsPerHost:       config.DefaultConns,
+				disableCompression:    true,
+				http2:                 true,
+			},
+		},
+		{
+			name: "new http client should keep compression enabled and http2 disabled when only pool is set",
+			cfg: &config.Config{
+				Gateway: config.Gateway{
+					HTTPClient: &config.HTTPClient{
+						Pool: newPool(),
+					},
+				},
+			},
+			expected: transportSettings{
+				idleConnTimeout:       90 * time.Second,
+				tlsHandshakeTimeout:   15 * time.Second,
+				responseHeaderTimeout: 10 * time.Second,
+				maxIdleConns:          100,
+				maxIdleConnsPerHost:   20,
+				maxConnsPerHost:       50,
+				disableCompression:    false,
+				http2:                 false,
+			},
+		},
+		{
+			name: "new http client should apply http2 and compression settings when pool is set",
+			cfg: &config.Config{
+				Gateway: config.Gateway{
+					HTTPClient: &config.HTTPClient{
+						EnableHTTP2:        true,
+						DisableCompression: true,
+						Pool:               newPool(),
+					},
+				},
+			},
+			expected: transportSettings{
+				idleConnTimeout:       90 * time.Second,
+				tlsHandshakeTimeout:   15 * time.Second,
+				responseHeaderTimeout: 10 * time.Second,
+				maxIdleConns:          100,
+				maxIdleConnsPerHost:   20,
+				maxConnsPerHost:       50,
+				disableCompression:    true,
+				http2:                 true,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client, err := config.NewHTTPClient(tt.cfg)
+			if err != nil {
+				t.Fatalf("NewHTTPClient() error = %v", err)
+			}
+			transportClient, ok := client.(*httpclient.TransportHTTPClient)
+			if !ok {
+				t.Fatalf("expected a transport http client actual %T", client)
+			}
+			transport, ok := transportClient.Transport.(*http.Transport)
+			if !ok {
+				t.Fatalf("expected an http transport actual %T", transportClient.Transport)
+			}
+
+			actual := newTransportSettings(transport)
+
+			if tt.expected != actual {
+				t.Errorf("expected %+v actual %+v", tt.expected, actual)
 			}
 		})
 	}
@@ -899,6 +1128,91 @@ func TestNewHTTPClient_PoolTimeoutDoesNotCutSlowBodies(t *testing.T) {
 	}
 	if string(body) != "firstsecond" {
 		t.Errorf("expected body %q, actual %q", "firstsecond", body)
+	}
+}
+
+func TestNewHTTPClient_EnableHTTP2(t *testing.T) {
+	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	server.EnableHTTP2 = true
+	server.StartTLS()
+	defer server.Close()
+
+	newPool := func() *config.Pool {
+		return &config.Pool{
+			Timeout:               &config.Duration{Duration: 5 * time.Second},
+			MaxIdleConns:          10,
+			MaxIdleConnsPerHost:   10,
+			MaxConnsPerHost:       10,
+			IdleConnTimeout:       &config.Duration{Duration: 90 * time.Second},
+			TLSHandshakeTimeout:   &config.Duration{Duration: 5 * time.Second},
+			KeepAlive:             &config.Duration{Duration: 30 * time.Second},
+			ResponseHeaderTimeout: &config.Duration{Duration: 10 * time.Second},
+		}
+	}
+	tests := []struct {
+		pool          *config.Pool
+		name          string
+		expectedProto int
+		enableHTTP2   bool
+	}{
+		{
+			name:          "http2 enabled without pool should talk http2 to the backend",
+			enableHTTP2:   true,
+			pool:          nil,
+			expectedProto: 2,
+		},
+		{
+			name:          "http2 enabled with pool should talk http2 to the backend",
+			enableHTTP2:   true,
+			pool:          newPool(),
+			expectedProto: 2,
+		},
+		{
+			name:          "http2 disabled without pool should talk http1 to the backend",
+			enableHTTP2:   false,
+			pool:          nil,
+			expectedProto: 1,
+		},
+		{
+			name:          "http2 disabled with pool should talk http1 to the backend",
+			enableHTTP2:   false,
+			pool:          newPool(),
+			expectedProto: 1,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &config.Config{
+				Gateway: config.Gateway{
+					HTTPClient: &config.HTTPClient{
+						// the test server presents a self-signed certificate
+						InsecureTLSVerify: true,
+						EnableHTTP2:       tt.enableHTTP2,
+						Pool:              tt.pool,
+					},
+				},
+			}
+			client, err := config.NewHTTPClient(cfg)
+			if err != nil {
+				t.Fatalf("NewHTTPClient() error = %v", err)
+			}
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, server.URL, nil)
+			if err != nil {
+				t.Fatalf("failed to build request: %v", err)
+			}
+
+			res, err := client.Do(req)
+			if err != nil {
+				t.Fatalf("request failed: %v", err)
+			}
+			defer res.Body.Close() //nolint:errcheck
+
+			if res.ProtoMajor != tt.expectedProto {
+				t.Errorf("expected http major version %v actual %v", tt.expectedProto, res.ProtoMajor)
+			}
+		})
 	}
 }
 

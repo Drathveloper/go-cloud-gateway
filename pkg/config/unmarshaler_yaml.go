@@ -11,23 +11,16 @@ var ErrUnmarshalDuration = errors.New("unmarshal duration failed")
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface for type Duration.
 //
-// The unmarshaler supports unmarshaling of float64 and string values.
-//
-// The unmarshaler supports unmarshaling of the following formats:
-//
-// 1. 30s
-// 2. 30
-// 3. 30.0
-// 4. 30.000000000.
+// Only a string in the time.ParseDuration format is accepted, such as 30s, 1m30s or
+// 250ms. A bare number is rejected: see Duration.
 func (d *Duration) UnmarshalYAML(unmarshal func(any2 any) error) error {
 	var val any
 	if err := unmarshal(&val); err != nil {
 		return ErrUnmarshalDuration
 	}
 	switch value := val.(type) {
-	case int:
-		d.Duration = time.Duration(value)
-		return nil
+	case int, int64, uint64, float64:
+		return newDurationWithoutUnitError(value)
 	case string:
 		var err error
 		d.Duration, err = time.ParseDuration(value)
@@ -38,4 +31,11 @@ func (d *Duration) UnmarshalYAML(unmarshal func(any2 any) error) error {
 	default:
 		return fmt.Errorf("%w: invalid duration: %v", ErrUnmarshalDuration, val)
 	}
+}
+
+// newDurationWithoutUnitError builds the error for a duration written as a bare number.
+// It names the fix because the mistake is easy to make and the number alone is ambiguous.
+func newDurationWithoutUnitError(value any) error {
+	return fmt.Errorf(
+		"%w: duration %v has no unit: use a string with a unit such as \"30s\"", ErrUnmarshalDuration, value)
 }

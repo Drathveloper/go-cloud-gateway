@@ -85,6 +85,9 @@ gateway:
 * **Global Filters**: Filters applied to all incoming requests.
 * **Settings**: Global settings such as timeouts and client configurations.
 
+Durations are strings with a unit, such as `30s`, `1m30s` or `250ms`. A bare number like
+`30` is rejected when the configuration is read.
+
 ### Path and Host patterns
 
 The `Path` predicate matches the request path segment by segment:

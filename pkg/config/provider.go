@@ -58,10 +58,23 @@ func buildHTTPClient(cfg *Config) (gateway.HTTPClient, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to build TLS config: %w", err)
 	}
-	if cfg != nil && cfg.Gateway.HTTPClient != nil && cfg.Gateway.HTTPClient.Pool != nil {
-		return buildConfiguredHTTPClient(cfg, tlsConfig)
+	transport, err := buildTransport(httpClientConfig(cfg), tlsConfig)
+	if err != nil {
+		return nil, err
 	}
-	return buildDefaultHTTPClient(tlsConfig), nil
+	// No client-wide timeout exists: it would cap the whole exchange including the body
+	// copy, cutting long downloads and streams. Each request is bounded by the per-route
+	// context deadline instead; pool.timeout only bounds dialing.
+	return httpclient.NewTransportHTTPClient(transport), nil
+}
+
+// httpClientConfig returns the http client section of the config, or an empty one when
+// the config or the section is missing, so that every setting falls back to its default.
+func httpClientConfig(cfg *Config) HTTPClient {
+	if cfg == nil || cfg.Gateway.HTTPClient == nil {
+		return HTTPClient{}
+	}
+	return *cfg.Gateway.HTTPClient
 }
 
 func buildTLSConfig(cfg *Config) (*tls.Config, error) {
@@ -108,53 +121,84 @@ func isInsecureSkipVerify(cfg *Config) bool {
 	return false
 }
 
-func buildConfiguredHTTPClient(config *Config, tlsConfig *tls.Config) (*httpclient.TransportHTTPClient, error) {
+// poolSettings holds the connection pool values the transport is built with.
+type poolSettings struct {
+	dialTimeout           time.Duration
+	keepAlive             time.Duration
+	idleConnTimeout       time.Duration
+	tlsHandshakeTimeout   time.Duration
+	responseHeaderTimeout time.Duration
+	maxIdleConns          int
+	maxIdleConnsPerHost   int
+	maxConnsPerHost       int
+}
+
+// newPoolSettings returns the default pool values overridden by the pool section when
+// there is one.
+//
+// The response header timeout has no default: the per-route deadline already bounds the
+// wait for the backend headers.
+func newPoolSettings(pool *Pool) poolSettings {
+	settings := poolSettings{
+		dialTimeout:         DefaultTimeout,
+		keepAlive:           DefaultKeepAlive,
+		idleConnTimeout:     DefaultIdleConnTimeout,
+		tlsHandshakeTimeout: DefaultTimeout,
+		maxIdleConns:        DefaultConns,
+		maxIdleConnsPerHost: DefaultConns,
+		maxConnsPerHost:     DefaultConns,
+	}
+	if pool == nil {
+		return settings
+	}
+	settings.dialTimeout = durationOrDefault(pool.Timeout, settings.dialTimeout)
+	settings.keepAlive = durationOrDefault(pool.KeepAlive, settings.keepAlive)
+	settings.idleConnTimeout = durationOrDefault(pool.IdleConnTimeout, settings.idleConnTimeout)
+	settings.tlsHandshakeTimeout = durationOrDefault(pool.TLSHandshakeTimeout, settings.tlsHandshakeTimeout)
+	settings.responseHeaderTimeout = durationOrDefault(pool.ResponseHeaderTimeout, settings.responseHeaderTimeout)
+	// The counters are taken as they are: zero keeps its net/http meaning (no limit, or
+	// the net/http default for idle connections per host) for a pool built in code.
+	settings.maxIdleConns = pool.MaxIdleConns
+	settings.maxIdleConnsPerHost = pool.MaxIdleConnsPerHost
+	settings.maxConnsPerHost = pool.MaxConnsPerHost
+	return settings
+}
+
+// durationOrDefault returns the configured duration, or the default when it is not set.
+// Validation requires every pool duration, but a pool built in code may leave some out.
+func durationOrDefault(value *Duration, defaultValue time.Duration) time.Duration {
+	if value == nil {
+		return defaultValue
+	}
+	return value.Duration
+}
+
+// buildTransport is the only place where the transport is assembled, so that a client
+// setting cannot be honored with a pool section and silently dropped without one.
+func buildTransport(clientCfg HTTPClient, tlsConfig *tls.Config) (*http.Transport, error) {
+	pool := newPoolSettings(clientCfg.Pool)
 	transport := &http.Transport{
 		Proxy:           http.ProxyFromEnvironment,
 		TLSClientConfig: tlsConfig,
 		DialContext: (&net.Dialer{
-			Timeout:   config.Gateway.HTTPClient.Pool.Timeout.Duration,
-			KeepAlive: config.Gateway.HTTPClient.Pool.KeepAlive.Duration,
+			Timeout:   pool.dialTimeout,
+			KeepAlive: pool.keepAlive,
 		}).DialContext,
-		MaxIdleConns:          config.Gateway.HTTPClient.Pool.MaxIdleConns,
-		MaxIdleConnsPerHost:   config.Gateway.HTTPClient.Pool.MaxIdleConnsPerHost,
-		MaxConnsPerHost:       config.Gateway.HTTPClient.Pool.MaxConnsPerHost,
-		IdleConnTimeout:       config.Gateway.HTTPClient.Pool.IdleConnTimeout.Duration,
-		TLSHandshakeTimeout:   config.Gateway.HTTPClient.Pool.TLSHandshakeTimeout.Duration,
-		ResponseHeaderTimeout: config.Gateway.HTTPClient.Pool.ResponseHeaderTimeout.Duration,
+		MaxIdleConns:          pool.maxIdleConns,
+		MaxIdleConnsPerHost:   pool.maxIdleConnsPerHost,
+		MaxConnsPerHost:       pool.maxConnsPerHost,
+		IdleConnTimeout:       pool.idleConnTimeout,
+		TLSHandshakeTimeout:   pool.tlsHandshakeTimeout,
+		ResponseHeaderTimeout: pool.responseHeaderTimeout,
 		ExpectContinueTimeout: ContinueDefaultTimeout,
-		DisableCompression:    config.Gateway.HTTPClient.DisableCompression,
+		DisableCompression:    clientCfg.DisableCompression,
 	}
-	if config.Gateway.HTTPClient.EnableHTTP2 {
+	if clientCfg.EnableHTTP2 {
 		if err := http2.ConfigureTransport(transport); err != nil {
 			return nil, fmt.Errorf("failed to configure http2 transport: %w", err)
 		}
 	}
-	// No client-wide timeout exists on this path: it would cap the whole exchange
-	// including the body copy, cutting long downloads and streams. Each request is
-	// bounded by the per-route context deadline instead; pool.timeout only bounds
-	// dialing.
-	return httpclient.NewTransportHTTPClient(transport), nil
-}
-
-func buildDefaultHTTPClient(tlsConfig *tls.Config) *httpclient.TransportHTTPClient {
-	transport := &http.Transport{
-		Proxy:           http.ProxyFromEnvironment,
-		TLSClientConfig: tlsConfig,
-		DialContext: (&net.Dialer{
-			Timeout:   DefaultTimeout,
-			KeepAlive: DefaultKeepAlive,
-		}).DialContext,
-		MaxIdleConns:          DefaultConns,
-		MaxIdleConnsPerHost:   DefaultConns,
-		MaxConnsPerHost:       DefaultConns,
-		IdleConnTimeout:       DefaultIdleConnTimeout,
-		TLSHandshakeTimeout:   DefaultTimeout,
-		ExpectContinueTimeout: ContinueDefaultTimeout,
-		DisableCompression:    true,
-	}
-	// No client-wide timeout: see buildConfiguredHTTPClient.
-	return httpclient.NewTransportHTTPClient(transport)
+	return transport, nil
 }
 
 //nolint:bodyclose

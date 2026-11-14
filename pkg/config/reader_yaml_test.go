@@ -58,6 +58,12 @@ func TestReaderYAML_Read(t *testing.T) {
 			expectedErr: errors.New("read yaml config failed: Key: 'Config.Gateway.Routes[0].ID' Error:Field validation for 'ID' failed on the 'required' tag"),
 		},
 		{
+			name:        "read should return error when a duration has no unit",
+			input:       "gateway:\n  routes:\n  - id: someId\n    uri: http://localhost:8001\n    timeout: 30",
+			expected:    nil,
+			expectedErr: errors.New("read yaml config failed: unmarshal duration failed: duration 30 has no unit: use a string with a unit such as \"30s\""),
+		},
+		{
 			name:        "read should return error when yaml is not well formed",
 			input:       "[",
 			expected:    nil,
