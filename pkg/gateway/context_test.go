@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
@@ -76,5 +77,67 @@ func TestNewGatewayContext_RouteTimeoutApplies(t *testing.T) {
 	}
 	if remaining := time.Until(deadline); remaining > time.Minute {
 		t.Errorf("expected deadline within the route timeout, remaining %s", remaining)
+	}
+}
+
+func TestNewGatewayContext_StreamingRouteTimeoutCancelsWithDeadlineCause(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		route := &gateway.Route{ID: "r1", Timeout: time.Minute, Streaming: true}
+
+		ctx, cancel := gateway.NewGatewayContext(t.Context(), route, &gateway.Request{})
+		defer cancel()
+
+		if _, ok := ctx.Deadline(); ok {
+			t.Error("expected a streaming route context to have no deadline")
+		}
+		time.Sleep(time.Minute - time.Second)
+		if ctx.Err() != nil {
+			t.Fatalf("expected context to be alive before the route timeout, actual %v", ctx.Err())
+		}
+		time.Sleep(2 * time.Second)
+		synctest.Wait()
+
+		select {
+		case <-ctx.Done():
+		default:
+			t.Fatal("expected context to be done after the route timeout")
+		}
+		if cause := context.Cause(ctx); !errors.Is(cause, context.DeadlineExceeded) {
+			t.Errorf("expected context.DeadlineExceeded cause, actual %v", cause)
+		}
+	})
+}
+
+func TestNewGatewayContext_StreamingRouteCancelStopsTimeout(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		route := &gateway.Route{ID: "r1", Timeout: time.Minute, Streaming: true}
+
+		ctx, cancel := gateway.NewGatewayContext(t.Context(), route, &gateway.Request{})
+		cancel()
+		time.Sleep(2 * time.Minute)
+		synctest.Wait()
+
+		if cause := context.Cause(ctx); !errors.Is(cause, context.Canceled) {
+			t.Errorf("expected context.Canceled cause, actual %v", cause)
+		}
+	})
+}
+
+func TestNewGatewayContext_StreamingRouteParentCancellationPropagates(t *testing.T) {
+	parent, cancelParent := context.WithCancel(t.Context())
+	route := &gateway.Route{ID: "r1", Timeout: time.Minute, Streaming: true}
+
+	ctx, cancel := gateway.NewGatewayContext(parent, route, &gateway.Request{})
+	defer cancel()
+
+	cancelParent()
+
+	select {
+	case <-ctx.Done():
+	default:
+		t.Fatal("expected gateway context to be done after parent cancellation")
+	}
+	if !errors.Is(ctx.Err(), context.Canceled) {
+		t.Errorf("expected context.Canceled, actual %v", ctx.Err())
 	}
 }

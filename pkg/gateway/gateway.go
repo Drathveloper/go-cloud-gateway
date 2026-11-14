@@ -39,6 +39,9 @@ func NewGateway(client HTTPClient) *Gateway {
 // Do process the gateway request. It will call all pre-process filters, the backend and the post-process filters.
 // It will return an error if the gateway request failed.
 // If the gateway request and filters are successful, it will return nil.
+//
+// On a streaming route the route timeout stops running once Do returns successfully,
+// so the response body can be streamed for as long as it lasts.
 func (g *Gateway) Do(ctx *Context) error {
 	if err := ctx.Route.Filters.PreProcessAll(ctx); err != nil {
 		return fmt.Errorf(gatewayErrMsg, ctx.Route.ID, err)
@@ -52,6 +55,12 @@ func (g *Gateway) Do(ctx *Context) error {
 	if err = ctx.Route.Filters.PostProcessAll(ctx); err != nil {
 		_ = ctx.Response.BodyReader.Close()
 		return fmt.Errorf(gatewayErrMsg, ctx.Route.ID, err)
+	}
+	if !ctx.disarmTimeout() {
+		// The timeout of a streaming route fired while the post-process filters
+		// ran: the context is already cancelled, so the body cannot be streamed.
+		_ = ctx.Response.BodyReader.Close()
+		return fmt.Errorf(gatewayErrMsg, ctx.Route.ID, context.DeadlineExceeded)
 	}
 	return nil
 }

@@ -184,6 +184,7 @@ func mapRoutesFromConfigToGateway(
 		if err != nil {
 			return nil, fmt.Errorf("map routes from config to gateway failed: %w", err)
 		}
+		buildRoute.Streaming = route.Streaming
 		out = append(out, *buildRoute)
 	}
 	return out, nil

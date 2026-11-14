@@ -21,3 +21,18 @@ func TestReleaseGatewayContext_DropsReferences(t *testing.T) {
 		t.Errorf("expected attributes cleared after release, actual %v", ctx.Attributes)
 	}
 }
+
+func TestReleaseGatewayContext_DropsStreamingTimeout(t *testing.T) {
+	route := &Route{ID: "r1", Timeout: time.Minute, Streaming: true}
+	ctx, cancel := NewGatewayContext(t.Context(), route, &Request{})
+	defer cancel()
+	if ctx.timeout == nil {
+		t.Fatal("expected a streaming route context to hold its timeout")
+	}
+
+	ReleaseGatewayContext(ctx)
+
+	if ctx.timeout != nil {
+		t.Error("expected the timeout dropped after release")
+	}
+}

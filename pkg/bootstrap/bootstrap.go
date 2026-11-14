@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/drathveloper/go-cloud-gateway/pkg/config"
 	"github.com/drathveloper/go-cloud-gateway/pkg/filter"
@@ -14,9 +15,16 @@ import (
 
 const initializeErrMsg = "gateway initialization failed: %w"
 
+// writeTimeoutGrace is the margin the server write timeout keeps over the longest route
+// timeout, so that the response to a timed out route can still be written.
+const writeTimeoutGrace = 5 * time.Second
+
 // Initialize initializes the gateway.
 //
 // The gateway is initialized with the given options.
+//
+// The server write timeout is raised when it does not cover the longest route timeout:
+// see ServerOpts.WriteTimeout.
 func Initialize(opts *Options) (*http.Server, error) {
 	for _, customPredicate := range opts.CustomPredicates {
 		predicate.BuilderRegistry.Register(customPredicate.Name, customPredicate.Builder)
@@ -49,8 +57,23 @@ func Initialize(opts *Options) (*http.Server, error) {
 		Addr:              fmt.Sprintf(":%d", opts.ServerOptions.Port),
 		ReadHeaderTimeout: opts.ServerOptions.ReadHeaderTimeout,
 		IdleTimeout:       opts.ServerOptions.IdleTimeout,
-		WriteTimeout:      opts.ServerOptions.WriteTimeout,
+		WriteTimeout:      serverWriteTimeout(opts.ServerOptions.WriteTimeout, routes),
 		ReadTimeout:       opts.ServerOptions.ReadTimeout,
 		MaxHeaderBytes:    opts.ServerOptions.MaxHeaderBytes,
 	}, nil
+}
+
+// serverWriteTimeout returns the write timeout the server must run with. The server
+// write timeout starts counting before the route timeout does, so when it is not the
+// longer of the two the connection is closed before the gateway can answer 504 Gateway
+// Timeout, and the route timeout is never reached. A non-positive value means no write
+// timeout and is left untouched.
+func serverWriteTimeout(configured time.Duration, routes gateway.Routes) time.Duration {
+	if configured <= 0 {
+		return configured
+	}
+	for i := range routes {
+		configured = max(configured, routes[i].Timeout+writeTimeoutGrace)
+	}
+	return configured
 }
