@@ -56,12 +56,20 @@ type ParameterizedItem struct {
 }
 
 // HTTPClient represents the gateway http client config.
+//
+// Every field applies whether or not Pool is set: a missing Pool only means the default
+// pool values are used.
 type HTTPClient struct {
-	MTLS               *MTLS `json:"mtls"                yaml:"mtls"`
-	Pool               *Pool `json:"pool"                yaml:"pool"`
-	InsecureTLSVerify  bool  `json:"insecure-tls-verify" yaml:"insecure-tls-verify"`
-	EnableHTTP2        bool  `json:"enable-http2"        yaml:"enable-http2"`
-	DisableCompression bool  `json:"disable-compression" yaml:"disable-compression"`
+	MTLS              *MTLS `json:"mtls"                yaml:"mtls"`
+	Pool              *Pool `json:"pool"                yaml:"pool"`
+	InsecureTLSVerify bool  `json:"insecure-tls-verify" yaml:"insecure-tls-verify"`
+	// EnableHTTP2 defaults to false.
+	EnableHTTP2 bool `json:"enable-http2" yaml:"enable-http2"`
+	// DisableCompression defaults to false, also when the whole http client section is
+	// missing: the client then asks the backend for gzip on requests that carry no
+	// Accept-Encoding header and decompresses those responses itself. Set it to true to
+	// forward backend responses exactly as they are encoded.
+	DisableCompression bool `json:"disable-compression" yaml:"disable-compression"`
 }
 
 // Pool represents the gateway http client pool config.
@@ -90,12 +98,14 @@ type MTLS struct {
 
 // Duration represents a time.Duration with a custom unmarshaler.
 //
-// The unmarshaler supports unmarshaling of float64 and string values.
+// The only supported format is the time.ParseDuration string: a number followed by a
+// unit, such as "30s", "1m30s" or "250ms".
 //
-// The unmarshaler supports unmarshaling of the following formats:
+// A bare number such as 30 is rejected with ErrUnmarshalDuration. It carries no unit, and
+// reading it as nanoseconds would silently turn a 30 meant as seconds into a timeout that
+// fails every request.
 //
-// 1. 30s
-// 2. 30.
+// An absent field keeps the zero value, which the gateway maps to its defaults.
 type Duration struct {
 	time.Duration
 }
