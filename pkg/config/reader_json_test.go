@@ -80,3 +80,21 @@ func TestReaderJSON_Read(t *testing.T) {
 		})
 	}
 }
+
+func TestReaderJSON_Read_StreamingRoute(t *testing.T) {
+	input := `{"gateway":{"routes":[
+		{"id":"r1","uri":"http://localhost:8001","streaming":true},
+		{"id":"r2","uri":"http://localhost:8001"}]}}`
+
+	cfg, err := config.NewReaderJSON(validator.New()).Read([]byte(input))
+	if err != nil {
+		t.Fatalf("expected nil err actual %v", err)
+	}
+
+	if !cfg.Gateway.Routes[0].Streaming {
+		t.Error("expected route r1 to be a streaming route")
+	}
+	if cfg.Gateway.Routes[1].Streaming {
+		t.Error("expected route r2 to be a regular route")
+	}
+}

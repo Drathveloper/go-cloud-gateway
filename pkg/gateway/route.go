@@ -33,6 +33,11 @@ type Route struct {
 	Predicates     Predicates
 	Filters        Filters
 	Timeout        time.Duration
+	// Streaming marks a route whose responses are long-lived streams (server-sent
+	// events, chunked downloads). Timeout then only bounds the time until the response
+	// is ready to be sent, and each individual write to the client, instead of the
+	// whole exchange.
+	Streaming bool
 }
 
 // NewRoute creates a new route.

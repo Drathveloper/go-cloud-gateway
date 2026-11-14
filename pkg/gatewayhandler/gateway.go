@@ -9,6 +9,7 @@ import (
 	"runtime/debug"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/drathveloper/go-cloud-gateway/internal/pkg/shared"
 	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
@@ -130,7 +131,19 @@ func (h *GatewayHandler) writeResponse(writer http.ResponseWriter, ctx *gateway.
 	}
 	writer.WriteHeader(response.Status)
 	dst := io.Writer(writer)
-	if isStreamingResponse(response) {
+	switch {
+	case ctx.Route.Streaming:
+		// The server write timeout is a deadline for the whole response and would
+		// cut the stream: it is replaced by a deadline renewed on every write, which
+		// still drops clients that stop reading. net/http clears the connection
+		// write deadline once the handler returns, so it does not leak into the
+		// next request of a kept-alive connection.
+		dst = &immediateFlushWriter{
+			dst:          writer,
+			controller:   http.NewResponseController(writer),
+			writeTimeout: ctx.Route.Timeout,
+		}
+	case isStreamingResponse(response):
 		// Without per-write flushing, streamed events would sit in the server
 		// output buffer until it fills.
 		dst = &immediateFlushWriter{dst: writer, controller: http.NewResponseController(writer)}
@@ -156,13 +169,20 @@ func isStreamingResponse(response *gateway.Response) bool {
 }
 
 // immediateFlushWriter flushes the response writer after every write so streamed
-// data is put on the wire as it is produced.
+// data is put on the wire as it is produced. A positive writeTimeout additionally
+// gives every write, flush included, its own deadline.
 type immediateFlushWriter struct {
-	dst        io.Writer
-	controller *http.ResponseController
+	dst          io.Writer
+	controller   *http.ResponseController
+	writeTimeout time.Duration
 }
 
 func (w *immediateFlushWriter) Write(output []byte) (int, error) {
+	if w.writeTimeout > 0 {
+		// Not every response writer supports deadlines: without one the write is
+		// only bounded by the server write timeout, as before.
+		_ = w.controller.SetWriteDeadline(time.Now().Add(w.writeTimeout))
+	}
 	written, err := w.dst.Write(output)
 	if err != nil {
 		return written, err //nolint:wrapcheck

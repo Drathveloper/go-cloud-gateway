@@ -25,7 +25,7 @@ The gateway's architecture is modular, comprising three main subsystems:
 
 ### Prerequisites
 
-* Go 1.24+ installed on your system.
+* Go 1.27+ installed on your system.
 
 ### Installation
 
@@ -84,6 +84,38 @@ gateway:
 * **Routes**: Define individual routes with associated predicates and filters.
 * **Global Filters**: Filters applied to all incoming requests.
 * **Settings**: Global settings such as timeouts and client configurations.
+
+### Timeouts and streaming routes
+
+Every route has a timeout: its own `timeout`, else `global-timeout`, else 10 seconds. It
+bounds the **whole exchange**, response body included, and the gateway answers
+`504 Gateway Timeout` when the backend does not reply in time.
+
+That is the wrong shape for long-lived responses such as Server-Sent Events, which would
+be cut when the timeout expires. Mark those routes as streaming:
+
+```yaml
+gateway:
+  routes:
+    - id: events
+      uri: http://localhost:8080
+      timeout: 5s
+      streaming: true
+```
+
+On a streaming route the timeout only bounds:
+
+* the time until the response is ready to be sent (pre-process filters, backend response
+  headers and post-process filters): past it the gateway still answers `504`;
+* each individual write to the client, so a client that stops reading is dropped.
+
+Once the response starts, the stream lasts as long as the backend keeps it open or until
+the client disconnects. Every write is flushed immediately.
+
+The server `WriteTimeout` (`bootstrap.ServerOpts`) is also a deadline for the whole
+response and starts counting before the route timeout. `bootstrap.Initialize` raises it to
+the longest route timeout plus 5 seconds when it is shorter than that, so a timed out
+route can still answer `504`. Streaming routes are not subject to it.
 
 ## Extending the Gateway
 

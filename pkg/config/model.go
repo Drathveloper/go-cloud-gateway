@@ -16,6 +16,10 @@ type Gateway struct {
 }
 
 // Route represents the gateway route config.
+//
+// Timeout bounds the whole exchange, response body included. Setting Streaming makes it
+// bound only the time until the response starts and each individual write to the
+// client, so long-lived responses such as server-sent events are not cut.
 type Route struct {
 	ID             string              `json:"id"              yaml:"id"              validate:"required"`
 	URI            string              `json:"uri"             yaml:"uri"             validate:"required"`
@@ -23,6 +27,7 @@ type Route struct {
 	Filters        []ParameterizedItem `json:"filters"         yaml:"filters"         validate:"dive"`
 	Timeout        Duration            `json:"timeout"         yaml:"timeout"`
 	CircuitBreaker CircuitBreaker      `json:"circuit-breaker" yaml:"circuit-breaker"`
+	Streaming      bool                `json:"streaming"       yaml:"streaming"`
 }
 
 // CircuitBreaker represents the gateway circuit breaker config.

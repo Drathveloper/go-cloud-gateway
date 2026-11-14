@@ -47,6 +47,7 @@ linters:
     - tagliatelle
     - nlreturn
     - exhaustruct
+    - exhaustruct_v5
     - gomodguard
   exclusions:
     generated: lax

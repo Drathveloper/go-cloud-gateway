@@ -970,3 +970,34 @@ func TestNewHTTPClient_DoesNotFollowRedirects(t *testing.T) {
 		})
 	}
 }
+
+func TestNewRoutes_Streaming(t *testing.T) {
+	tests := []struct {
+		name      string
+		streaming bool
+	}{
+		{name: "streaming route config should build a streaming route", streaming: true},
+		{name: "regular route config should build a regular route", streaming: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &config.Config{
+				Gateway: config.Gateway{
+					Routes: []config.Route{
+						{ID: "r1", URI: "http://localhost:8001", Streaming: tt.streaming},
+					},
+				},
+			}
+
+			routes, err := config.NewRoutes(
+				cfg, predicate.NewFactory(predicate.BuilderRegistry), filter.NewFactory(filter.BuilderRegistry), slog.Default())
+			if err != nil {
+				t.Fatalf("expected nil err actual %v", err)
+			}
+
+			if routes[0].Streaming != tt.streaming {
+				t.Errorf("expected streaming %t actual %t", tt.streaming, routes[0].Streaming)
+			}
+		})
+	}
+}
