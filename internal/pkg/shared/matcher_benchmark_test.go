@@ -1,13 +1,12 @@
 package shared_test
 
 import (
-	"regexp"
 	"testing"
 
 	"github.com/drathveloper/go-cloud-gateway/internal/pkg/shared"
 )
 
-func BenchmarkPathMatcher(b *testing.B) {
+func BenchmarkPathPattern_Match(b *testing.B) {
 	cases := []struct {
 		pattern string
 		path    string
@@ -34,15 +33,16 @@ func BenchmarkPathMatcher(b *testing.B) {
 	}
 
 	for _, c := range cases {
+		pattern := shared.CompilePathPattern(c.pattern)
 		b.Run(c.pattern+"_"+c.path, func(b *testing.B) {
 			for b.Loop() {
-				shared.PathMatcher(c.pattern, c.path)
+				pattern.Match(c.path)
 			}
 		})
 	}
 }
 
-func BenchmarkHostMatcher(b *testing.B) {
+func BenchmarkHostPattern_Match(b *testing.B) {
 	cases := []struct {
 		pattern string
 		host    string
@@ -53,13 +53,19 @@ func BenchmarkHostMatcher(b *testing.B) {
 		{"api.*.example.com", "api.v1.example.com"},
 		{"*.example.*", "sub.example.org"},
 		{"a.*.b.*.c", "a.foo.b.bar.c"},
+		{"api.example.com", "api.example.com"},
+		{"api.example.com", "api.example.com:8080"},
+		{"*.example.com", "sub.example.com:8080"},
 	}
 
 	for _, tc := range cases {
-		pattern := regexp.MustCompile(shared.ConvertPatternToRegex(tc.pattern))
+		pattern, err := shared.CompileHostPattern(tc.pattern)
+		if err != nil {
+			b.Fatalf("failed to compile host pattern: %v", err)
+		}
 		b.Run(tc.pattern+"_"+tc.host, func(b *testing.B) {
 			for b.Loop() {
-				shared.HostMatcher(pattern, tc.host)
+				pattern.Match(tc.host)
 			}
 		})
 	}
