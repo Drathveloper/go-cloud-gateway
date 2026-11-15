@@ -30,6 +30,22 @@ const (
 // There is no way to skip a block: a fragment without a wrapper fails the test, and so
 // does a wrapper without a fragment.
 var readmeGoFragments = map[string]string{
+	// Configuration built in code: statements that build the configuration and the server.
+	"cfg := &config.Config{": `package snippet
+
+import (
+	"net/http"
+	"time"
+
+	"github.com/drathveloper/go-cloud-gateway/pkg/bootstrap"
+	"github.com/drathveloper/go-cloud-gateway/pkg/config"
+)
+
+func newServer() (*http.Server, error) {
+	// README SNIPPET
+	return server, err
+}
+`,
 	// Bootstrap options: statements, with the configuration already read.
 	"opts := bootstrap.NewOptionsBuilder(cfg).": `package snippet
 
