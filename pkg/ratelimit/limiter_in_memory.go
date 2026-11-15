@@ -82,6 +82,25 @@ func (rl *InMemoryRateLimiter) Allow(key string) (bool, int) {
 	defer rl.mutex.Unlock()
 	// One clock reading serves the sweep check, the bucket creation and the bucket itself.
 	now := rl.time.Now()
+	return rl.bucketAt(key, now).allowAt(now)
+}
+
+// AllowWithRetryAfter is Allow that also returns, for a rejected key, the time until its
+// bucket holds one token again. It implements RetryAfterRateLimiter.
+//
+// The wait is zero for an allowed key, and for a rejected key whose bucket never refills
+// (a rate of zero or less).
+func (rl *InMemoryRateLimiter) AllowWithRetryAfter(key string) (bool, int, time.Duration) {
+	rl.mutex.Lock()
+	defer rl.mutex.Unlock()
+	// One clock reading serves the sweep check, the bucket creation and the bucket itself.
+	now := rl.time.Now()
+	return rl.bucketAt(key, now).allowOrWaitAt(now)
+}
+
+// bucketAt returns the bucket of key, creating it when the key is not known, after
+// sweeping the buckets when a sweep is due. The caller holds the mutex.
+func (rl *InMemoryRateLimiter) bucketAt(key string, now time.Time) *TokenBucket {
 	if now.Sub(rl.lastSweep) >= sweepInterval {
 		rl.sweep(now)
 	}
@@ -90,7 +109,7 @@ func (rl *InMemoryRateLimiter) Allow(key string) (bool, int) {
 		bucket = newTokenBucketAt(rl.time, rl.rate, rl.burst, now)
 		rl.buckets[key] = bucket
 	}
-	return bucket.allowAt(now)
+	return bucket
 }
 
 // sweep deletes the buckets that are full at now. The keys can be chosen by the client

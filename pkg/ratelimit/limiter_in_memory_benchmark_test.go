@@ -20,6 +20,20 @@ func BenchmarkInMemoryRateLimiter_Allow_ExistingKey(b *testing.B) {
 	}
 }
 
+// Every call is rejected, the pattern of a client that keeps hammering once its burst is
+// spent. The cost includes computing how long it has to wait. The clock is frozen so the
+// bucket never refills.
+func BenchmarkInMemoryRateLimiter_AllowWithRetryAfter_RejectedKey(b *testing.B) {
+	limiter := ratelimit.NewInMemoryRateLimiter(&MockTimeProvider{WantedTime: time.Now(), Increment: 0}, 1000, 1)
+	limiter.AllowWithRetryAfter("key")
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		limiter.AllowWithRetryAfter("key")
+	}
+}
+
 // Every call uses a key never seen before, the pattern of a client forging its
 // X-Forwarded-For header. The cost includes building the key, creating its bucket and,
 // amortized, the sweeps that delete the buckets left behind. The fake clock advances one
