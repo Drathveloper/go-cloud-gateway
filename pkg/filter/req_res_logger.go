@@ -3,7 +3,10 @@ package filter
 import (
 	"fmt"
 	"log/slog"
+	"maps"
+	"net/http"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/drathveloper/go-cloud-gateway/internal/pkg/shared"
 	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
@@ -16,11 +19,21 @@ const RequestResponseLoggerFilterName = "RequestResponseLogger"
 // and logs. Bigger bodies are forwarded untouched and logged without their content.
 const DefaultMaxLoggedBodyBytes int64 = 64 * 1024
 
+// redactedHeaderValue is what the filter logs in place of each value of a redacted header.
+const redactedHeaderValue = "[REDACTED]"
+
 // RequestResponseLogger is a filter that logs the request and response.
+//
+// Headers that carry credentials are logged by name only: every value of Authorization,
+// Proxy-Authorization, Cookie, Set-Cookie and X-Api-Key is replaced by "[REDACTED]".
+// WithRedactedHeaders adds more headers to that set.
 type RequestResponseLogger struct {
-	level        slog.Level
-	maxBodyBytes int64
-	logBodies    bool
+	// extraRedactedHeaders holds the canonical names added to the built-in set. The
+	// built-in names are not stored here so they also apply to the zero value.
+	extraRedactedHeaders map[string]struct{}
+	maxBodyBytes         int64
+	level                slog.Level
+	logBodies            bool
 }
 
 // NewRequestResponseLoggerFilter creates a new RequestResponseLoggerFilter. Bodies larger
@@ -53,6 +66,8 @@ func NewHeadersOnlyRequestResponseLoggerFilter(level slog.Level) *RequestRespons
 // per request and response (default DefaultMaxLoggedBodyBytes; negative means unlimited).
 // The "log-bodies" argument selects whether bodies are logged at all (default true).
 // Disabling it skips the body capture entirely, so no body is buffered or copied.
+// The "redact-headers" argument is a list of header names, in any case, whose values are
+// redacted in addition to the ones the filter always redacts.
 func NewRequestResponseLoggerBuilder() gateway.FilterBuilderFunc {
 	return func(args map[string]any) (gateway.Filter, error) {
 		maxBodyBytes := DefaultMaxLoggedBodyBytes
@@ -71,19 +86,34 @@ func NewRequestResponseLoggerBuilder() gateway.FilterBuilderFunc {
 			}
 			logBodies = logBodiesArg
 		}
-		levelStr, _ := shared.ConvertToString(args["level"])
-		var level slog.Level
-		switch strings.ToLower(levelStr) {
-		case "debug":
-			level = slog.LevelDebug
-		case "warn":
-			level = slog.LevelWarn
-		case "error":
-			level = slog.LevelError
-		default:
-			level = slog.LevelInfo
+		var redactHeaders []string
+		if args["redact-headers"] != nil {
+			names, err := shared.ConvertToStringSlice(args["redact-headers"])
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert 'redact-headers' attribute: %w", err)
+			}
+			redactHeaders = names
 		}
-		return NewRequestResponseLoggerFilter(level, maxBodyBytes, logBodies), nil
+		levelStr, _ := shared.ConvertToString(args["level"])
+		filter := NewRequestResponseLoggerFilter(parseLogLevel(levelStr), maxBodyBytes, logBodies)
+		return filter.WithRedactedHeaders(redactHeaders...), nil
+	}
+}
+
+// WithRedactedHeaders returns a copy of the filter that also redacts the values of the
+// given headers, on top of the ones it already redacts. Names are case-insensitive.
+// The receiver is left untouched, so a filter that is already serving requests is safe.
+func (f *RequestResponseLogger) WithRedactedHeaders(names ...string) *RequestResponseLogger {
+	extra := make(map[string]struct{}, len(f.extraRedactedHeaders)+len(names))
+	maps.Copy(extra, f.extraRedactedHeaders)
+	for _, name := range names {
+		extra[http.CanonicalHeaderKey(strings.TrimSpace(name))] = struct{}{}
+	}
+	return &RequestResponseLogger{
+		extraRedactedHeaders: extra,
+		maxBodyBytes:         f.maxBodyBytes,
+		level:                f.level,
+		logBodies:            f.logBodies,
 	}
 }
 
@@ -92,10 +122,13 @@ func (f *RequestResponseLogger) PreProcess(ctx *gateway.Context) error {
 	if !ctx.Logger.Enabled(ctx, f.level) {
 		return nil
 	}
+	// The live map is the one forwarded to the backend, so it is never modified: the
+	// log gets a copy when, and only when, there is something to redact.
+	headers := f.redactedCopy(ctx.Request.Headers)
 	if !f.logBodies {
 		ctx.Logger.Log(ctx, f.level, "Received request",
 			"url", ctx.Request.Method+" "+ctx.Request.URL.String(),
-			"headers", ctx.Request.Headers)
+			"headers", headers)
 		return nil
 	}
 	var body []byte
@@ -106,8 +139,8 @@ func (f *RequestResponseLogger) PreProcess(ctx *gateway.Context) error {
 	}
 	ctx.Logger.Log(ctx, f.level, "Received request",
 		"url", ctx.Request.Method+" "+ctx.Request.URL.String(),
-		"headers", ctx.Request.Headers,
-		"body", body)
+		"headers", headers,
+		"body", loggableBody(body))
 	return nil
 }
 
@@ -119,7 +152,7 @@ func (f *RequestResponseLogger) PostProcess(ctx *gateway.Context) error {
 	if !f.logBodies {
 		ctx.Logger.Log(ctx, f.level, "Returned response",
 			"status", ctx.Response.Status,
-			"headers", ctx.Response.Headers)
+			"headers", f.redactedCopy(ctx.Response.Headers))
 		return nil
 	}
 	// Snapshot everything logged from onDone now: the callback fires later, from
@@ -127,14 +160,21 @@ func (f *RequestResponseLogger) PostProcess(ctx *gateway.Context) error {
 	// and while the only safe references are the ones captured here.
 	logger := ctx.Logger
 	status := ctx.Response.Status
-	headers := ctx.Response.Headers.Clone()
+	// The snapshot is private to the log line, so it is redacted in place.
+	headers := f.redact(ctx.Response.Headers.Clone())
 	var body []byte
 	ctx.Response.BodyReader.ObserveStream(
 		func(chunk []byte) {
 			body = appendUpToLimit(body, chunk, f.maxBodyBytes)
 		},
 		func(total int64, err error) {
-			attrs := []any{"status", status, "headers", headers, "body", body, "bytes", total}
+			if int64(len(body)) < total || err != nil {
+				// The logged body is a prefix cut at an arbitrary byte, by the limit or
+				// by the stream ending early. Without this, text cut in the middle of a
+				// character would be logged as bytes.
+				body = trimIncompleteRune(body)
+			}
+			attrs := []any{"status", status, "headers", headers, "body", loggableBody(body), "bytes", total}
 			if err != nil {
 				attrs = append(attrs, "error", err)
 			}
@@ -164,4 +204,88 @@ func appendUpToLimit(body, chunk []byte, maxBytes int64) []byte {
 // Name returns the name of the filter.
 func (f *RequestResponseLogger) Name() string {
 	return RequestResponseLoggerFilterName
+}
+
+// redactedCopy returns headers ready to be logged without modifying them. When no header
+// is sensitive it returns the same map and copies nothing. Otherwise it returns a shallow
+// copy with the sensitive values replaced: the other headers still share their values
+// with the original, so the result must be logged before the original can change.
+func (f *RequestResponseLogger) redactedCopy(headers http.Header) http.Header {
+	for name := range headers {
+		if f.isRedacted(name) {
+			return f.redact(maps.Clone(headers))
+		}
+	}
+	return headers
+}
+
+// redact replaces every value of the sensitive headers and returns the same map. The
+// values are replaced with new slices rather than overwritten, so slices shared with
+// another map are left intact; the map itself must belong to the caller.
+func (f *RequestResponseLogger) redact(headers http.Header) http.Header {
+	for name, values := range headers {
+		if !f.isRedacted(name) {
+			continue
+		}
+		redacted := make([]string, len(values))
+		for i := range redacted {
+			redacted[i] = redactedHeaderValue
+		}
+		headers[name] = redacted
+	}
+	return headers
+}
+
+// isRedacted reports whether the values of the named header must not be logged. The name
+// is canonicalized first because a filter can write a key to the map in any case.
+func (f *RequestResponseLogger) isRedacted(name string) bool {
+	name = http.CanonicalHeaderKey(name)
+	switch name {
+	case "Authorization", "Proxy-Authorization", "Cookie", "Set-Cookie", "X-Api-Key":
+		return true
+	}
+	_, redacted := f.extraRedactedHeaders[name]
+	return redacted
+}
+
+// parseLogLevel returns the level named by level, in any case, or info when it names none.
+func parseLogLevel(level string) slog.Level {
+	switch strings.ToLower(level) {
+	case "debug":
+		return slog.LevelDebug
+	case "warn":
+		return slog.LevelWarn
+	case "error":
+		return slog.LevelError
+	default:
+		return slog.LevelInfo
+	}
+}
+
+// loggableBody returns the body in the form it is logged. Text is logged as a string:
+// slog's JSON handler encodes a []byte in base64, which makes a text body unreadable.
+// A body that is not valid UTF-8 stays a []byte: as a string its invalid bytes would be
+// replaced by the handler and could no longer be recovered from the log. A missing body
+// is logged as the empty string, so the attribute has the same type with or without one.
+func loggableBody(body []byte) any {
+	if utf8.Valid(body) {
+		return string(body)
+	}
+	return body
+}
+
+// trimIncompleteRune removes a UTF-8 sequence left unfinished at the end of body.
+// Anything else, including invalid bytes, is left as it is.
+func trimIncompleteRune(body []byte) []byte {
+	for size := 1; size < utf8.UTFMax && size <= len(body); size++ {
+		start := len(body) - size
+		if !utf8.RuneStart(body[start]) {
+			continue
+		}
+		if !utf8.FullRune(body[start:]) {
+			return body[:start]
+		}
+		break
+	}
+	return body
 }

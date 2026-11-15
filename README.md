@@ -88,6 +88,18 @@ gateway:
 Durations are strings with a unit, such as `30s`, `1m30s` or `250ms`. A bare number like
 `30` is rejected when the configuration is read.
 
+`RequestResponseLogger` logs the values of `Authorization`, `Proxy-Authorization`,
+`Cookie`, `Set-Cookie` and `X-Api-Key` as `[REDACTED]`. Its `redact-headers` argument
+adds more header names to that list:
+
+```yaml
+  global-filters:
+    - name: RequestResponseLogger
+      args:
+        redact-headers:
+          - X-Internal-Token
+```
+
 ### Path and Host patterns
 
 The `Path` predicate matches the request path segment by segment:
