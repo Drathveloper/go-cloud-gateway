@@ -20,9 +20,17 @@ type Options struct {
 
 // ServerOpts is the options for the server.
 //
-// WriteTimeout is raised by Initialize to the longest route timeout plus a margin when
-// it is shorter than that: a write timeout that expires before a route timeout closes
-// the connection before the gateway can answer. Streaming routes are not subject to it.
+// ReadTimeout and WriteTimeout are raised by Initialize to the longest route timeout
+// plus a margin when they are positive and shorter than that; a value that disables the
+// timeout is kept. A read timeout that expires before a route timeout cuts the request
+// body while it is still being sent to the backend, and a write timeout that expires
+// before it closes the connection before the gateway can answer.
+//
+// The write timeout does not apply to streaming routes. The read timeout does: the
+// request body of a streaming route is still bounded by it.
+//
+// ReadHeaderTimeout and IdleTimeout fall back to ReadTimeout when they are zero. The
+// fallback is the configured ReadTimeout, not the raised one.
 type ServerOpts struct {
 	CustomHandlers    []CustomHandler
 	ReadHeaderTimeout time.Duration

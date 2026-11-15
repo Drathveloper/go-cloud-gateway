@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"slices"
 
 	"github.com/drathveloper/go-cloud-gateway/pkg/circuitbreaker"
 )
@@ -48,6 +49,9 @@ type Route struct {
 //
 // The uri must be an http or https url with a host, such as http://localhost:8080.
 // Anything else returns an error wrapping ErrInvalidRouteURI.
+//
+// The route filters are the global filters followed by the route filters. They are
+// copied, so the same globalFilters slice can be passed to several routes.
 func NewRoute(
 	routeID string,
 	uri string,
@@ -68,11 +72,15 @@ func NewRoute(
 		return nil, fmt.Errorf(
 			"%w %q: expected an http or https url with a host, such as http://localhost:8080", ErrInvalidRouteURI, uri)
 	}
+	// Not append(globalFilters, routeFilters...): when globalFilters has spare capacity
+	// that writes the route filters into its backing array, and every route built from
+	// the same slice would end up with the filters of the last one.
+	filters := slices.Concat(globalFilters, routeFilters)
 	return &Route{
 		ID:             routeID,
 		URI:            *routeURI,
 		Predicates:     predicates,
-		Filters:        append(globalFilters, routeFilters...),
+		Filters:        filters,
 		Timeout:        timeout,
 		CircuitBreaker: circuitBreaker,
 		Logger:         logger,

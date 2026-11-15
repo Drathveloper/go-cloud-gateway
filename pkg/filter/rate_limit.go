@@ -3,13 +3,15 @@ package filter
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/drathveloper/go-cloud-gateway/internal/pkg/shared"
 	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 	"github.com/drathveloper/go-cloud-gateway/pkg/ratelimit"
 )
 
-// ErrRateLimitExceeded is returned when the rate limit is exceeded.
+// ErrRateLimitExceeded is returned when the rate limit is exceeded. The RateLimit filter
+// returns it as a RateLimitExceededError, which errors.Is matches against it.
 var ErrRateLimitExceeded = errors.New("rate limit exceeded")
 
 // ErrInvalidRateLimitKey is returned when the rate limit key is invalid.
@@ -21,20 +23,55 @@ var ErrInvalidRateLimitType = errors.New("invalid rate limit type")
 // RateLimitFilterName is the name of the rate limit filter.
 const RateLimitFilterName = "RateLimit"
 
+// RateLimitExceededError is the error the RateLimit filter returns for a rejected request.
+//
+// It unwraps to ErrRateLimitExceeded, so errors.Is(err, ErrRateLimitExceeded) holds for
+// it. An error handler that needs the details gets them with
+// errors.AsType[*RateLimitExceededError](err).
+type RateLimitExceededError struct {
+	// RetryAfter is how long the client has to wait before a request can be allowed
+	// again. It is zero when the limiter cannot tell, which is the case of every limiter
+	// that does not implement ratelimit.RetryAfterRateLimiter.
+	RetryAfter time.Duration
+	// Remaining is the number of tokens the limiter reported as left.
+	Remaining int
+}
+
+// Error returns the error message. The wait is only part of it when it is known.
+func (e *RateLimitExceededError) Error() string {
+	if e.RetryAfter <= 0 {
+		return fmt.Sprintf("%s: remaining %d", ErrRateLimitExceeded.Error(), e.Remaining)
+	}
+	return fmt.Sprintf("%s: remaining %d, retry after %s", ErrRateLimitExceeded.Error(), e.Remaining, e.RetryAfter)
+}
+
+// Unwrap returns ErrRateLimitExceeded.
+func (e *RateLimitExceededError) Unwrap() error {
+	return ErrRateLimitExceeded
+}
+
 // RateLimit is a filter that limits the number of requests per second.
 //
 // The rate limiter is used to check if the request is allowed to proceed.
 // The key func is used to get the key for the rate limiter.
 type RateLimit struct {
 	limiter ratelimit.RateLimiter
-	keyFunc ratelimit.KeyFunc
+	// retryAfterLimiter is the limiter when it can also report how long a rejected key
+	// has to wait, nil otherwise. It is resolved once here rather than on every request.
+	retryAfterLimiter ratelimit.RetryAfterRateLimiter
+	keyFunc           ratelimit.KeyFunc
 }
 
 // NewRateLimitFilter creates a new RateLimitFilter.
+//
+// A limiter that also implements ratelimit.RetryAfterRateLimiter makes the filter report
+// how long a rejected request has to wait.
 func NewRateLimitFilter(limiter ratelimit.RateLimiter, keyFunc ratelimit.KeyFunc) *RateLimit {
+	retryAfterLimiter, _ := limiter.(ratelimit.RetryAfterRateLimiter)
 	return &RateLimit{
-		limiter: limiter,
-		keyFunc: keyFunc,
+		limiter:           limiter,
+		retryAfterLimiter: retryAfterLimiter,
+		keyFunc:           keyFunc,
 	}
 }
 
@@ -78,15 +115,19 @@ func NewRateLimitBuilder() gateway.FilterBuilderFunc {
 }
 
 // PreProcess checks if the request is allowed to proceed.
-// If the request is not allowed to proceed, the filter will return an ErrRateLimitExceeded error with the remaining
-// requests as the error message.
+// If the request is not allowed to proceed, the filter will return a RateLimitExceededError, which wraps
+// ErrRateLimitExceeded and carries the remaining requests and, when the limiter reports it, the time to wait.
 // If the request is allowed to proceed, the filter will return nil.
 func (f *RateLimit) PreProcess(ctx *gateway.Context) error {
-	key := f.keyFunc(ctx)
-	if allowed, remaining := f.limiter.Allow(key); !allowed {
-		return fmt.Errorf("%w: remaining %d", ErrRateLimitExceeded, remaining)
+	allowed, remaining, retryAfter := f.allow(f.keyFunc(ctx))
+	if allowed {
+		return nil
 	}
-	return nil
+	return &RateLimitExceededError{
+		Remaining: remaining,
+		// A limiter that cannot tell may answer with anything up to zero.
+		RetryAfter: max(retryAfter, 0),
+	}
 }
 
 // PostProcess does nothing.
@@ -97,4 +138,14 @@ func (f *RateLimit) PostProcess(_ *gateway.Context) error {
 // Name returns the name of the filter.
 func (f *RateLimit) Name() string {
 	return RateLimitFilterName
+}
+
+// allow asks the limiter once. The decision and the wait come from that single call:
+// reading the wait after Allow would describe the limiter after other requests changed it.
+func (f *RateLimit) allow(key string) (bool, int, time.Duration) {
+	if f.retryAfterLimiter != nil {
+		return f.retryAfterLimiter.AllowWithRetryAfter(key)
+	}
+	allowed, remaining := f.limiter.Allow(key)
+	return allowed, remaining, 0
 }
