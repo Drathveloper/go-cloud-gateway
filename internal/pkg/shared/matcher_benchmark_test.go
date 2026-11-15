@@ -42,6 +42,37 @@ func BenchmarkPathPattern_Match(b *testing.B) {
 	}
 }
 
+func BenchmarkPathPattern_MatchEscaped(b *testing.B) {
+	cases := []struct {
+		pattern string
+		path    string
+	}{
+		// the first cases are also in BenchmarkPathPattern_Match: they have no escape, so
+		// they measure what reading the path as an escaped one costs by itself
+		{"/a/**/c", "/a/b/d/c"},
+		{"/a/b/c", "/a/b/c"},
+		{"/a/**", "/a/b/c/d/e"},
+		{"/server/one/*", "/server/one/x/t"},
+		{"/server/**/x", "/server/one/two/x"},
+		{"/user/**/details/extra", "/user/profile/details"},
+		{"/static/*.css", "/static/a%2Fb.css"},
+		{"/static/*/b.css", "/static/a%2Fb.css"},
+		{"/files/my file", "/files/my%20file"},
+		{"/server/**/x", "/server/one%2Ftwo/%78"},
+		{"/api/**/users/*", "/api/v1/users/extra/users/7%2F8"},
+	}
+
+	for _, c := range cases {
+		pattern := shared.CompilePathPattern(c.pattern)
+		b.Run(c.pattern+"_"+c.path, func(b *testing.B) {
+			b.ReportAllocs()
+			for b.Loop() {
+				pattern.MatchEscaped(c.path)
+			}
+		})
+	}
+}
+
 func BenchmarkHostPattern_Match(b *testing.B) {
 	cases := []struct {
 		pattern string
