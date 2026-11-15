@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"slices"
 
 	"github.com/drathveloper/go-cloud-gateway/internal/pkg/shared"
 	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
@@ -19,6 +20,8 @@ type Header struct {
 }
 
 // NewHeaderPredicate creates a new header predicate.
+//
+// An empty regexp only requires the header to exist.
 func NewHeaderPredicate(header, regexpStr string) (*Header, error) {
 	var pattern *regexp.Regexp
 	var err error
@@ -29,21 +32,25 @@ func NewHeaderPredicate(header, regexpStr string) (*Header, error) {
 		}
 	}
 	return &Header{
-		name:    header,
+		// request headers are keyed by their canonical name: resolving it here keeps it out of every evaluation
+		name:    http.CanonicalHeaderKey(header),
 		pattern: pattern,
 	}, nil
 }
 
 // NewHeaderPredicateBuilder creates a new header predicate builder.
+//
+// The 'name' argument is required. The 'regexp' argument is optional: without it the predicate
+// only requires the header to exist.
 func NewHeaderPredicateBuilder() gateway.PredicateBuilderFunc {
 	return func(args map[string]any) (gateway.Predicate, error) {
 		name, err := shared.ConvertToString(args["name"])
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert 'name' attribute: %w", err)
 		}
-		regex, err := shared.ConvertToString(args["regexp"])
+		regex, err := optionalRegexpArg(args)
 		if err != nil {
-			return nil, fmt.Errorf("failed to convert 'regexp' attribute: %w", err)
+			return nil, err
 		}
 		return NewHeaderPredicate(name, regex)
 	}
@@ -52,20 +59,34 @@ func NewHeaderPredicateBuilder() gateway.PredicateBuilderFunc {
 // Test checks if the header predicate matches the given request.
 //
 // If the header does not exist, the predicate will return false.
-// If the header exists but does not match the regexp, the predicate will return false.
-// If the header exists and matches the regexp, the predicate will return true.
+// If the header exists and there is no regexp, the predicate will return true, even when its value is empty.
+// If the header exists and there is a regexp, the predicate will return true when at least one of
+// its values (which can be empty) matches the regexp.
 func (p *Header) Test(request *http.Request) bool {
-	value := request.Header.Get(p.name)
-	if value == "" {
-		return false
+	values := request.Header[p.name]
+	if p.pattern == nil {
+		return len(values) > 0
 	}
-	if p.pattern != nil {
-		return p.pattern.MatchString(value)
-	}
-	return true
+	return slices.ContainsFunc(values, p.pattern.MatchString)
 }
 
 // Name returns the name of the predicate.
 func (p *Header) Name() string {
 	return HeaderPredicateName
+}
+
+// optionalRegexpArg reads the 'regexp' argument shared by the header, query and cookie predicate builders.
+//
+// A missing regexp is not an error: it yields the empty regexp, which those predicates treat as
+// an existence check.
+func optionalRegexpArg(args map[string]any) (string, error) {
+	value := args["regexp"]
+	if value == nil {
+		return "", nil
+	}
+	regex, err := shared.ConvertToString(value)
+	if err != nil {
+		return "", fmt.Errorf("failed to convert 'regexp' attribute: %w", err)
+	}
+	return regex, nil
 }
