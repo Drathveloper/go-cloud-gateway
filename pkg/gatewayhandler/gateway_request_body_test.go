@@ -103,6 +103,7 @@ func TestGatewayHandler_ServeHTTP_RequestBodyReadDeadlines(t *testing.T) {
 		streaming       bool
 		readBeforeReply bool
 		expectDeadlines bool
+		expectGrace     bool
 	}{
 		{
 			name:            "streaming route answered while the body arrives should bound every read",
@@ -117,9 +118,10 @@ func TestGatewayHandler_ServeHTTP_RequestBodyReadDeadlines(t *testing.T) {
 			expectedBody:    "done",
 		},
 		{
-			name:         "regular route answered while the body arrives should keep the server read timeout",
+			name:         "regular route answered while the body arrives should wait for the rest of it for a moment only",
 			streaming:    false,
 			expectedBody: payload,
+			expectGrace:  true,
 		},
 	}
 	for _, tt := range tests {
@@ -156,6 +158,16 @@ func TestGatewayHandler_ServeHTTP_RequestBodyReadDeadlines(t *testing.T) {
 
 			assert.Equal(t, tt.expectedBody, recorder.Body.String())
 			deadlines, fullDuplex := recorder.recorded()
+			if tt.expectGrace {
+				// One for the response, well under the route timeout, which the end
+				// of the body takes off the connection.
+				assert.Zero(t, fullDuplex)
+				require.Len(t, deadlines, 2)
+				assert.True(t, deadlines[0].After(start), "deadline %s is in the past", deadlines[0])
+				assert.True(t, deadlines[0].Before(start.Add(timeout/2)), "deadline %s is too late", deadlines[0])
+				assert.True(t, deadlines[1].IsZero(), "expected the deadline to be cleared at the end of the body")
+				return
+			}
 			if !tt.expectDeadlines {
 				assert.Empty(t, deadlines)
 				assert.Zero(t, fullDuplex)
@@ -183,6 +195,7 @@ func TestGatewayHandler_ServeHTTP_AbandonsTheRequestBodyOnTimeout(t *testing.T) 
 		name            string
 		readBody        bool
 		expectAbandoned bool
+		expectGrace     bool
 	}{
 		{
 			name:            "timeout with the body unread should abandon it before the error is handled",
@@ -195,8 +208,9 @@ func TestGatewayHandler_ServeHTTP_AbandonsTheRequestBodyOnTimeout(t *testing.T) 
 			readBody:   true,
 		},
 		{
-			name:       "any other error with the body unread should leave the connection alone",
-			gatewayErr: gateway.ErrHTTP,
+			name:        "any other error with the body unread should wait for the rest of it for a moment only",
+			gatewayErr:  gateway.ErrHTTP,
+			expectGrace: true,
 		},
 	}
 	for _, tt := range tests {
@@ -226,6 +240,12 @@ func TestGatewayHandler_ServeHTTP_AbandonsTheRequestBodyOnTimeout(t *testing.T) 
 				newTestRequest(t, http.MethodPost, "http://localhost:8080/test", strings.NewReader("payload")))
 
 			require.True(t, handled, "expected the error to be handled")
+			if tt.expectGrace {
+				require.Len(t, onError, 1)
+				assert.False(t, recorder.isExpired(), "expected a read deadline ahead, actual %s", onError[0])
+				assert.True(t, onError[0].Before(time.Now().Add(time.Second)), "deadline %s is too late", onError[0])
+				return
+			}
 			if !tt.expectAbandoned {
 				assert.Empty(t, onError)
 				return
@@ -336,6 +356,7 @@ func TestGatewayHandler_ServeHTTP_ReleasesTheRequestBody(t *testing.T) {
 	request := newTestRequest(t, http.MethodPost, "http://localhost:8080/test", strings.NewReader("payload"))
 
 	handler.ServeHTTP(recorder, request)
+	whileHandling, _ := recorder.recorded()
 	body, abandonable := request.Body.(interface{ Abandon() })
 	require.True(t, abandonable, "expected the request body to be the one the handler tracks")
 	body.Abandon()
@@ -343,5 +364,5 @@ func TestGatewayHandler_ServeHTTP_ReleasesTheRequestBody(t *testing.T) {
 	<-closed
 
 	deadlines, _ := recorder.recorded()
-	assert.Empty(t, deadlines, "expected no read deadline once the handler has returned")
+	assert.Len(t, deadlines, len(whileHandling), "expected no read deadline once the handler has returned")
 }

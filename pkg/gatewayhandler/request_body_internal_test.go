@@ -318,12 +318,13 @@ func TestRequestBody_RenewReadDeadline_DoesNothing(t *testing.T) {
 			},
 		},
 		{
-			name:    "closed body should keep the connection as it is",
+			name:    "closed body should only get the grace of its close",
 			timeout: time.Minute,
 			prepare: func(t *testing.T, body *requestBody) {
 				t.Helper()
 				require.NoError(t, body.Close())
 			},
+			expectedDeadlines: 1,
 		},
 		{
 			name:    "released body should keep the connection as it is",
@@ -413,7 +414,9 @@ func TestRequestBody_Abandon(t *testing.T) {
 
 		body.Abandon()
 
-		assert.Empty(t, recorder.deadlines())
+		deadlines := recorder.deadlines()
+		require.Len(t, deadlines, 1, "expected the grace of the close alone")
+		assert.True(t, deadlines[0].After(time.Now()), "expected no deadline in the past")
 	})
 	t.Run("read that fails on its own should keep its error", func(t *testing.T) {
 		body := newTrackedBody(t, &scriptedBody{err: errClientGone}, newConnRecorder())
@@ -442,19 +445,148 @@ func TestRequestBody_Release(t *testing.T) {
 	assert.False(t, deadlines[0].IsZero(), "expected the last deadline to be kept")
 }
 
+// Closing a body makes net/http read what is left of it: a body that is closed before
+// its end, which the http transport does when it gives up on a request, only waits for
+// the client for a moment.
 func TestRequestBody_Close(t *testing.T) {
-	recorder := newConnRecorder()
-	source := &scriptedBody{chunks: []string{"one", "two"}}
-	body := newTrackedBody(t, source, recorder)
-	body.renewReadDeadline(time.Minute)
+	t.Run("unfinished body should get a grace for what is left of it", func(t *testing.T) {
+		recorder := newConnRecorder()
+		source := &scriptedBody{chunks: []string{"one", "two"}}
+		body := newTrackedBody(t, source, recorder)
+		start := time.Now()
 
-	require.NoError(t, body.Close())
-	_, _ = io.ReadAll(body)
+		require.NoError(t, body.Close())
 
-	assert.Equal(t, 1, source.closes)
-	deadlines := recorder.deadlines()
-	require.Len(t, deadlines, 1, "expected the deadline of the renewal alone")
-	assert.False(t, deadlines[0].IsZero(), "expected the last deadline to be kept")
+		assert.Equal(t, 1, source.closes)
+		deadlines := recorder.deadlines()
+		require.Len(t, deadlines, 1)
+		assert.False(t, deadlines[0].Before(start.Add(unreadBodyGrace)), "deadline %s is too early", deadlines[0])
+		assert.False(t, deadlines[0].After(time.Now().Add(unreadBodyGrace)), "deadline %s is too late", deadlines[0])
+	})
+	t.Run("body read to the end should keep the connection as it is", func(t *testing.T) {
+		recorder := newConnRecorder()
+		source := &scriptedBody{chunks: []string{"one", "two"}}
+		body := newTrackedBody(t, source, recorder)
+		_, err := io.ReadAll(body)
+		require.NoError(t, err)
+
+		require.NoError(t, body.Close())
+
+		assert.Equal(t, 1, source.closes)
+		assert.Empty(t, recorder.deadlines())
+	})
+	t.Run("body closed once the handler is answering should keep the connection as it is", func(t *testing.T) {
+		recorder := newConnRecorder()
+		source := &scriptedBody{chunks: []string{"one", "two"}}
+		body := newTrackedBody(t, source, recorder)
+		require.False(t, body.settle())
+
+		require.NoError(t, body.Close())
+
+		assert.Equal(t, 1, source.closes)
+		assert.Empty(t, recorder.deadlines())
+	})
+	t.Run("reads after the close should not touch the connection", func(t *testing.T) {
+		recorder := newConnRecorder()
+		body := newTrackedBody(t, &scriptedBody{chunks: []string{"one", "two"}}, recorder)
+		body.renewReadDeadline(time.Minute)
+		require.NoError(t, body.Close())
+		closed := len(recorder.deadlines())
+
+		_, _ = io.ReadAll(body)
+
+		assert.Len(t, recorder.deadlines(), closed)
+	})
+}
+
+// A response that does not need the rest of the request body only waits for it for a
+// moment, on HTTP/1, where the server reads it before it writes the response.
+func TestRequestBody_GiveUpAfter(t *testing.T) {
+	const grace = 50 * time.Millisecond
+	t.Run("unfinished body should get a deadline for what is left of it", func(t *testing.T) {
+		recorder := newConnRecorder()
+		body := newTrackedBody(t, &scriptedBody{chunks: []string{"one"}}, recorder)
+		start := time.Now()
+
+		body.giveUpAfter(grace)
+
+		deadlines := recorder.deadlines()
+		require.Len(t, deadlines, 1)
+		assert.False(t, deadlines[0].Before(start.Add(grace)), "deadline %s is too early", deadlines[0])
+		assert.False(t, deadlines[0].After(time.Now().Add(grace)), "deadline %s is too late", deadlines[0])
+	})
+	t.Run("end of the body should take the deadline off the connection", func(t *testing.T) {
+		recorder := newConnRecorder()
+		body := newTrackedBody(t, &scriptedBody{chunks: []string{"one"}}, recorder)
+		body.giveUpAfter(grace)
+
+		_, err := io.ReadAll(body)
+
+		require.NoError(t, err)
+		deadlines := recorder.deadlines()
+		require.Len(t, deadlines, 2)
+		assert.True(t, deadlines[1].IsZero(), "expected the deadline to be cleared at the end of the body")
+	})
+	t.Run("failed read should keep the deadline", func(t *testing.T) {
+		recorder := newConnRecorder()
+		body := newTrackedBody(t, &scriptedBody{err: errClientGone}, recorder)
+		body.giveUpAfter(grace)
+
+		_, err := body.Read(make([]byte, 1))
+
+		assert.Equal(t, errClientGone, err)
+		assert.Len(t, recorder.deadlines(), 1)
+	})
+	t.Run("body read to the end should keep the connection as it is", func(t *testing.T) {
+		recorder := newConnRecorder()
+		body := newTrackedBody(t, &scriptedBody{chunks: []string{"one"}}, recorder)
+		_, err := io.ReadAll(body)
+		require.NoError(t, err)
+
+		body.giveUpAfter(grace)
+
+		assert.Empty(t, recorder.deadlines())
+	})
+	t.Run("abandoned body should keep its deadline in the past", func(t *testing.T) {
+		recorder := newConnRecorder()
+		body := newTrackedBody(t, &scriptedBody{chunks: []string{"one"}}, recorder)
+		body.Abandon()
+
+		body.giveUpAfter(grace)
+
+		deadlines := recorder.deadlines()
+		require.Len(t, deadlines, 1)
+		assert.True(t, deadlines[0].Before(time.Now()))
+	})
+	t.Run("released body should not have its deadline cleared by a late read", func(t *testing.T) {
+		recorder := newConnRecorder()
+		body := newTrackedBody(t, &scriptedBody{chunks: []string{"one"}}, recorder)
+		body.giveUpAfter(grace)
+		body.release()
+
+		_, err := io.ReadAll(body)
+
+		require.NoError(t, err)
+		assert.Len(t, recorder.deadlines(), 1)
+	})
+	t.Run("http/2 request should keep the stream as it is", func(t *testing.T) {
+		recorder := newConnRecorder()
+		request := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "http://localhost/upload",
+			&scriptedBody{chunks: []string{"one"}})
+		request.ContentLength = -1
+		request.ProtoMajor = 2
+		body := trackRequestBody(recorder, request)
+		require.NotNil(t, body)
+
+		body.giveUpAfter(grace)
+
+		assert.Empty(t, recorder.deadlines())
+	})
+	t.Run("request without a body should do nothing", func(t *testing.T) {
+		var body *requestBody
+
+		assert.NotPanics(t, func() { body.giveUpAfter(grace) })
+	})
 }
 
 func TestRequestBody_NoBody(t *testing.T) {

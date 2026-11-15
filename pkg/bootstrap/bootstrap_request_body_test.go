@@ -45,6 +45,8 @@ var bodyTestProtocols = []struct {
 // bodyTestGateway describes a gateway with a single route to a backend.
 type bodyTestGateway struct {
 	backendURL string
+	// routeExtra is more JSON for the route, such as its filters, starting with a comma.
+	routeExtra string
 	timeout    time.Duration
 	// readTimeout replaces the read timeout of the initialized server when it is set.
 	// Initialize never leaves it under the route timeout plus five seconds: a test
@@ -58,8 +60,8 @@ type bodyTestGateway struct {
 // its URL and a client for it. HTTP/2 is served over TLS.
 func (g bodyTestGateway) start(t *testing.T) (string, *http.Client) {
 	t.Helper()
-	cfgJSON := fmt.Sprintf(`{"gateway":{"routes":[{"id":"r1","uri":%q,"timeout":%q,"streaming":%t}]}}`,
-		g.backendURL, g.timeout.String(), g.streaming)
+	cfgJSON := fmt.Sprintf(`{"gateway":{"routes":[{"id":"r1","uri":%q,"timeout":%q,"streaming":%t%s}]}}`,
+		g.backendURL, g.timeout.String(), g.streaming, g.routeExtra)
 	cfg, err := config.NewReaderJSON(validator.New()).Read([]byte(cfgJSON))
 	require.NoError(t, err)
 	server, err := bootstrap.Initialize(
@@ -176,6 +178,9 @@ type slowUpload struct {
 	stallAfter int
 	interval   time.Duration
 	chunked    bool
+	// keptOpen says that the server is expected to keep the connection: the client
+	// does not wait for it to be closed after the response.
+	keptOpen bool
 }
 
 // slowUploadReply is what the client of a slowUpload got back.
@@ -235,6 +240,9 @@ func (u slowUpload) send(t *testing.T, addr string) slowUploadReply {
 	res, err := readRawResponse(conn)
 	require.NoError(t, err, "no response while the request body was being sent")
 	reply := slowUploadReply{status: res.status, closes: res.closes(), sent: int(sent.Load())}
+	if u.keptOpen {
+		return reply
+	}
 	_, reply.connErr = conn.Read(make([]byte, 1))
 	return reply
 }

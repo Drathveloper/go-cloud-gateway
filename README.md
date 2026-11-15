@@ -443,6 +443,13 @@ the stream of the request ends. As with any response sent before the request is 
 it writes to see it: one that only reads once it has sent everything keeps writing to a
 connection that is closed half a second later, and may get a connection reset instead.
 
+Any other response that does not need the rest of the request body, such as a `429`, a
+`502`, a `503` or the response of a backend that answers before the end of the upload,
+waits for that rest for 100 milliseconds at most. A body that is complete by then, which
+is the usual case, keeps its connection; past that moment the response is sent and the
+connection is closed, as above. Without it the client of a slow upload would only learn
+that it was rejected once it had sent everything.
+
 That is the wrong shape for long-lived responses such as Server-Sent Events, which would
 be cut when the timeout expires. Mark those routes as streaming:
 

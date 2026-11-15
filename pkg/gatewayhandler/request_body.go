@@ -11,6 +11,10 @@ import (
 	"time"
 )
 
+// unreadBodyGrace is how long a response waits for what is left of a request body that
+// nobody is going to read: see requestBody.giveUpAfter.
+const unreadBodyGrace = 100 * time.Millisecond
+
 // errRequestBodyAbandoned is the error of the reads of a request body that was abandoned
 // because the route timed out. It is a context.DeadlineExceeded: the http transport may
 // report it instead of the timeout that caused it, and both must be answered alike.
@@ -48,6 +52,11 @@ type requestBody struct {
 	// settled is set once the handler has decided how to answer: the body cannot be
 	// abandoned after that. See settle.
 	settled bool
+	// givenUp is set once giveUpAfter has set a deadline for the rest of the body.
+	givenUp bool
+	// http1 is whether the request came over HTTP/1, where the server reads the rest
+	// of the body before it writes the response.
+	http1 bool
 }
 
 // trackRequestBody puts a requestBody in place of the body of the request and returns it.
@@ -56,7 +65,7 @@ func trackRequestBody(writer http.ResponseWriter, request *http.Request) *reques
 	if request.Body == nil || request.Body == http.NoBody || request.ContentLength == 0 {
 		return nil
 	}
-	body := &requestBody{body: request.Body, writer: writer}
+	body := &requestBody{body: request.Body, writer: writer, http1: request.ProtoMajor == 1}
 	request.Body = body
 	return body
 }
@@ -75,7 +84,20 @@ func (b *requestBody) Read(output []byte) (int, error) {
 
 // Close closes the body of the request. The deadline of the last read is left in place:
 // it bounds what net/http still reads of the body to be able to reuse the connection.
+//
+// The http transport closes the body before it has read it to the end when it gives up
+// on the request, because the backend cannot be reached for instance. Closing a body
+// makes net/http read what is left of it, so the transport, and the error it reports,
+// would wait for the client: the rest of the body gets the same grace as in giveUpAfter.
+// Once the handler is answering it has set that deadline itself, and a new one could
+// outlive a body that the server has read to the end by then: see settle.
 func (b *requestBody) Close() error {
+	b.mu.Lock()
+	answering := b.settled
+	b.mu.Unlock()
+	if !answering {
+		b.giveUpAfter(unreadBodyGrace)
+	}
 	b.release()
 	return b.body.Close() //nolint:wrapcheck
 }
@@ -132,13 +154,42 @@ func (b *requestBody) extendReadDeadline() {
 	}
 }
 
+// giveUpAfter bounds how long the server waits for what is left of the body, which the
+// handler calls before it writes a response that does not need it: an error of the
+// gateway, or the response of a backend that answered before the end of the body.
+//
+// On HTTP/1 the server reads the rest of the body before it writes the response, to be
+// able to reuse the connection, for as long as the server read timeout allows: the
+// client of a slow upload only learnt that it was rejected once it had sent everything.
+// The response now waits for the given grace at most. A body that is complete by then,
+// which is the usual case, keeps its connection: giving up at once would close the
+// connection of every request with a body that the gateway rejects. Past the grace the
+// response is sent and the server closes the connection.
+//
+// It does nothing on HTTP/2, where the server does not wait for the body, nor once the
+// body has been read to the end or abandoned.
+func (b *requestBody) giveUpAfter(grace time.Duration) {
+	if b == nil || !b.http1 {
+		return
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.done || b.abandoned {
+		return
+	}
+	if err := http.NewResponseController(b.writer).SetReadDeadline(time.Now().Add(grace)); err == nil {
+		// A read that is returning the end of the body clears it: see finish.
+		b.givenUp = true
+	}
+}
+
 // finish records that a read failed, so nothing is left to read, and returns the error
 // the read must report.
 //
 // At the end of the body net/http clears the read deadline of the connection and starts
 // the background read that detects a client that goes away. A deadline set after that
-// makes that read fail, which cancels the request: renewReadDeadline may have set one
-// while the last read was returning, so it is cleared here. After any other error the
+// makes that read fail, which cancels the request: renewReadDeadline and giveUpAfter may
+// have set one while the last read was returning, so it is cleared here. After any other error the
 // deadline stays: clearing it would let net/http wait for the client without a limit.
 func (b *requestBody) finish(err error) error {
 	b.mu.Lock()
@@ -146,7 +197,7 @@ func (b *requestBody) finish(err error) error {
 	b.done = true
 	renewed := b.renew.Swap(false)
 	if errors.Is(err, io.EOF) {
-		if renewed {
+		if renewed || b.givenUp {
 			_ = http.NewResponseController(b.writer).SetReadDeadline(time.Time{})
 		}
 		return err
@@ -167,6 +218,7 @@ func (b *requestBody) release() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.done = true
+	b.givenUp = false
 	b.renew.Store(false)
 }
 

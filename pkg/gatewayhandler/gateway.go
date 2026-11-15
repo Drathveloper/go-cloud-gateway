@@ -96,6 +96,8 @@ func (h *GatewayHandler) ServeHTTP(writer http.ResponseWriter, request *http.Req
 			// come from a filter. net/http would read what is left of the body
 			// before it writes the response.
 			body.Abandon()
+		} else {
+			body.giveUpAfter(unreadBodyGrace)
 		}
 		closeAfterAbandonedBody(writer, request, body)
 		h.errHandler.Handle(ctx, err, writer)
@@ -109,6 +111,9 @@ func (h *GatewayHandler) ServeHTTP(writer http.ResponseWriter, request *http.Req
 	if ctx.Route.Streaming {
 		// The read side of what writeResponse does with the write deadline.
 		body.renewReadDeadline(ctx.Route.Timeout)
+	} else {
+		// The backend answered without waiting for the end of the body.
+		body.giveUpAfter(unreadBodyGrace)
 	}
 	h.writeResponse(writer, ctx)
 }
