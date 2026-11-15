@@ -28,6 +28,9 @@ const routeTimeoutGrace = 5 * time.Second
 // Custom predicates and filters are only known to the gateway being initialized: the
 // global predicate.BuilderRegistry and filter.BuilderRegistry are left untouched.
 //
+// The config is validated with config.Validate before anything is built, whether it was
+// read by a reader or built in code. An invalid or nil config is an error.
+//
 // The server read and write timeouts are raised when they do not cover the longest route
 // timeout: see ServerOpts.ReadTimeout and ServerOpts.WriteTimeout.
 func Initialize(opts *Options) (*http.Server, error) {
@@ -36,6 +39,10 @@ func Initialize(opts *Options) (*http.Server, error) {
 		// Resolved here and not when the options are built, so that a default logger
 		// installed in between is the one used.
 		logger = slog.Default()
+	}
+	// A config read by a reader has been validated already, one built in code has not.
+	if err := config.Validate(opts.Config); err != nil {
+		return nil, fmt.Errorf(initializeErrMsg, err)
 	}
 	routes, err := config.NewRoutes(
 		opts.Config, newPredicateFactory(opts.CustomPredicates), newFilterFactory(opts.CustomFilters), logger)

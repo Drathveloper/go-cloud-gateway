@@ -108,6 +108,40 @@ func main() {
 [`examples/minimal-gateway`](examples/minimal-gateway) is a runnable gateway. The server listens on port 8000
 unless [the bootstrap options](#bootstrap-options) say otherwise.
 
+### Configuration built in code
+
+A program that reads no file can build the `config.Config` itself. The field names are the configuration keys
+in camel case, and a duration is a `config.Duration`, which wraps a `time.Duration`:
+
+```go
+cfg := &config.Config{
+    Gateway: config.Gateway{
+        GlobalTimeout: config.Duration{Duration: 30 * time.Second},
+        Routes: []config.Route{
+            {
+                ID:  "example-route",
+                URI: "http://localhost:8080",
+                Predicates: []config.ParameterizedItem{
+                    {Name: "Path", Args: map[string]any{"patterns": []any{"/api/v1/*"}}},
+                },
+            },
+        },
+    },
+}
+server, err := bootstrap.Initialize(bootstrap.NewOptionsBuilder(cfg).Build())
+```
+
+`bootstrap.Initialize` validates the configuration with `config.Validate` and returns an error when it is not
+valid, with one line per broken rule. The rules are the ones the readers apply, which makes everything this
+document says about a required key or a range true for the matching field. `config.Validate(cfg)` can also be
+called on its own. Some rules are easy to miss in code, where a field that is left out is a zero:
+
+* `Gateway.Routes` needs at least one route, and each route an `ID` and a `URI`.
+* When `HTTPClient.Pool` is set, its five durations are pointers that cannot be nil, although they can point
+  to a zero duration, and its three counters cannot be zero. Leave `Pool` nil to get the defaults.
+* When `HTTPClient.MTLS` is set, `Enabled` is a pointer that cannot be nil.
+* When `CircuitBreaker.Enabled` is `true`, no other field of the circuit breaker can be zero.
+
 ## Configuration
 
 The gateway can be configured using either YAML or JSON files. A basic YAML configuration example:
@@ -133,7 +167,8 @@ gateway:
 ```
 
 Every YAML example in this document is a complete configuration and is read and built by a test
-(`pkg/bootstrap/readme_examples_test.go`).
+(`pkg/bootstrap/readme_examples_test.go`). Every Go snippet is compiled by another one
+(`pkg/bootstrap/readme_go_snippets_test.go`).
 
 Settings under `gateway`:
 
@@ -276,6 +311,7 @@ Arguments of `RequestResponseLogger`:
 | `log-bodies`     | `true`  | Whether the bodies are logged. With `false` no body is buffered or copied.           |
 | `max-body-bytes` | `65536` | Most body bytes logged per request and per response. A negative value means no limit. |
 | `redact-headers` | none    | List of header names whose values are redacted, besides the ones that always are.    |
+| `redact-query-params` | none | List of query parameter names whose values are redacted in the logged URL, besides the ones that always are. |
 
 The request body is buffered in memory to be logged, up to `max-body-bytes`: a bigger request body is
 forwarded untouched and logged without its content. The response body is not held back: it streams to the
@@ -285,6 +321,31 @@ size of the body, once the body has been sent.
 `RequestResponseLogger` logs the values of `Authorization`, `Proxy-Authorization`,
 `Cookie`, `Set-Cookie` and `X-Api-Key` as `[REDACTED]`. Its `redact-headers` argument
 adds more header names to that list.
+
+The URL of the request is logged with the credentials it carries replaced the same way:
+
+* The values of the query parameters `access_token`, `id_token`, `refresh_token`, `token`, `api_key`,
+  `apikey`, `password`, `secret`, `client_secret` and `signature`. The `redact-query-params` argument adds
+  more names to that list. `GET /callback?state=xyz&access_token=abc` is logged as
+  `GET /callback?state=xyz&access_token=[REDACTED]`.
+* The user info, which a request only has when its request line holds an absolute URL:
+  `http://user:password@example.org/path` is logged as `http://[REDACTED]@example.org/path`.
+
+How the query string is redacted:
+
+* Only the log line changes. The backend receives the query string as the client sent it.
+* A name matches whatever the case of its ASCII letters, and it is compared decoded: `Access_Token=abc` and
+  `access%5Ftoken=abc` are both redacted. The names of `redact-query-params` are written decoded: `api key`,
+  not `api%20key` or `api+key`.
+* The whole name has to match: `token_type` and `mytoken` are logged as they are.
+* Every value of a repeated parameter is redacted, and so is a parameter that follows a `;` instead of a `&`
+  (`?a=1;token=abc`).
+* The rest of the URL is logged as it was received: the name of the redacted parameter, the order of the
+  parameters, their encoding and the ones that are malformed. A sensitive parameter with no value or with an
+  empty one (`?token`, `?token=`) is also logged as it is.
+* The path and the bodies are not redacted: a credential sent in either of them is logged.
+
+In code, `WithRedactedHeaders` and `WithRedactedQueryParams` return a copy of the filter with more names.
 
 ```yaml
 gateway:
@@ -296,6 +357,8 @@ gateway:
         max-body-bytes: 4096
         redact-headers:
           - X-Internal-Token
+        redact-query-params:
+          - session_id
   routes:
     - id: users
       uri: http://localhost:8080
@@ -401,14 +464,15 @@ request cancelled by the client is not a failure. A `5xx` response is still sent
 |-------------------------------|------------------------------------------------------------------------------------|
 | `enabled`                     | `true` to give the route a circuit breaker. Defaults to `false`.                   |
 | `interval`                    | While the breaker is closed, its counters are reset every `interval`.              |
-| `min-requests-threshold`      | Requests the breaker must have counted before it can open.                         |
+| `min-requests-threshold`      | Requests the breaker must have counted before it can open, from 1 to 4294967295.   |
 | `failure-rate-threshold`      | Percentage of failed requests at which the breaker opens, from 1 to 100.           |
 | `wait-duration-in-open-state` | Time the breaker stays open before it lets requests through again (half-open).     |
-| `num-allowed-half-open-calls` | Requests let through while half-open. The breaker closes when that many succeed in a row and opens again on the first failure. |
+| `num-allowed-half-open-calls` | Requests let through while half-open, from 1 to 4294967295. The breaker closes when that many succeed in a row and opens again on the first failure. |
 
-All the settings are required when `enabled` is `true`, and none can be zero. While the breaker is open, and
-for the requests over the allowed ones while it is half-open, the gateway answers `503 Service Unavailable`
-without calling the backend.
+All the settings are required when `enabled` is `true`, and none can be zero. A negative duration and a
+number out of its range are rejected when the gateway starts, also when `enabled` is `false`. While the
+breaker is open, and for the requests over the allowed ones while it is half-open, the gateway answers
+`503 Service Unavailable` without calling the backend.
 
 ```yaml
 gateway:
@@ -536,7 +600,39 @@ Settings under `mtls`:
 | `key`     | when `enabled` is `true` | Private key of the client certificate, PEM encoded.                      |
 | `ca`      | when `enabled` is `true` | Certificates the backend certificates are verified against, PEM encoded. |
 
-`cert`, `key` and `ca` hold the PEM text itself, not a file name.
+`cert`, `key` and `ca` hold the PEM text itself, not a file name. In YAML a block scalar (`|`) keeps the
+line breaks of the PEM text; in JSON they are written as `\n`. With `mtls` enabled the certificates of the
+backends are verified against `ca` instead of the certificates the system trusts.
+
+```yaml
+gateway:
+  httpclient:
+    mtls:
+      enabled: true
+      cert: |
+        -----BEGIN CERTIFICATE-----
+        <base64 of the client certificate>
+        -----END CERTIFICATE-----
+      key: |
+        -----BEGIN PRIVATE KEY-----
+        <base64 of the private key of the client certificate>
+        -----END PRIVATE KEY-----
+      ca: |
+        -----BEGIN CERTIFICATE-----
+        <base64 of the certificate of the authority that signs the backend certificates>
+        -----END CERTIFICATE-----
+  routes:
+    - id: ledger
+      uri: https://ledger.internal.example.org
+      predicates:
+        - name: Path
+          args:
+            patterns:
+              - /ledger/**
+```
+
+The lines in angle brackets stand for your own PEM content: the test that builds the examples puts there a
+certificate and a key it generates.
 
 * The client has no timeout of its own: every request is bound by the timeout of its route.
 * Redirects are not followed: `3xx` responses are forwarded to the client.
@@ -595,13 +691,18 @@ none.
 * The error handler logs every error it answers: `429` and `499` at `warn` level, the rest at `error` level.
 * A circuit breaker logs each state change as `circuit breaker state changed`, with the attributes `breaker`
   (the route id), `from` and `to` (`closed`, `open` or `half-open`). Opening is logged at `warn` level, the
-  other changes at `info` level.
+  other changes at `info` level. The line is written by the request that caused the change, without holding
+  up the breaker: a slow log handler delays that request, not the other requests of the route. The lines of
+  a breaker are written one at a time and in the order of the changes. While one is being written the next
+  lines wait for it, up to 16 of them: beyond that the oldest waiting ones are dropped.
 * A panic in a filter is logged with its stack and answered with `500`.
 
 ## Bootstrap options
 
 `bootstrap.NewOptionsBuilder(cfg)` returns a builder with the defaults. `Build` returns the options that
-`bootstrap.Initialize` takes. `Initialize` returns the `*http.Server`, not started.
+`bootstrap.Initialize` takes. `Initialize` returns the `*http.Server`, not started, or an error when the
+configuration is not valid or the gateway cannot be built from it. The configuration is validated with
+`config.Validate` whether it was read from a file or [built in code](#configuration-built-in-code).
 
 | Method                 | Default                             | Description                                                |
 |------------------------|-------------------------------------|------------------------------------------------------------|
