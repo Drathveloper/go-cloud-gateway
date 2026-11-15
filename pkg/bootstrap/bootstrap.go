@@ -3,6 +3,7 @@ package bootstrap
 import (
 	"fmt"
 	"log/slog"
+	"maps"
 	"net/http"
 	"time"
 
@@ -24,18 +25,20 @@ const routeTimeoutGrace = 5 * time.Second
 //
 // The gateway is initialized with the given options.
 //
+// Custom predicates and filters are only known to the gateway being initialized: the
+// global predicate.BuilderRegistry and filter.BuilderRegistry are left untouched.
+//
 // The server read and write timeouts are raised when they do not cover the longest route
 // timeout: see ServerOpts.ReadTimeout and ServerOpts.WriteTimeout.
 func Initialize(opts *Options) (*http.Server, error) {
-	for _, customPredicate := range opts.CustomPredicates {
-		predicate.BuilderRegistry.Register(customPredicate.Name, customPredicate.Builder)
+	logger := opts.Logger
+	if logger == nil {
+		// Resolved here and not when the options are built, so that a default logger
+		// installed in between is the one used.
+		logger = slog.Default()
 	}
-	for _, customFilter := range opts.CustomFilters {
-		filter.BuilderRegistry.Register(customFilter.Name, customFilter.Builder)
-	}
-	filterFactory := filter.NewFactory(filter.BuilderRegistry)
-	predFactory := predicate.NewFactory(predicate.BuilderRegistry)
-	routes, err := config.NewRoutes(opts.Config, predFactory, filterFactory, slog.Default())
+	routes, err := config.NewRoutes(
+		opts.Config, newPredicateFactory(opts.CustomPredicates), newFilterFactory(opts.CustomFilters), logger)
 	if err != nil {
 		return nil, fmt.Errorf(initializeErrMsg, err)
 	}
@@ -45,7 +48,9 @@ func Initialize(opts *Options) (*http.Server, error) {
 	}
 	gwy := gateway.NewGateway(client)
 
-	gatewayHandler := gatewayhandler.NewGatewayHandler(gwy, routes, opts.GatewayErrorHandler)
+	// A nil not found handler is ignored by the option, which keeps the default one.
+	gatewayHandler := gatewayhandler.NewGatewayHandler(
+		gwy, routes, opts.GatewayErrorHandler, gatewayhandler.WithNotFoundHandler(opts.NotFoundHandler))
 
 	mux := http.NewServeMux()
 	for _, customHandler := range opts.ServerOptions.CustomHandlers {
@@ -64,6 +69,28 @@ func Initialize(opts *Options) (*http.Server, error) {
 	}
 	raiseReadTimeout(server, routes)
 	return server, nil
+}
+
+// newPredicateFactory returns a factory that knows the built-in predicates and the given
+// custom ones. The custom builders are registered in a copy of the global registry:
+// registered in the global one they would leak into every other gateway of the process,
+// and one named like a built-in predicate would replace it for all of them.
+func newPredicateFactory(customPredicates []CustomPredicate) *predicate.Factory {
+	registry := maps.Clone(predicate.BuilderRegistry)
+	for _, customPredicate := range customPredicates {
+		registry.Register(customPredicate.Name, customPredicate.Builder)
+	}
+	return predicate.NewFactory(registry)
+}
+
+// newFilterFactory returns a factory that knows the built-in filters and the given custom
+// ones. See newPredicateFactory for why the global registry is copied.
+func newFilterFactory(customFilters []CustomFilter) *filter.Factory {
+	registry := maps.Clone(filter.BuilderRegistry)
+	for _, customFilter := range customFilters {
+		registry.Register(customFilter.Name, customFilter.Builder)
+	}
+	return filter.NewFactory(registry)
 }
 
 // coverRouteTimeouts returns the read or write timeout the server must run with. Both

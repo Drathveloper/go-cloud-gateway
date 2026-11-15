@@ -1,6 +1,7 @@
 package bootstrap_test
 
 import (
+	"log/slog"
 	"net/http"
 	"reflect"
 	"testing"
@@ -355,6 +356,64 @@ func TestOptionsBuilder_Build(t *testing.T) {
 				t.Errorf("expected %+v actual %+v", tt.expectedOpts, opts)
 			}
 			assertServerOpts(t, tt.expectedOpts.ServerOptions, opts.ServerOptions)
+		})
+	}
+}
+
+func TestOptionsBuilder_Build_LoggerAndNotFoundHandler(t *testing.T) {
+	logger := slog.New(slog.DiscardHandler)
+	// A pointer, so that the handlers can be compared.
+	notFoundHandler := http.NewServeMux()
+	tests := []struct {
+		configure               func(builder *bootstrap.OptionsBuilder)
+		expectedLogger          *slog.Logger
+		expectedNotFoundHandler http.Handler
+		name                    string
+	}{
+		{
+			name:                    "build should leave logger and not found handler unset when none provided",
+			configure:               func(_ *bootstrap.OptionsBuilder) {},
+			expectedLogger:          nil,
+			expectedNotFoundHandler: nil,
+		},
+		{
+			name: "build should succeed when logger provided",
+			configure: func(builder *bootstrap.OptionsBuilder) {
+				builder.WithLogger(logger)
+			},
+			expectedLogger:          logger,
+			expectedNotFoundHandler: nil,
+		},
+		{
+			name: "build should succeed when not found handler provided",
+			configure: func(builder *bootstrap.OptionsBuilder) {
+				builder.WithNotFoundHandler(notFoundHandler)
+			},
+			expectedLogger:          nil,
+			expectedNotFoundHandler: notFoundHandler,
+		},
+		{
+			name: "build should succeed when logger and not found handler provided",
+			configure: func(builder *bootstrap.OptionsBuilder) {
+				builder.WithLogger(logger).WithNotFoundHandler(notFoundHandler)
+			},
+			expectedLogger:          logger,
+			expectedNotFoundHandler: notFoundHandler,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			builder := bootstrap.NewOptionsBuilder(&config.Config{})
+			tt.configure(builder)
+
+			opts := builder.Build()
+
+			if opts.Logger != tt.expectedLogger {
+				t.Errorf("expected logger %v actual %v", tt.expectedLogger, opts.Logger)
+			}
+			if opts.NotFoundHandler != tt.expectedNotFoundHandler {
+				t.Errorf("expected not found handler %v actual %v", tt.expectedNotFoundHandler, opts.NotFoundHandler)
+			}
 		})
 	}
 }

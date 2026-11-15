@@ -1,6 +1,8 @@
 package bootstrap
 
 import (
+	"log/slog"
+	"net/http"
 	"time"
 
 	"github.com/drathveloper/go-cloud-gateway/pkg/config"
@@ -17,9 +19,11 @@ const defaultMaxHeaderBytes = 1 << 20
 // OptionsBuilder is the builder for the initialization options.
 type OptionsBuilder struct {
 	config             *config.Config
+	logger             *slog.Logger
+	customErrorHandler gatewayhandler.ErrorHandler
+	notFoundHandler    http.Handler
 	customFilters      []CustomFilter
 	customPredicates   []CustomPredicate
-	customErrorHandler gatewayhandler.ErrorHandler
 	serverOptions      ServerOpts
 }
 
@@ -91,10 +95,28 @@ func (b *OptionsBuilder) WithErrorHandler(errorHandler gatewayhandler.ErrorHandl
 	return b
 }
 
+// WithLogger sets the logger the gateway logs with.
+//
+// Nil, the default, means slog.Default(), resolved when Initialize runs.
+func (b *OptionsBuilder) WithLogger(logger *slog.Logger) *OptionsBuilder {
+	b.logger = logger
+	return b
+}
+
+// WithNotFoundHandler sets the handler that answers the requests that match no route.
+//
+// Nil, the default, keeps the default handler: see gatewayhandler.WithNotFoundHandler.
+func (b *OptionsBuilder) WithNotFoundHandler(handler http.Handler) *OptionsBuilder {
+	b.notFoundHandler = handler
+	return b
+}
+
 // Build builds the options.
 func (b *OptionsBuilder) Build() *Options {
 	return &Options{
 		Config:              b.config,
+		Logger:              b.logger,
+		NotFoundHandler:     b.notFoundHandler,
 		CustomFilters:       b.customFilters,
 		CustomPredicates:    b.customPredicates,
 		GatewayErrorHandler: b.customErrorHandler,

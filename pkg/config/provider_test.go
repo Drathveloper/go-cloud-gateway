@@ -1,6 +1,7 @@
 package config_test
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -24,7 +25,8 @@ import (
 
 //nolint:bodyclose
 func TestNewRoutes(t *testing.T) {
-	logger := slog.Default()
+	var logs bytes.Buffer
+	logger := newBufferLogger(&logs, false)
 	tests := []struct {
 		expectedErr error
 		config      *config.Config
@@ -75,7 +77,7 @@ func TestNewRoutes(t *testing.T) {
 						filter.NewAddRequestHeaderFilter("X-Test", "True"),
 					},
 					Timeout:        10 * time.Second,
-					Logger:         logger,
+					Logger:         logger.With("route", "r1"),
 					CircuitBreaker: gateway.CircuitBreaker[*http.Response](nil),
 				},
 			},
@@ -135,7 +137,7 @@ func TestNewRoutes(t *testing.T) {
 						filter.NewAddRequestHeaderFilter("X-Test", "True"),
 					},
 					Timeout:        10 * time.Second,
-					Logger:         logger,
+					Logger:         logger.With("route", "r1"),
 					CircuitBreaker: gateway.CircuitBreaker[*http.Response](nil),
 				},
 			},
@@ -353,7 +355,7 @@ func TestNewRoutes(t *testing.T) {
 						filter.NewAddRequestHeaderFilter("X-Test", "True"),
 					},
 					Timeout:        10 * time.Second,
-					Logger:         logger,
+					Logger:         logger.With("route", "r1"),
 					CircuitBreaker: nil,
 				},
 			},
@@ -415,7 +417,7 @@ func TestNewRoutes(t *testing.T) {
 						filter.NewAddRequestHeaderFilter("X-Test", "True"),
 					},
 					Timeout: 10 * time.Second,
-					Logger:  logger,
+					Logger:  logger.With("route", "r1"),
 					CircuitBreaker: circuitbreaker.NewCircuitBreaker[*http.Response](circuitbreaker.Settings{
 						Name:        "r1",
 						Interval:    10 * time.Second,
@@ -451,8 +453,9 @@ func TestNewRoutes(t *testing.T) {
 				if !reflect.DeepEqual(routes[i].Filters, tt.expected[i].Filters) {
 					t.Errorf("expected %v actual %v", tt.expected[i], routes[i])
 				}
-				if !reflect.DeepEqual(routes[i].Logger, tt.expected[i].Logger) {
-					t.Errorf("expected %v actual %v", tt.expected[i], routes[i])
+				expectedLine := probeLine(&logs, tt.expected[i].Logger)
+				if actualLine := probeLine(&logs, routes[i].Logger); expectedLine != actualLine {
+					t.Errorf("expected logger writing %q actual %q", expectedLine, actualLine)
 				}
 				if !reflect.DeepEqual(routes[i].Predicates, tt.expected[i].Predicates) {
 					t.Errorf("expected %v actual %v", tt.expected[i], routes[i])
@@ -1014,7 +1017,10 @@ func TestNewHTTPClient_TransportSettings(t *testing.T) {
 	}
 }
 
-func newCircuitBreakerRoute(t *testing.T) gateway.Routes {
+// newCircuitBreakerRoute returns a route with a circuit breaker that opens on the third
+// failure and stays open for the given time. The route and its breaker log through the
+// given logger.
+func newCircuitBreakerRoute(t *testing.T, logger *slog.Logger, waitInOpenState time.Duration) gateway.Routes {
 	t.Helper()
 	cfg := &config.Config{
 		Gateway: config.Gateway{
@@ -1033,7 +1039,7 @@ func newCircuitBreakerRoute(t *testing.T) gateway.Routes {
 						Interval:                config.Duration{Duration: time.Minute},
 						FailureRateThreshold:    50,
 						NumAllowedHalfOpenCalls: 1,
-						WaitDurationInOpenState: config.Duration{Duration: time.Minute},
+						WaitDurationInOpenState: config.Duration{Duration: waitInOpenState},
 						MinRequestsThreshold:    3,
 					},
 				},
@@ -1044,7 +1050,7 @@ func newCircuitBreakerRoute(t *testing.T) gateway.Routes {
 		cfg,
 		predicate.NewFactory(predicate.BuilderRegistry),
 		filter.NewFactory(filter.BuilderRegistry),
-		slog.Default())
+		logger)
 	if err != nil {
 		t.Fatalf("NewRoutes() error = %v", err)
 	}
@@ -1052,7 +1058,7 @@ func newCircuitBreakerRoute(t *testing.T) gateway.Routes {
 }
 
 func TestNewRoutes_CircuitBreakerOpensOnNetworkErrors(t *testing.T) {
-	routes := newCircuitBreakerRoute(t)
+	routes := newCircuitBreakerRoute(t, slog.New(slog.DiscardHandler), time.Minute)
 	breaker := routes[0].CircuitBreaker
 
 	for range 5 {
@@ -1067,7 +1073,7 @@ func TestNewRoutes_CircuitBreakerOpensOnNetworkErrors(t *testing.T) {
 }
 
 func TestNewRoutes_CircuitBreakerIgnoresClientCancellations(t *testing.T) {
-	routes := newCircuitBreakerRoute(t)
+	routes := newCircuitBreakerRoute(t, slog.New(slog.DiscardHandler), time.Minute)
 	breaker := routes[0].CircuitBreaker
 
 	for range 5 {

@@ -23,12 +23,23 @@ import (
 // ErrInitializeMTLS is the error returned when the mTLS initialization failed.
 var ErrInitializeMTLS = errors.New("failed to initialize mTLS")
 
+// routeLogKey is the attribute every log line of a route carries with the route id.
+const routeLogKey = "route"
+
 // NewRoutes creates a new gateway route from the given config.
+//
+// Each route logs through a child of the given logger that carries the route id in the
+// "route" attribute, and so does its circuit breaker. A nil logger means slog.Default().
 func NewRoutes(
 	cfg *Config,
 	predicateFactory *predicate.Factory,
 	filterFactory *filter.Factory,
 	logger *slog.Logger) (gateway.Routes, error) {
+	if logger == nil {
+		// The route loggers are derived from this one, and deriving from a nil logger
+		// panics: without the fallback, routes could no longer be built without a logger.
+		logger = slog.Default()
+	}
 	return mapRoutesFromConfigToGateway(cfg.Gateway, predicateFactory, filterFactory, logger)
 }
 
@@ -222,9 +233,12 @@ func mapRoutesFromConfigToGateway(
 			return nil, fmt.Errorf("map routes from config to gateway failed: %w", err)
 		}
 		timeout := calculateTimeout(route.Timeout, gwConfig.GlobalTimeout)
-		circuitBreaker := mapCircuitBreakerFromConfigToGateway(route.ID, route.CircuitBreaker)
+		// The route id is attached here, once per route, instead of on every request:
+		// filters and the error handler log through the route logger as it is.
+		routeLogger := logger.With(routeLogKey, route.ID)
+		circuitBreaker := mapCircuitBreakerFromConfigToGateway(route.ID, route.CircuitBreaker, routeLogger)
 		buildRoute, err := gateway.NewRoute(
-			route.ID, route.URI, predicates, globalFilters, filters, timeout, circuitBreaker, logger)
+			route.ID, route.URI, predicates, globalFilters, filters, timeout, circuitBreaker, routeLogger)
 		if err != nil {
 			return nil, fmt.Errorf("map routes from config to gateway failed: %w", err)
 		}
@@ -281,9 +295,31 @@ func isRequestSuccessful(err error) bool {
 	return err == nil || errors.Is(err, context.Canceled)
 }
 
+// logCircuitBreakerStateChange returns the circuit breaker callback that logs every state
+// change. Without it a breaker that opens makes the gateway answer 503 and nothing in the
+// logs says why. Opening is the only change that takes the route out of service, hence
+// the only one logged at warn level.
+//
+// The breaker runs the callback while it holds its mutex: it must not call back into the
+// breaker, and a slow log handler holds up the requests of the route meanwhile.
+func logCircuitBreakerStateChange(logger *slog.Logger) func(name string, previous, current circuitbreaker.State) {
+	return func(name string, previous, current circuitbreaker.State) {
+		level := slog.LevelInfo
+		if current == circuitbreaker.StateOpen {
+			level = slog.LevelWarn
+		}
+		// The states are logged by name: a State is an integer, which is what a JSON
+		// handler would print for it.
+		logger.Log(context.Background(), level, "circuit breaker state changed",
+			"breaker", name,
+			"from", previous.String(),
+			"to", current.String())
+	}
+}
+
 //nolint:bodyclose
 func mapCircuitBreakerFromConfigToGateway(
-	name string, circuitBreaker CircuitBreaker) gateway.CircuitBreaker[*http.Response] {
+	name string, circuitBreaker CircuitBreaker, logger *slog.Logger) gateway.CircuitBreaker[*http.Response] {
 	if !circuitBreaker.Enabled {
 		return nil
 	}
@@ -294,7 +330,7 @@ func mapCircuitBreakerFromConfigToGateway(
 		Timeout:     circuitBreaker.WaitDurationInOpenState.Duration,
 		ReadyToTrip: circuitbreaker.DefaultReadyToTrip(
 			circuitBreaker.MinRequestsThreshold, circuitBreaker.FailureRateThreshold),
-		OnStateChange: func(_ string, _, _ circuitbreaker.State) {},
+		OnStateChange: logCircuitBreakerStateChange(logger),
 		IsSuccessful:  isRequestSuccessful,
 	}
 	return circuitbreaker.NewCircuitBreaker[*http.Response](settings)

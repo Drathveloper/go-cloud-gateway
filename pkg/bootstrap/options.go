@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -10,11 +11,24 @@ import (
 )
 
 // Options is the options for the initialization of the gateway.
+//
+// Logger is the logger the gateway logs with. Each route logs through a child of it that
+// carries the route id in the "route" attribute. Nil means slog.Default(), resolved when
+// Initialize runs.
+//
+// NotFoundHandler answers the requests that match no route. Nil means the default
+// handler: see gatewayhandler.WithNotFoundHandler.
+//
+// CustomFilters and CustomPredicates are only registered for the gateway built from
+// these options. One named like a built-in filter or predicate replaces it for that
+// gateway alone.
 type Options struct {
 	Config              *config.Config
+	Logger              *slog.Logger
+	GatewayErrorHandler gatewayhandler.ErrorHandler
+	NotFoundHandler     http.Handler
 	CustomFilters       []CustomFilter
 	CustomPredicates    []CustomPredicate
-	GatewayErrorHandler gatewayhandler.ErrorHandler
 	ServerOptions       ServerOpts
 }
 
