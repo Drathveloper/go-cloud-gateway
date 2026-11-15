@@ -45,6 +45,9 @@ type requestBody struct {
 	done bool
 	// abandoned is set once Abandon made the reads fail.
 	abandoned bool
+	// settled is set once the handler has decided how to answer: the body cannot be
+	// abandoned after that. See settle.
+	settled bool
 }
 
 // trackRequestBody puts a requestBody in place of the body of the request and returns it.
@@ -93,11 +96,31 @@ func (b *requestBody) Abandon() {
 	}
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	if b.done {
+	if b.done || b.settled {
 		return
 	}
 	b.abandoned = true
 	_ = http.NewResponseController(b.writer).SetReadDeadline(time.Unix(1, 0))
+}
+
+// settle stops the body from being abandoned from now on and reports whether it has
+// been. The handler calls it right before it answers, and closes the connection after
+// the response of an abandoned body.
+//
+// net/http closes that connection on its own when part of the body is left unread, but
+// not in the one case Abandon cannot tell apart: a read that is returning the end of the
+// body. net/http has then already started the background read that detects a client that
+// goes away, the deadline in the past makes that read fail, and net/http cancels the
+// context of the connection for good, without closing it. Every later request of a
+// connection kept alive in that state would start with a cancelled context.
+func (b *requestBody) settle() bool {
+	if b == nil {
+		return false
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.settled = true
+	return b.abandoned
 }
 
 // extendReadDeadline gives the read that is about to start its own deadline.
@@ -164,7 +187,8 @@ func (b *requestBody) renewReadDeadline(timeout time.Duration) {
 	}
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	if b.done {
+	// An abandoned body stays unreadable: its connection is closed after the response.
+	if b.done || b.abandoned {
 		return
 	}
 	controller := http.NewResponseController(b.writer)

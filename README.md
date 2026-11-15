@@ -438,8 +438,8 @@ bounds the **whole exchange**, response body included, and the gateway answers
 The `504` is sent when the timeout expires, also to a client that is still sending the
 request body. The gateway stops reading that body, so the connection cannot be reused: the
 response carries `Connection: close` and the connection is closed after it. A request whose
-body was read to the end keeps its connection, and on HTTP/2 only the stream of the request
-ends. As with any response sent before the request is complete, a client has to read while
+body had been read to the end before the timeout keeps its connection, and on HTTP/2 only
+the stream of the request ends. As with any response sent before the request is complete, a client has to read while
 it writes to see it: one that only reads once it has sent everything keeps writing to a
 connection that is closed half a second later, and may get a connection reset instead.
 

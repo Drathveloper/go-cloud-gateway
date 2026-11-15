@@ -496,3 +496,69 @@ func TestRequestBody_ConcurrentUse(t *testing.T) {
 	_, _ = body.Read(make([]byte, 1))
 	assert.Len(t, recorder.deadlines(), last, "expected no deadline once released")
 }
+
+// The handler settles the body right before it answers: it learns whether the body was
+// abandoned, which costs the connection, and nothing can abandon it after that.
+func TestRequestBody_Settle(t *testing.T) {
+	t.Run("abandoned body should be reported", func(t *testing.T) {
+		body := newTrackedBody(t, &scriptedBody{chunks: []string{"one"}}, newConnRecorder())
+		body.Abandon()
+
+		assert.True(t, body.settle())
+	})
+	t.Run("body abandoned while its last read returns should be reported", func(t *testing.T) {
+		recorder := newConnRecorder()
+		source := &abandonedAtEndBody{}
+		body := newTrackedBody(t, source, recorder)
+		source.abandon = body.Abandon
+
+		_, err := body.Read(make([]byte, 1))
+
+		assert.Equal(t, io.EOF, err)
+		assert.Len(t, recorder.deadlines(), 1)
+		assert.True(t, body.settle())
+	})
+	t.Run("body left alone should not be reported", func(t *testing.T) {
+		body := newTrackedBody(t, &scriptedBody{chunks: []string{"one"}}, newConnRecorder())
+
+		assert.False(t, body.settle())
+	})
+	t.Run("settled body should not be abandoned anymore", func(t *testing.T) {
+		recorder := newConnRecorder()
+		body := newTrackedBody(t, &scriptedBody{chunks: []string{"one"}}, recorder)
+		require.False(t, body.settle())
+
+		body.Abandon()
+
+		assert.Empty(t, recorder.deadlines())
+		assert.False(t, body.settle())
+	})
+	t.Run("abandoned body should not get its read deadline renewed", func(t *testing.T) {
+		recorder := newConnRecorder()
+		body := newTrackedBody(t, &scriptedBody{chunks: []string{"one"}}, recorder)
+		body.Abandon()
+
+		body.renewReadDeadline(time.Minute)
+
+		assert.Len(t, recorder.deadlines(), 1)
+		assert.Zero(t, recorder.fullDuplexCalls())
+	})
+	t.Run("request without a body should not be reported", func(t *testing.T) {
+		var body *requestBody
+
+		assert.False(t, body.settle())
+	})
+}
+
+// abandonedAtEndBody is a body that is abandoned while the read that reaches its end is
+// returning, which is when a route timeout cannot tell that nothing is left to read.
+type abandonedAtEndBody struct {
+	abandon func()
+}
+
+func (b *abandonedAtEndBody) Read([]byte) (int, error) {
+	b.abandon()
+	return 0, io.EOF
+}
+
+func (b *abandonedAtEndBody) Close() error { return nil }
