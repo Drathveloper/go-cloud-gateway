@@ -29,7 +29,14 @@ func readTestConfig(t *testing.T, cfgJSON string) *config.Config {
 func startTestGateway(t *testing.T, cfgJSON string, serverOpts bootstrap.ServerOpts) *httptest.Server {
 	t.Helper()
 	builder := bootstrap.NewOptionsBuilder(readTestConfig(t, cfgJSON)).WithServerOptions(serverOpts)
-	server, err := bootstrap.Initialize(builder.Build())
+	return startTestGatewayWithOptions(t, builder.Build())
+}
+
+// startTestGatewayWithOptions serves the gateway built from the given options on a test
+// server that keeps the timeouts of the initialized server.
+func startTestGatewayWithOptions(t *testing.T, opts *bootstrap.Options) *httptest.Server {
+	t.Helper()
+	server, err := bootstrap.Initialize(opts)
 	if err != nil {
 		t.Fatalf("failed to initialize gateway: %v", err)
 	}
