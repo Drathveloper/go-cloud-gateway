@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"slices"
 	"testing"
 	"time"
 
@@ -103,6 +104,65 @@ func TestNewRoute(t *testing.T) {
 			}
 			if tt.expectedURI != route.URI.String() {
 				t.Errorf("expected uri %s actual %s", tt.expectedURI, route.URI.String())
+			}
+		})
+	}
+}
+
+// NewRoute is public API: a caller can build every route from one slice of global
+// filters. With spare capacity in that slice, appending the route filters to it in place
+// would make the routes overwrite each other's filters.
+func TestNewRoute_DoesNotShareFiltersBetweenRoutes(t *testing.T) {
+	tests := []struct {
+		name          string
+		globalFilters []string
+		spareCapacity int
+	}{
+		{
+			name:          "new route should keep its own filters when the global filters have spare capacity",
+			globalFilters: []string{"G1", "G2"},
+			spareCapacity: 4,
+		},
+		{
+			name:          "new route should keep its own filters when the global filters are empty with spare capacity",
+			globalFilters: nil,
+			spareCapacity: 4,
+		},
+		{
+			name:          "new route should keep its own filters when the global filters have no spare capacity",
+			globalFilters: []string{"G1", "G2"},
+			spareCapacity: 0,
+		},
+	}
+	filterIDs := func(filters gateway.Filters) []string {
+		ids := make([]string, 0, len(filters))
+		for _, f := range filters {
+			ids = append(ids, f.Name())
+		}
+		return ids
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			globalFilters := make(gateway.Filters, 0, len(tt.globalFilters)+tt.spareCapacity)
+			for _, id := range tt.globalFilters {
+				globalFilters = append(globalFilters, &DummyFilter{ID: id})
+			}
+			routeFilters1 := gateway.Filters{&DummyFilter{ID: "R1-A"}, &DummyFilter{ID: "R1-B"}}
+			routeFilters2 := gateway.Filters{&DummyFilter{ID: "R2-A"}}
+
+			route1, err1 := gateway.NewRoute("R1", "http://localhost:8080", nil, globalFilters, routeFilters1, 0, nil, nil)
+			route2, err2 := gateway.NewRoute("R2", "http://localhost:8080", nil, globalFilters, routeFilters2, 0, nil, nil)
+			if err1 != nil || err2 != nil {
+				t.Fatalf("expected err %v actual %v %v", nil, err1, err2)
+			}
+
+			expected1 := append(slices.Clone(tt.globalFilters), "R1-A", "R1-B")
+			if actual := filterIDs(route1.Filters); !slices.Equal(expected1, actual) {
+				t.Errorf("expected %v actual %v", expected1, actual)
+			}
+			expected2 := append(slices.Clone(tt.globalFilters), "R2-A")
+			if actual := filterIDs(route2.Filters); !slices.Equal(expected2, actual) {
+				t.Errorf("expected %v actual %v", expected2, actual)
 			}
 		})
 	}
