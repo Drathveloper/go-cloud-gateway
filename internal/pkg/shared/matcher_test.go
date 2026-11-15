@@ -182,6 +182,182 @@ func TestPathPattern_Match(t *testing.T) {
 	}
 }
 
+func TestPathPattern_MatchEscaped(t *testing.T) {
+	tests := []struct {
+		name    string
+		pattern string
+		path    string
+		match   bool
+	}{
+		{
+			name:    "empty match should succeed when path is empty",
+			pattern: "",
+			path:    "",
+			match:   true,
+		},
+		{
+			name:    "empty match should fail when path is not empty",
+			pattern: "",
+			path:    "/a%2Fb",
+			match:   false,
+		},
+		{
+			name:    "any match should succeed",
+			pattern: "/**",
+			path:    "/a%2Fb/c",
+			match:   true,
+		},
+		{
+			name:    "path without escapes should match as it does decoded",
+			pattern: "/server/**/x",
+			path:    "/server/one/two/x",
+			match:   true,
+		},
+		{
+			name:    "simple match should succeed when the encoded separator is inside the segment",
+			pattern: "/static/*.css",
+			path:    "/static/a%2Fb.css",
+			match:   true,
+		},
+		{
+			name:    "simple match should succeed when the encoded separator is in lower case",
+			pattern: "/static/*.css",
+			path:    "/static/a%2fb.css",
+			match:   true,
+		},
+		{
+			name:    "pattern with one more segment should fail when the separator is encoded",
+			pattern: "/static/*/b.css",
+			path:    "/static/a%2Fb.css",
+			match:   false,
+		},
+		{
+			name:    "literal pattern should fail when the separator is encoded",
+			pattern: "/static/a/b.css",
+			path:    "/static/a%2Fb.css",
+			match:   false,
+		},
+		{
+			name:    "single character match should succeed on an encoded separator",
+			pattern: "/static/a?b.css",
+			path:    "/static/a%2Fb.css",
+			match:   true,
+		},
+		{
+			name:    "single character match should take an escape as one character",
+			pattern: "/files/my?file",
+			path:    "/files/my%20file",
+			match:   true,
+		},
+		{
+			name:    "single character match should fail when the escape is taken as three characters",
+			pattern: "/files/my???file",
+			path:    "/files/my%20file",
+			match:   false,
+		},
+		{
+			name:    "literal pattern should match the character an escape stands for",
+			pattern: "/files/my file",
+			path:    "/files/my%20file",
+			match:   true,
+		},
+		{
+			name:    "literal pattern should match an escaped unreserved character",
+			pattern: "/files/abc",
+			path:    "/files/%61b%63",
+			match:   true,
+		},
+		{
+			name:    "literal pattern should not match the text of an escape",
+			pattern: "/files/my%20file",
+			path:    "/files/my%20file",
+			match:   false,
+		},
+		{
+			name:    "literal pattern should match an escaped percent sign",
+			pattern: "/files/100%",
+			path:    "/files/100%25",
+			match:   true,
+		},
+		{
+			name:    "escaped percent sign followed by 2F should not be an encoded separator",
+			pattern: "/files/a%2Fb",
+			path:    "/files/a%252Fb",
+			match:   true,
+		},
+		{
+			name:    "simple match should backtrack over escapes",
+			pattern: "/files/*%20b",
+			path:    "/files/a%2520%2520b%2520b",
+			match:   true,
+		},
+		{
+			name:    "simple match should fail when nothing follows the wildcard match",
+			pattern: "/files/*b",
+			path:    "/files/a%2Fb%2Fc",
+			match:   false,
+		},
+		{
+			name:    "recursive match should count an encoded separator as part of one segment",
+			pattern: "/api/**/users/*",
+			path:    "/api/v1/users/extra/users/7%2F8",
+			match:   true,
+		},
+		{
+			name:    "recursive match should fail when the last segment is behind an encoded separator",
+			pattern: "/api/**/users",
+			path:    "/api/v1%2Fusers",
+			match:   false,
+		},
+		{
+			name:    "leading encoded separator should not be trimmed",
+			pattern: "/a",
+			path:    "/%2Fa",
+			match:   false,
+		},
+		{
+			name:    "trailing encoded separator should not be trimmed",
+			pattern: "/a",
+			path:    "/a%2F",
+			match:   false,
+		},
+		{
+			name:    "trailing separator should not be significant",
+			pattern: "/a%2Fb",
+			path:    "/a%252Fb/",
+			match:   true,
+		},
+		{
+			name:    "encoded dot segment should stay one segment with the separator",
+			pattern: "/public/*",
+			path:    "/public/..%2Fadmin",
+			match:   true,
+		},
+		{
+			name:    "encoded dot segment should not be seen as the segments it decodes to",
+			pattern: "/public/*/admin",
+			path:    "/public/..%2Fadmin",
+			match:   false,
+		},
+		{
+			name:    "percent sign that does not start an escape should be taken as it is",
+			pattern: "/a%zz/b%2",
+			path:    "/a%zz/b%2",
+			match:   true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pattern := shared.CompilePathPattern(tt.pattern)
+
+			actual := pattern.MatchEscaped(tt.path)
+			if tt.match != actual {
+				t.Errorf("expected %t actual %t", tt.match, actual)
+			}
+		})
+	}
+}
+
 func TestHostPattern_Match(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -339,6 +515,76 @@ func TestHostPattern_Match(t *testing.T) {
 			result := pattern.Match(tt.host)
 			if tt.expected != result {
 				t.Errorf("expected %t actual %t", tt.expected, result)
+			}
+		})
+	}
+}
+
+// A '*' of the pattern is a wildcard whatever the segment has at that place, a '*' of
+// its own included: it used to be compared as a literal there, and the rest of the
+// pattern was then held against a segment that the wildcard would have matched.
+func TestPathPattern_Match_WildcardOverALiteralAsterisk(t *testing.T) {
+	tests := []struct {
+		name    string
+		pattern string
+		path    string
+		escaped string
+		match   bool
+	}{
+		{
+			name:    "wildcard should match a segment that starts with an asterisk",
+			pattern: "/files/*.css",
+			path:    "/files/*x.css",
+			escaped: "/files/%2Ax.css",
+			match:   true,
+		},
+		{
+			name:    "wildcard should match an asterisk and what follows it",
+			pattern: "/a*",
+			path:    "/a*b",
+			escaped: "/a%2Ab",
+			match:   true,
+		},
+		{
+			name:    "wildcard should match a lone asterisk",
+			pattern: "/a/*",
+			path:    "/a/*",
+			escaped: "/a/%2a",
+			match:   true,
+		},
+		{
+			name:    "wildcard between literals should match a segment full of asterisks",
+			pattern: "/a*b",
+			path:    "/a***b",
+			escaped: "/a%2A*%2Ab",
+			match:   true,
+		},
+		{
+			name:    "literal after the wildcard should still be required",
+			pattern: "/files/*.css",
+			path:    "/files/*x.js",
+			escaped: "/files/%2Ax.js",
+			match:   false,
+		},
+		{
+			name:    "wildcard should not cross a separator after an asterisk",
+			pattern: "/files/*.css",
+			path:    "/files/*/x.css",
+			escaped: "/files/%2A/x.css",
+			match:   false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pattern := shared.CompilePathPattern(tt.pattern)
+
+			if actual := pattern.Match(tt.path); actual != tt.match {
+				t.Errorf("path %q: expected %t actual %t", tt.path, tt.match, actual)
+			}
+			for _, escaped := range []string{tt.path, tt.escaped} {
+				if actual := pattern.MatchEscaped(escaped); actual != tt.match {
+					t.Errorf("escaped path %q: expected %t actual %t", escaped, tt.match, actual)
+				}
 			}
 		})
 	}

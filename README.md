@@ -206,7 +206,7 @@ Durations are strings with a unit, such as `30s`, `1m30s` or `250ms`. A bare num
 | Predicate | Arguments                    | Matches when                                                             |
 |-----------|------------------------------|--------------------------------------------------------------------------|
 | `Path`    | `patterns` (list)            | The request path matches at least one pattern.                           |
-| `Host`    | `patterns` (list)            | The `Host` header matches at least one pattern.                          |
+| `Host`    | `patterns` (list)            | The host of the request matches at least one pattern.                    |
 | `Method`  | `methods` (list)             | The request method is in the list. The methods can be written in any case. |
 | `Header`  | `name`, `regexp` (optional)  | The request has the header and, with `regexp`, one of its values matches it. |
 | `Query`   | `name`, `regexp` (optional)  | The request has the query parameter and, with `regexp`, one of its values matches it. |
@@ -220,6 +220,8 @@ Durations are strings with a unit, such as `30s`, `1m30s` or `250ms`. A bare num
   empty value is present (`?flag` and `?flag=` both match `Query` with `name: flag`).
 * `regexp` uses the Go [regular expression syntax](https://pkg.go.dev/regexp/syntax) and matches anywhere in
   the value. Use `^` and `$` to match the whole value. An empty value can match it.
+* `Header` also reads a value as a comma-separated list, and takes a few headers from where the server
+  leaves them: see [Header values](#header-values).
 * Datetimes are [RFC 3339](https://www.rfc-editor.org/rfc/rfc3339) timestamps, such as `2030-01-01T00:00:00Z`.
 
 ```yaml
@@ -271,13 +273,94 @@ The `Path` predicate matches the request path segment by segment:
 * `**` matches any number of segments, including none: `/api/**/users/*` matches
   `/api/users/7` and `/api/v1/tenants/users/7`.
 * `*` matches any number of characters within a segment and `?` exactly one.
+* The segments are the ones of the path as the client sent it, split at its `/`. Each one is
+  percent-decoded before it is compared: `/files/my%20file` matches the pattern `/files/my file`.
+* An encoded slash (`%2F`) does not end a segment: it is one more character of it, which `*` and `?` can
+  match. `/static/a%2Fb.css` matches `/static/*.css` and does not match `/static/*/b.css`, which is the
+  pattern for `/static/a/b.css`.
 
-The `Host` predicate matches the `Host` header, case-insensitively:
+Dot segments are not resolved by the `Path` predicate. The server redirects a request with `/./`, `/../`
+or `//` in its path to the clean path with a `307` before any route is tried, but only when they are not
+encoded: `/public/%2E%2E/admin` and `/public/..%2Fadmin` are matched as they are, the first one as the
+segments `public`, `..` and `admin` and the second one as `public` and `../admin`. Neither matches a
+route for `/admin/**`, and both match `/public/**`, whose backend receives them as the client sent them.
+
+The backend receives the path as the client encoded it, `%2F` included. The exception is a path changed
+by `RewritePath`: the filter works on the decoded path, so the path it writes has a `/` where the client
+sent `%2F`.
+
+The `Host` predicate matches the host of the request, case-insensitively. The host is the `Host` header,
+or the `:authority` pseudo-header in HTTP/2:
 
 * `*` matches one or more characters within a label, `**` across labels and `?` exactly one
-  character. Everything else is literal.
+  character. Everything else is literal: a pattern is not a regular expression.
 * The port is ignored unless the pattern has one: `example.org` matches
   `example.org:8080`, while `example.org:8080` only matches that port.
+
+To match the host with a regular expression, use the `Header` predicate with `name: Host`, described
+below.
+
+#### Header values
+
+With `regexp`, a value of the header matches when the regexp matches it as a whole, the way it was
+received, or when it matches any element of the value read as a comma-separated list
+([RFC 9110, section 5.6.1](https://www.rfc-editor.org/rfc/rfc9110#section-5.6.1)). A header sent in
+several lines and the same header in one line are the same header, and a proxy may turn one into the
+other: with `regexp: ^v[0-9]+$`, the line `X-Api-Version: beta, v3` matches, like the two lines
+`X-Api-Version: beta` and `X-Api-Version: v3` do.
+
+* The elements are trimmed of the spaces and tabs around them and the empty ones are skipped. A comma
+  inside a quoted string does not separate anything: `"a, b", c` has the elements `"a, b"` and `c`.
+* The whole value is tested first, so a regexp for a value that has commas and is not a list, such as
+  `^Sun, 15 Nov 2026` for a `Date`, matches as it always did.
+* A regexp can therefore match an element of a value that it does not match as a whole: `^deflate$`
+  matches `Accept-Encoding: gzip, deflate`. That holds for every header, also for the ones that are not
+  lists: `^15 Nov` matches the `Date` above.
+
+The server takes some headers out of the request headers. `Header` handles them by `name`, written in
+any case:
+
+| `name`              | What the predicate tests                                                              |
+|---------------------|---------------------------------------------------------------------------------------|
+| `Host`              | The host of the request, as the client sent it: with its port, if it sent one, and in the same case. It is not read as a list, and a request without a host does not match. |
+| `Transfer-Encoding` | The transfer coding of the request body. It can only be `chunked`, in lower case: the server rejects any other coding before the request is routed, and HTTP/2 has no transfer codings. |
+| `Trailer`           | Nothing: the gateway does not start. The server keeps the names the header announces, but not the value the client sent. |
+
+* Use the `Host` predicate to route by host name: it takes patterns and ignores the port and the case.
+  Use `Header` with `name: Host` when the host has to match a regular expression, or when the port or the
+  case matter: `regexp: ^(api|admin)\.example\.org(:[0-9]+)?$`.
+* A `name` that cannot be the name of a header, such as one with a space or an HTTP/2 pseudo-header like
+  `:authority`, is rejected when the gateway starts.
+* `Expect: 100-continue` can only be matched on HTTP/1: the HTTP/2 server answers it and removes the
+  header. `Content-Length` is removed from a chunked request.
+
+```yaml
+gateway:
+  routes:
+    - id: tenants
+      uri: http://localhost:8081
+      predicates:
+        - name: Header
+          args:
+            name: Host
+            regexp: ^tenant-[0-9]+\.example\.org(:[0-9]+)?$
+        - name: Header
+          args:
+            name: X-Api-Version
+            regexp: ^v[0-9]+$
+    - id: uploads
+      uri: http://localhost:8082
+      predicates:
+        - name: Header
+          args:
+            name: Transfer-Encoding
+        - name: Path
+          args:
+            patterns:
+              - /uploads/*
+    - id: default
+      uri: http://localhost:8080
+```
 
 ### Filters
 
