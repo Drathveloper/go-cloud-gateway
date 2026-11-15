@@ -119,7 +119,7 @@ func TestGatewayHandler_ServeHTTP_WriteDeadlines(t *testing.T) {
 		name      string
 		streaming bool
 	}{
-		{name: "streaming route should bound every write", streaming: true},
+		{name: "streaming route should bound every write and nothing in between", streaming: true},
 		{name: "regular route should leave the server write deadline alone", streaming: false},
 	}
 	for _, tt := range tests {
@@ -151,12 +151,20 @@ func TestGatewayHandler_ServeHTTP_WriteDeadlines(t *testing.T) {
 				}
 				return
 			}
-			if len(recorder.deadlines) == 0 {
-				t.Fatal("expected a write deadline per write, actual none")
+			// The headers and the only write of the body get a deadline each, cleared
+			// once they are on the wire, and the end of the response gets the last one.
+			if len(recorder.deadlines) != 5 {
+				t.Fatalf("expected 5 write deadlines, actual %v", recorder.deadlines)
 			}
-			for _, deadline := range recorder.deadlines {
+			for index, deadline := range recorder.deadlines {
+				if index == 1 || index == 3 {
+					if !deadline.IsZero() {
+						t.Errorf("expected write deadline %d to be cleared, actual %s", index, deadline)
+					}
+					continue
+				}
 				if deadline.Before(start.Add(time.Minute)) || deadline.After(time.Now().Add(time.Minute)) {
-					t.Errorf("expected write deadline one route timeout ahead, actual %s", deadline)
+					t.Errorf("expected write deadline %d one route timeout ahead, actual %s", index, deadline)
 				}
 			}
 		})

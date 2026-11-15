@@ -454,7 +454,10 @@ On a streaming route the timeout only bounds:
 * each individual write to the client, so a client that stops reading is dropped.
 
 Once the response starts, the stream lasts as long as the backend keeps it open or until
-the client disconnects. Every write is flushed immediately.
+the client disconnects. The response headers are sent as soon as the backend has answered,
+without waiting for the first data, and every write is flushed immediately. The timeout does
+not bound the time between two writes nor the time the stream takes to end: a stream can
+stay quiet for longer than the timeout, over HTTP/1.1 and over HTTP/2.
 
 The server `ReadTimeout` and `WriteTimeout` (`bootstrap.ServerOpts`) are also deadlines,
 for the whole request and for the whole response, and start counting before the route
