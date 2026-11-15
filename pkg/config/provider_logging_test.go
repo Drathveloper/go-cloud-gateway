@@ -2,6 +2,7 @@ package config_test
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"log"
 	"log/slog"
@@ -11,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/drathveloper/go-cloud-gateway/pkg/circuitbreaker"
 	"github.com/drathveloper/go-cloud-gateway/pkg/config"
 	"github.com/drathveloper/go-cloud-gateway/pkg/filter"
 	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
@@ -239,4 +241,69 @@ func TestNewRoutes_CircuitBreakerLogsStatesByName(t *testing.T) {
 			}
 		})
 	}
+}
+
+// stalledHandler is a log handler whose output makes no progress: Handle reports that it
+// was called and does not return until it is released.
+type stalledHandler struct {
+	entered chan struct{}
+	release chan struct{}
+}
+
+func (h stalledHandler) Enabled(context.Context, slog.Level) bool {
+	return true
+}
+
+func (h stalledHandler) Handle(context.Context, slog.Record) error {
+	h.entered <- struct{}{}
+	<-h.release
+	return nil
+}
+
+func (h stalledHandler) WithAttrs([]slog.Attr) slog.Handler {
+	return h
+}
+
+func (h stalledHandler) WithGroup(string) slog.Handler {
+	return h
+}
+
+// The breaker used to log its state changes while it held its lock: a log handler that
+// was slow held up every request of the route until the line was written.
+func TestNewRoutes_CircuitBreakerSlowLogHandlerDoesNotHoldUpTheRoute(t *testing.T) {
+	// Only a failing test waits this long.
+	const watchdog = 5 * time.Second
+	handler := stalledHandler{entered: make(chan struct{}, 1), release: make(chan struct{})}
+	breaker := newCircuitBreakerRoute(t, slog.New(handler), time.Minute)[0].CircuitBreaker
+	opened := make(chan struct{})
+	go func() {
+		defer close(opened)
+		for range 3 {
+			failRequest(breaker)
+		}
+	}()
+	select {
+	case <-handler.entered:
+	case <-time.After(watchdog):
+		t.Fatal("expected the breaker to log that it opened")
+	}
+
+	answered := make(chan error, 1)
+	go func() {
+		_, err := breaker.Execute(func() (*http.Response, error) { //nolint:bodyclose // the callback returns no response
+			return nil, nil //nolint:nilnil
+		})
+		answered <- err
+	}()
+
+	select {
+	case err := <-answered:
+		if !errors.Is(err, circuitbreaker.ErrOpenState) {
+			t.Errorf("expected %v actual %v", circuitbreaker.ErrOpenState, err)
+		}
+	case <-time.After(watchdog):
+		t.Error("expected the route to answer while the state change is being logged")
+	}
+	close(handler.release)
+	<-opened
 }

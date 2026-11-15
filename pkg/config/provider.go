@@ -28,6 +28,9 @@ const routeLogKey = "route"
 //
 // Each route logs through a child of the given logger that carries the route id in the
 // "route" attribute, and so does its circuit breaker. A nil logger means slog.Default().
+//
+// The config is not validated here: Validate does that, and bootstrap.Initialize calls it
+// before building the routes.
 func NewRoutes(
 	cfg *Config,
 	predicateFactory *predicate.Factory,
@@ -163,7 +166,8 @@ func newPoolSettings(pool *Pool) poolSettings {
 	settings.tlsHandshakeTimeout = durationOrDefault(pool.TLSHandshakeTimeout, settings.tlsHandshakeTimeout)
 	settings.responseHeaderTimeout = durationOrDefault(pool.ResponseHeaderTimeout, settings.responseHeaderTimeout)
 	// The counters are taken as they are: zero keeps its net/http meaning (no limit, or
-	// the net/http default for idle connections per host) for a pool built in code.
+	// the net/http default for idle connections per host) for a pool that was not
+	// validated. Validate, and so bootstrap.Initialize, requires them to be set.
 	settings.maxIdleConns = pool.MaxIdleConns
 	settings.maxIdleConnsPerHost = pool.MaxIdleConnsPerHost
 	settings.maxConnsPerHost = pool.MaxConnsPerHost
@@ -171,7 +175,8 @@ func newPoolSettings(pool *Pool) poolSettings {
 }
 
 // durationOrDefault returns the configured duration, or the default when it is not set.
-// Validation requires every pool duration, but a pool built in code may leave some out.
+// Validation requires every pool duration, but a pool that was not validated, built in
+// code and given to NewHTTPClient directly, may leave some out.
 func durationOrDefault(value *Duration, defaultValue time.Duration) time.Duration {
 	if value == nil {
 		return defaultValue
@@ -299,8 +304,9 @@ func isRequestSuccessful(err error) bool {
 // logs says why. Opening is the only change that takes the route out of service, hence
 // the only one logged at warn level.
 //
-// The breaker runs the callback while it holds its mutex: it must not call back into the
-// breaker, and a slow log handler holds up the requests of the route meanwhile.
+// The breaker runs the callback without holding its lock, on the goroutine of the request
+// that changed the state: a slow log handler delays that request, not the other requests
+// of the route. See circuitbreaker.Settings for the order of the calls.
 func logCircuitBreakerStateChange(logger *slog.Logger) func(name string, previous, current circuitbreaker.State) {
 	return func(name string, previous, current circuitbreaker.State) {
 		level := slog.LevelInfo
@@ -323,7 +329,9 @@ func mapCircuitBreakerFromConfigToGateway(
 		return nil
 	}
 	settings := circuitbreaker.Settings{
-		Name:        name,
+		Name: name,
+		// The conversion wraps around outside the range of a uint32, which is why
+		// Validate limits the value to it.
 		MaxRequests: uint32(circuitBreaker.NumAllowedHalfOpenCalls), //nolint:gosec
 		Interval:    circuitBreaker.Interval.Duration,
 		Timeout:     circuitBreaker.WaitDurationInOpenState.Duration,

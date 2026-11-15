@@ -13,6 +13,9 @@ type ReaderJSON struct {
 }
 
 // NewReaderJSON creates a new reader for json files.
+//
+// The validator checks the validate tags of the config types. Nil means a
+// validator.New(), which is also what Validate uses.
 func NewReaderJSON(validate *validator.Validate) *ReaderJSON {
 	return &ReaderJSON{
 		validate: validate,
@@ -20,13 +23,14 @@ func NewReaderJSON(validate *validator.Validate) *ReaderJSON {
 }
 
 // Read reads the given input and returns the config or error if config is invalid.
+// A valid config is one that Validate accepts.
 func (r *ReaderJSON) Read(input []byte) (*Config, error) {
 	baseErr := "read json config failed"
 	var cfg Config
 	if err := json.Unmarshal(input, &cfg); err != nil {
 		return nil, fmt.Errorf("%s: %w", baseErr, err)
 	}
-	if err := r.validate.Struct(&cfg); err != nil {
+	if err := validateConfig(r.validate, &cfg); err != nil {
 		return nil, fmt.Errorf("%s: %w", baseErr, err)
 	}
 	return &cfg, nil
