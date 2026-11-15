@@ -167,7 +167,8 @@ gateway:
 ```
 
 Every YAML example in this document is a complete configuration and is read and built by a test
-(`pkg/bootstrap/readme_examples_test.go`).
+(`pkg/bootstrap/readme_examples_test.go`). Every Go snippet is compiled by another one
+(`pkg/bootstrap/readme_go_snippets_test.go`).
 
 Settings under `gateway`:
 
@@ -536,7 +537,39 @@ Settings under `mtls`:
 | `key`     | when `enabled` is `true` | Private key of the client certificate, PEM encoded.                      |
 | `ca`      | when `enabled` is `true` | Certificates the backend certificates are verified against, PEM encoded. |
 
-`cert`, `key` and `ca` hold the PEM text itself, not a file name.
+`cert`, `key` and `ca` hold the PEM text itself, not a file name. In YAML a block scalar (`|`) keeps the
+line breaks of the PEM text; in JSON they are written as `\n`. With `mtls` enabled the certificates of the
+backends are verified against `ca` instead of the certificates the system trusts.
+
+```yaml
+gateway:
+  httpclient:
+    mtls:
+      enabled: true
+      cert: |
+        -----BEGIN CERTIFICATE-----
+        <base64 of the client certificate>
+        -----END CERTIFICATE-----
+      key: |
+        -----BEGIN PRIVATE KEY-----
+        <base64 of the private key of the client certificate>
+        -----END PRIVATE KEY-----
+      ca: |
+        -----BEGIN CERTIFICATE-----
+        <base64 of the certificate of the authority that signs the backend certificates>
+        -----END CERTIFICATE-----
+  routes:
+    - id: ledger
+      uri: https://ledger.internal.example.org
+      predicates:
+        - name: Path
+          args:
+            patterns:
+              - /ledger/**
+```
+
+The lines in angle brackets stand for your own PEM content: the test that builds the examples puts there a
+certificate and a key it generates.
 
 * The client has no timeout of its own: every request is bound by the timeout of its route.
 * Redirects are not followed: `3xx` responses are forwarded to the client.
