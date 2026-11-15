@@ -33,13 +33,26 @@ type Route struct {
 // CircuitBreaker represents the gateway circuit breaker config.
 //
 // The circuit breaker configuration fields are required if the circuit breaker is enabled.
+//
+// The counters are limited to what the breaker counts with, an unsigned 32 bit integer.
+// Outside that range the breaker does something else than what is written, without any
+// error:
+//   - MinRequestsThreshold: below 1 the breaker opens at the first failed request, and
+//     over 4294967295 it can never open.
+//   - NumAllowedHalfOpenCalls: a negative number wraps around to a huge one, which lets
+//     every request through while half-open and never closes the breaker again, and a
+//     number over 4294967295 wraps around to a small one.
+//
+// Interval and WaitDurationInOpenState cannot be negative, which Validate checks because
+// a tag cannot: a negative Interval never resets the counters and a negative
+// WaitDurationInOpenState keeps the breaker open for a minute.
 type CircuitBreaker struct {
 	Enabled                 bool     `json:"enabled"                     yaml:"enabled"`
-	Interval                Duration `json:"interval"                    yaml:"interval"                    validate:"required_if=Enabled true"`                         //nolint:lll
-	FailureRateThreshold    int      `json:"failure-rate-threshold"      yaml:"failure-rate-threshold"      validate:"required_if=Enabled true,omitempty,min=1,max=100"` //nolint:lll
-	NumAllowedHalfOpenCalls int      `json:"num-allowed-half-open-calls" yaml:"num-allowed-half-open-calls" validate:"required_if=Enabled true"`                         //nolint:lll
-	WaitDurationInOpenState Duration `json:"wait-duration-in-open-state" yaml:"wait-duration-in-open-state" validate:"required_if=Enabled true"`                         //nolint:lll
-	MinRequestsThreshold    int      `json:"min-requests-threshold"      yaml:"min-requests-threshold"      validate:"required_if=Enabled true"`                         //nolint:lll
+	Interval                Duration `json:"interval"                    yaml:"interval"                    validate:"required_if=Enabled true"`                                //nolint:lll
+	FailureRateThreshold    int      `json:"failure-rate-threshold"      yaml:"failure-rate-threshold"      validate:"required_if=Enabled true,omitempty,min=1,max=100"`        //nolint:lll
+	NumAllowedHalfOpenCalls int      `json:"num-allowed-half-open-calls" yaml:"num-allowed-half-open-calls" validate:"required_if=Enabled true,omitempty,min=1,max=4294967295"` //nolint:lll
+	WaitDurationInOpenState Duration `json:"wait-duration-in-open-state" yaml:"wait-duration-in-open-state" validate:"required_if=Enabled true"`                                //nolint:lll
+	MinRequestsThreshold    int      `json:"min-requests-threshold"      yaml:"min-requests-threshold"      validate:"required_if=Enabled true,omitempty,min=1,max=4294967295"` //nolint:lll
 }
 
 // ParameterizedItem represents the gateway predicate or filter config.
