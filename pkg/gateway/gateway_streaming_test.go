@@ -3,6 +3,7 @@ package gateway_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -115,6 +116,97 @@ func TestGateway_Do_StreamingRouteTimeoutCoversPostProcess(t *testing.T) {
 		}
 		if !body.closed {
 			t.Error("expected the backend response body to be closed")
+		}
+	})
+}
+
+// ctxErrHTTPClient waits for the request context to be done and returns its Err, like
+// the HTTP/2 transport of net/http does, rather than its cause.
+type ctxErrHTTPClient struct{}
+
+func (c *ctxErrHTTPClient) Do(req *http.Request) (*http.Response, error) {
+	<-req.Context().Done()
+	return nil, fmt.Errorf("http2: %w", req.Context().Err())
+}
+
+// ctxErrPreProcessFilter waits for the route context to be done and returns its Err.
+type ctxErrPreProcessFilter struct {
+	post bool
+}
+
+func (f *ctxErrPreProcessFilter) PreProcess(ctx *gateway.Context) error {
+	if f.post {
+		return nil
+	}
+	<-ctx.Done()
+	return fmt.Errorf("filter: %w", ctx.Err())
+}
+
+func (f *ctxErrPreProcessFilter) PostProcess(ctx *gateway.Context) error {
+	if !f.post {
+		return nil
+	}
+	<-ctx.Done()
+	return fmt.Errorf("filter: %w", ctx.Err())
+}
+
+func (f *ctxErrPreProcessFilter) Name() string { return "CtxErr" }
+
+// The context of a streaming route is cancelled with the timeout as its cause, but its
+// Err is context.Canceled: what reports ctx.Err() must still be answered as a timeout,
+// not as a client that went away.
+func TestGateway_Do_StreamingRouteTimeoutReportedAsCanceled(t *testing.T) {
+	tests := []struct {
+		client  gateway.HTTPClient
+		name    string
+		filters gateway.Filters
+	}{
+		{name: "http client", client: &ctxErrHTTPClient{}},
+		{name: "pre-process filter", client: &MockHTTPClient{}, filters: gateway.Filters{&ctxErrPreProcessFilter{}}},
+		{
+			name: "post-process filter",
+			client: &MockHTTPClient{Response: &http.Response{
+				StatusCode: http.StatusOK, ContentLength: -1, Body: io.NopCloser(strings.NewReader("")),
+			}},
+			filters: gateway.Filters{&ctxErrPreProcessFilter{post: true}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				route := &gateway.Route{ID: "r1", Timeout: time.Second, Streaming: true, Filters: tt.filters}
+				ctx, cancel := gateway.NewGatewayContext(t.Context(), route, newStreamingTestRequest(t))
+				defer cancel()
+
+				err := gateway.NewGateway(tt.client).Do(ctx)
+
+				if !errors.Is(err, context.DeadlineExceeded) {
+					t.Errorf("expected context.DeadlineExceeded actual %v", err)
+				}
+				if errors.Is(err, context.Canceled) {
+					t.Errorf("expected the error not to be a context.Canceled actual %v", err)
+				}
+			})
+		})
+	}
+}
+
+// A streaming route whose client goes away is still reported as context.Canceled.
+func TestGateway_Do_StreamingRouteClientGoneStaysCanceled(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		parent, cancelParent := context.WithCancel(t.Context())
+		route := &gateway.Route{ID: "r1", Timeout: time.Minute, Streaming: true}
+		ctx, cancel := gateway.NewGatewayContext(parent, route, newStreamingTestRequest(t))
+		defer cancel()
+		go func() {
+			time.Sleep(time.Second)
+			cancelParent()
+		}()
+
+		err := gateway.NewGateway(&ctxErrHTTPClient{}).Do(ctx)
+
+		if !errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			t.Errorf("expected context.Canceled only, actual %v", err)
 		}
 	})
 }

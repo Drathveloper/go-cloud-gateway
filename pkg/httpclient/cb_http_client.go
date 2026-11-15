@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/drathveloper/go-cloud-gateway/internal/pkg/shared"
 	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 )
 
@@ -42,6 +43,9 @@ func (c *CircuitBreakerHTTPClient) doWithCircuitBreaker(
 	result, err := circuitBreaker.Execute(func() (*http.Response, error) {
 		resp, err := c.client.Do(req)
 		if err != nil {
+			// The timeout of a streaming route may come back as a context.Canceled,
+			// which the breaker takes for a client that went away and does not count.
+			err = shared.AsRouteTimeout(req.Context(), err)
 			return nil, fmt.Errorf("wrapped circuit breaker request failed: %w", err)
 		}
 		if resp.StatusCode >= internalServerErrorStatusCode {
