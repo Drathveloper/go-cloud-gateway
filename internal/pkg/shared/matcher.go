@@ -159,13 +159,15 @@ func simpleMatch(pattern, str string) bool {
 	starIdx, match := -1, 0
 	for sIdx < len(str) {
 		switch {
-		case pIdx < len(pattern) && (pattern[pIdx] == str[sIdx] || pattern[pIdx] == '?'):
-			pIdx++
-			sIdx++
+		// Before the literal comparison: a '*' of the pattern is a wildcard also when
+		// the segment has a '*' of its own at that place.
 		case pIdx < len(pattern) && pattern[pIdx] == '*':
 			starIdx = pIdx
 			match = sIdx
 			pIdx++
+		case pIdx < len(pattern) && (pattern[pIdx] == str[sIdx] || pattern[pIdx] == '?'):
+			pIdx++
+			sIdx++
 		case starIdx != -1:
 			pIdx = starIdx + 1
 			match++
@@ -191,13 +193,13 @@ func simpleMatchEscaped(pattern, str string) bool {
 	for sIdx < len(str) {
 		char, width := escapedChar(str, sIdx)
 		switch {
-		case pIdx < len(pattern) && (pattern[pIdx] == char || pattern[pIdx] == '?'):
-			pIdx++
-			sIdx += width
 		case pIdx < len(pattern) && pattern[pIdx] == '*':
 			starIdx = pIdx
 			match = sIdx
 			pIdx++
+		case pIdx < len(pattern) && (pattern[pIdx] == char || pattern[pIdx] == '?'):
+			pIdx++
+			sIdx += width
 		case starIdx != -1:
 			pIdx = starIdx + 1
 			_, skipped := escapedChar(str, match)

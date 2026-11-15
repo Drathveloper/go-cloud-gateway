@@ -519,3 +519,73 @@ func TestHostPattern_Match(t *testing.T) {
 		})
 	}
 }
+
+// A '*' of the pattern is a wildcard whatever the segment has at that place, a '*' of
+// its own included: it used to be compared as a literal there, and the rest of the
+// pattern was then held against a segment that the wildcard would have matched.
+func TestPathPattern_Match_WildcardOverALiteralAsterisk(t *testing.T) {
+	tests := []struct {
+		name    string
+		pattern string
+		path    string
+		escaped string
+		match   bool
+	}{
+		{
+			name:    "wildcard should match a segment that starts with an asterisk",
+			pattern: "/files/*.css",
+			path:    "/files/*x.css",
+			escaped: "/files/%2Ax.css",
+			match:   true,
+		},
+		{
+			name:    "wildcard should match an asterisk and what follows it",
+			pattern: "/a*",
+			path:    "/a*b",
+			escaped: "/a%2Ab",
+			match:   true,
+		},
+		{
+			name:    "wildcard should match a lone asterisk",
+			pattern: "/a/*",
+			path:    "/a/*",
+			escaped: "/a/%2a",
+			match:   true,
+		},
+		{
+			name:    "wildcard between literals should match a segment full of asterisks",
+			pattern: "/a*b",
+			path:    "/a***b",
+			escaped: "/a%2A*%2Ab",
+			match:   true,
+		},
+		{
+			name:    "literal after the wildcard should still be required",
+			pattern: "/files/*.css",
+			path:    "/files/*x.js",
+			escaped: "/files/%2Ax.js",
+			match:   false,
+		},
+		{
+			name:    "wildcard should not cross a separator after an asterisk",
+			pattern: "/files/*.css",
+			path:    "/files/*/x.css",
+			escaped: "/files/%2A/x.css",
+			match:   false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pattern := shared.CompilePathPattern(tt.pattern)
+
+			if actual := pattern.Match(tt.path); actual != tt.match {
+				t.Errorf("path %q: expected %t actual %t", tt.path, tt.match, actual)
+			}
+			for _, escaped := range []string{tt.path, tt.escaped} {
+				if actual := pattern.MatchEscaped(escaped); actual != tt.match {
+					t.Errorf("escaped path %q: expected %t actual %t", escaped, tt.match, actual)
+				}
+			}
+		})
+	}
+}
