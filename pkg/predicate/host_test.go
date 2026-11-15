@@ -67,6 +67,36 @@ func TestHostPredicate_Test(t *testing.T) {
 			host:     "test.other.org",
 			expected: false,
 		},
+		{
+			name:     "test should match when host has a port and pattern has none",
+			patterns: []string{"example.org"},
+			host:     "example.org:8080",
+			expected: true,
+		},
+		{
+			name:     "test should match when host and pattern have the same port",
+			patterns: []string{"example.org:8080"},
+			host:     "example.org:8080",
+			expected: true,
+		},
+		{
+			name:     "test shouldn't match when pattern has a port and host has another",
+			patterns: []string{"example.org:8080"},
+			host:     "example.org:9090",
+			expected: false,
+		},
+		{
+			name:     "test should match when host case differs from pattern",
+			patterns: []string{"**.example.org"},
+			host:     "Test.Example.ORG",
+			expected: true,
+		},
+		{
+			name:     "test should match any host when pattern is **",
+			patterns: []string{"**"},
+			host:     "test.other.org:8080",
+			expected: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

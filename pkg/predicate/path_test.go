@@ -67,6 +67,18 @@ func TestPath_Test(t *testing.T) {
 			PredicatePath: []string{"/server/**"},
 			Expected:      false,
 		},
+		{
+			Name:          "Path should match when ** has to skip an earlier occurrence of the next segment",
+			ReqPath:       "/api/v1/users/extra/users/7",
+			PredicatePath: []string{"/api/**/users/*"},
+			Expected:      true,
+		},
+		{
+			Name:          "Path should not match when there are no patterns",
+			ReqPath:       "/server/one",
+			PredicatePath: []string{},
+			Expected:      false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {

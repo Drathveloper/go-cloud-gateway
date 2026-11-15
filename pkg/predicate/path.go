@@ -13,13 +13,19 @@ const PathPredicateName = "Path"
 
 // Path is a predicate that checks if the request path matches a given pattern.
 type Path struct {
-	patterns []string
+	patterns []shared.PathPattern
 }
 
 // NewPathPredicate creates a new path predicate.
+//
+// The patterns are compiled here, once, instead of on every request.
 func NewPathPredicate(patterns ...string) *Path {
+	compiled := make([]shared.PathPattern, 0, len(patterns))
+	for _, pattern := range patterns {
+		compiled = append(compiled, shared.CompilePathPattern(pattern))
+	}
 	return &Path{
-		patterns: patterns,
+		patterns: compiled,
 	}
 }
 
@@ -39,8 +45,8 @@ func NewPathPredicateBuilder() gateway.PredicateBuilderFunc {
 // If the request path does not match any pattern, the predicate will return false.
 // If the request path matches at least one pattern, the predicate will return true.
 func (p *Path) Test(r *http.Request) bool {
-	for _, pattern := range p.patterns {
-		if shared.PathMatcher(pattern, r.URL.Path) {
+	for i := range p.patterns {
+		if p.patterns[i].Match(r.URL.Path) {
 			return true
 		}
 	}
