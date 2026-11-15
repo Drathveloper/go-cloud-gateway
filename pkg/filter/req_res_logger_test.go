@@ -55,9 +55,37 @@ func TestNewRequestResponseLoggerFilterBuilder(t *testing.T) {
 			expectedErr: nil,
 		},
 		{
-			name: "build should succeed when level is present and is not valid",
+			name: "build should fail when level is present and names no level",
 			args: map[string]any{
-				"level": "OTHER",
+				"level": "warning",
+			},
+			expectedErr: errors.New("invalid log level \"warning\": expected debug, info, warn or error"),
+		},
+		{
+			name: "build should fail when level is present and is empty",
+			args: map[string]any{
+				"level": "",
+			},
+			expectedErr: errors.New("invalid log level \"\": expected debug, info, warn or error"),
+		},
+		{
+			name: "build should fail when level is present and is not a string",
+			args: map[string]any{
+				"level": 42,
+			},
+			expectedErr: errors.New("failed to convert 'level' attribute: value is required to be a valid string"),
+		},
+		{
+			name: "build should succeed when level is present in another case",
+			args: map[string]any{
+				"level": "WARN",
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "build should succeed when level is null",
+			args: map[string]any{
+				"level": nil,
 			},
 			expectedErr: nil,
 		},
@@ -823,5 +851,13 @@ func TestRequestResponseLogger_PostProcess_InterruptedStreamStaysText(t *testing
 	expected := `"body":"a","bytes":2`
 	if !strings.Contains(buf.String(), expected) {
 		t.Errorf("expected: %s\nactual: %s", expected, buf.String())
+	}
+}
+
+func TestNewRequestResponseLoggerFilterBuilder_InvalidLevelIsErrInvalidLogLevel(t *testing.T) {
+	_, err := filter.NewRequestResponseLoggerBuilder().Build(map[string]any{"level": "warning"})
+
+	if !errors.Is(err, filter.ErrInvalidLogLevel) {
+		t.Errorf("expected err %s actual %v", filter.ErrInvalidLogLevel, err)
 	}
 }

@@ -6,7 +6,8 @@ import (
 
 const divideByPercentage = 100.0
 
-// DefaultReadyToTrip returns true if the number of consecutive failures is higher than the failure rate threshold.
+// DefaultReadyToTrip returns true when the percentage of failed requests reaches the failure rate threshold,
+// which is a percentage between 1 and 100. A threshold over 100 can never be reached.
 // If there are not enough requests, the function returns always false.
 func DefaultReadyToTrip(minRequestsThreshold, failureRateThreshold int) func(counts Counts) bool {
 	return func(counts Counts) bool {

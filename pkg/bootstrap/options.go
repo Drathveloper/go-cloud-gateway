@@ -45,6 +45,10 @@ type Options struct {
 //
 // ReadHeaderTimeout and IdleTimeout fall back to ReadTimeout when they are zero. The
 // fallback is the configured ReadTimeout, not the raised one.
+//
+// A zero or negative timeout means no timeout. OptionsBuilder.WithServerOptions cannot
+// set a field to zero, because it reads zero as "keep the current value": use a negative
+// value there to disable a timeout.
 type ServerOpts struct {
 	CustomHandlers    []CustomHandler
 	ReadHeaderTimeout time.Duration

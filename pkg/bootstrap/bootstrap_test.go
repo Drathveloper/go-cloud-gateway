@@ -447,3 +447,77 @@ func TestInitialize_RouteTimeoutOnSlowUploads(t *testing.T) {
 		})
 	}
 }
+
+func TestInitialize_ServerOptionsCustomHandlersAreServed(t *testing.T) {
+	backend := newHangingBackend(t)
+	cfg := readTestConfig(t, fmt.Sprintf(
+		`{"gateway":{"routes":[{"id":"r1","uri":%q,"predicates":[{"name":"Path","args":{"patterns":["/api/**"]}}]}]}}`,
+		backend.URL))
+	health := bootstrap.CustomHandler{
+		Method: http.MethodGet,
+		Path:   "/health",
+		Handler: http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+			_, _ = io.WriteString(writer, "healthy")
+		}),
+	}
+	builder := bootstrap.NewOptionsBuilder(cfg).
+		WithServerOptions(bootstrap.ServerOpts{CustomHandlers: []bootstrap.CustomHandler{health}})
+	server, err := bootstrap.Initialize(builder.Build())
+	if err != nil {
+		t.Fatalf("expected nil err actual %v", err)
+	}
+	testServer := httptest.NewServer(server.Handler)
+	defer testServer.Close()
+
+	status, body, err := getTestURL(t, testServer.Client(), testServer.URL+"/health")
+	if err != nil {
+		t.Fatalf("expected nil err actual %v", err)
+	}
+
+	if status != http.StatusOK || string(body) != "healthy" {
+		t.Errorf("expected status %d and body %q, actual status %d and body %q",
+			http.StatusOK, "healthy", status, body)
+	}
+}
+
+// Zero means "keep the current value" to WithServerOptions, so a negative value is the
+// way to disable a timeout through the builder.
+func TestInitialize_NegativeServerTimeoutsDisableThem(t *testing.T) {
+	cfg := readTestConfig(t, `{"gateway":{"routes":[{"id":"r1","uri":"http://localhost:8001","timeout":"30s"}]}}`)
+	tests := []struct {
+		name          string
+		serverOpts    bootstrap.ServerOpts
+		expectedRead  time.Duration
+		expectedWrite time.Duration
+	}{
+		{
+			name:          "zero timeouts should keep the defaults, raised over the route timeout",
+			serverOpts:    bootstrap.ServerOpts{ReadTimeout: 0, WriteTimeout: 0},
+			expectedRead:  35 * time.Second,
+			expectedWrite: 35 * time.Second,
+		},
+		{
+			name:          "negative timeouts should be kept, which disables them",
+			serverOpts:    bootstrap.ServerOpts{ReadTimeout: -1, WriteTimeout: -1},
+			expectedRead:  -1,
+			expectedWrite: -1,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			builder := bootstrap.NewOptionsBuilder(cfg).WithServerOptions(tt.serverOpts)
+
+			server, err := bootstrap.Initialize(builder.Build())
+			if err != nil {
+				t.Fatalf("expected nil err actual %v", err)
+			}
+
+			if server.ReadTimeout != tt.expectedRead {
+				t.Errorf("expected read timeout %s actual %s", tt.expectedRead, server.ReadTimeout)
+			}
+			if server.WriteTimeout != tt.expectedWrite {
+				t.Errorf("expected write timeout %s actual %s", tt.expectedWrite, server.WriteTimeout)
+			}
+		})
+	}
+}

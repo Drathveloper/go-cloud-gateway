@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/go-playground/validator/v10"
@@ -102,5 +103,43 @@ func TestReaderJSON_Read_StreamingRoute(t *testing.T) {
 	}
 	if cfg.Gateway.Routes[1].Streaming {
 		t.Error("expected route r2 to be a regular route")
+	}
+}
+
+func TestReaderJSON_Read_CircuitBreakerFailureRateThreshold(t *testing.T) {
+	tests := []struct {
+		name      string
+		threshold int
+		enabled   bool
+		expectErr bool
+	}{
+		{name: "read should succeed when threshold is the lowest percentage", enabled: true, threshold: 1},
+		{name: "read should succeed when threshold is the highest percentage", enabled: true, threshold: 100},
+		{name: "read should fail when threshold is zero", enabled: true, threshold: 0, expectErr: true},
+		{name: "read should fail when threshold is over 100", enabled: true, threshold: 101, expectErr: true},
+		{name: "read should fail when threshold is negative", enabled: true, threshold: -1, expectErr: true},
+		{name: "read should succeed when the breaker is disabled and has no threshold", enabled: false, threshold: 0},
+		{
+			name:      "read should fail when the breaker is disabled and threshold is over 100",
+			enabled:   false,
+			threshold: 101,
+			expectErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			input := fmt.Sprintf(`{"gateway":{"routes":[{"id":"r1","uri":"http://localhost:8001","circuit-breaker":{`+
+				`"enabled":%t,"interval":"1m","min-requests-threshold":2,"failure-rate-threshold":%d,`+
+				`"wait-duration-in-open-state":"1m","num-allowed-half-open-calls":1}}]}}`, tt.enabled, tt.threshold)
+
+			_, err := config.NewReaderJSON(validator.New()).Read([]byte(input))
+
+			if tt.expectErr != (err != nil) {
+				t.Errorf("expected error %t actual %v", tt.expectErr, err)
+			}
+			if err != nil && !strings.Contains(err.Error(), "FailureRateThreshold") {
+				t.Errorf("expected the error to name the threshold, actual %v", err)
+			}
+		})
 	}
 }

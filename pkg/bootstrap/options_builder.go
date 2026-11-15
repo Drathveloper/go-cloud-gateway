@@ -60,8 +60,15 @@ func (b *OptionsBuilder) WithCustomPredicates(predicates ...CustomPredicate) *Op
 
 // WithServerOptions sets the server options.
 //
-// The server options are merged with the default options.
+// The server options are merged with the ones already set: only the fields that are not
+// zero are taken, so a zero field keeps its current value, which is the default unless an
+// earlier call changed it. That makes zero unusable to disable a timeout: pass a negative
+// value instead, which net/http also reads as no timeout. Nil CustomHandlers keep the
+// handlers already set.
 func (b *OptionsBuilder) WithServerOptions(opts ServerOpts) *OptionsBuilder {
+	if opts.CustomHandlers != nil {
+		b.serverOptions.CustomHandlers = opts.CustomHandlers
+	}
 	if opts.ReadHeaderTimeout != 0 {
 		b.serverOptions.ReadHeaderTimeout = opts.ReadHeaderTimeout
 	}
@@ -83,7 +90,8 @@ func (b *OptionsBuilder) WithServerOptions(opts ServerOpts) *OptionsBuilder {
 	return b
 }
 
-// WithCustomHandlers sets the custom handlers.
+// WithCustomHandlers sets the custom handlers. It is the same as setting
+// ServerOpts.CustomHandlers through WithServerOptions: the last call wins.
 func (b *OptionsBuilder) WithCustomHandlers(handlers ...CustomHandler) *OptionsBuilder {
 	b.serverOptions.CustomHandlers = handlers
 	return b
