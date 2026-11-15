@@ -41,8 +41,9 @@ type Route struct {
 	Timeout        time.Duration
 	// Streaming marks a route whose responses are long-lived streams (server-sent
 	// events, chunked downloads). Timeout then only bounds the time until the response
-	// is ready to be sent, and each individual write to the client, instead of the
-	// whole exchange.
+	// is ready to be sent, and from then on each individual write to the client and
+	// each individual read of what is left of the request body, instead of the whole
+	// exchange.
 	Streaming bool
 }
 

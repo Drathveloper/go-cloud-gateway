@@ -2,12 +2,14 @@ package gateway
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"sync"
+	"sync/atomic"
 
 	"github.com/drathveloper/go-cloud-gateway/internal/pkg/shared"
 )
@@ -82,14 +84,28 @@ func NewGatewayResponse(response *http.Response) *Response {
 	}
 }
 
+// abandoner is implemented by the source of a request body that can give up on the client
+// it reads from: Abandon makes its pending and future reads fail at once, unless nothing
+// is left to read. It must be safe to call from any goroutine and at any time.
+//
+// The gateway handler implements it for the body of the inbound request.
+type abandoner interface {
+	Abandon()
+}
+
 // ReplayableBody creates a new representation of the body that can be read multiple times.
 type ReplayableBody struct {
 	original io.ReadCloser
-	reader   *bytes.Reader
-	data     []byte
-	length   int64
+	// abandoner is the original source when it can be abandoned, nil otherwise.
+	abandoner abandoner
+	reader    *bytes.Reader
+	data      []byte
+	length    int64
+	// closed is atomic because Close is the one method that runs on two goroutines:
+	// an http transport closes the body of the request it was given from the
+	// goroutine that writes it, at any time and even after RoundTrip has returned.
+	closed   atomic.Bool
 	captured bool
-	closed   bool
 }
 
 // NewReplayableBody initializes a ReplayableBody allowing multiple reads from the same body by buffering the content.
@@ -97,10 +113,13 @@ func NewReplayableBody(original io.ReadCloser, length int64) *ReplayableBody {
 	if original == nil {
 		original = io.NopCloser(bytes.NewReader([]byte{}))
 	}
+	// Kept apart from original, which a capture or an observer may wrap later on.
+	source, _ := original.(abandoner)
 	return &ReplayableBody{
-		original: original,
-		length:   length,
-		captured: false,
+		original:  original,
+		abandoner: source,
+		length:    length,
+		captured:  false,
 	}
 }
 
@@ -223,11 +242,31 @@ func (rb *ReplayableBody) Len() int64 {
 // Close releases any resources associated with the ReplayableBody and closes the underlying source.
 // It is idempotent: only the first call closes the underlying source.
 // A captured body remains replayable after Close.
+// It is safe to call from several goroutines at once.
 // Returns an error if any.
 func (rb *ReplayableBody) Close() error {
-	if rb.closed {
+	if rb.closed.Swap(true) {
 		return nil
 	}
-	rb.closed = true
 	return rb.original.Close() //nolint:wrapcheck
+}
+
+// abandonOnTimeout abandons the source of the body as soon as the given context, the one
+// of a route, times out. It does nothing when the context is done for any other reason,
+// such as the client going away, or when the source cannot be abandoned. Calling the
+// returned function stops it.
+//
+// A body that is still arriving when the route times out is of no use anymore, but an
+// http transport does not return from the round trip before the read of the body it is
+// waiting on does, which is up to the client.
+func (rb *ReplayableBody) abandonOnTimeout(ctx context.Context) func() bool {
+	if rb == nil || rb.abandoner == nil {
+		return func() bool { return false }
+	}
+	return context.AfterFunc(ctx, func() {
+		// The context of a streaming route is cancelled with the timeout as cause.
+		if errors.Is(context.Cause(ctx), context.DeadlineExceeded) {
+			rb.abandoner.Abandon()
+		}
+	})
 }

@@ -1,6 +1,7 @@
 package gatewayhandler
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -81,19 +82,53 @@ func (h *GatewayHandler) ServeHTTP(writer http.ResponseWriter, request *http.Req
 		return
 	}
 	shared.SetXForwardedHeaders(request)
+	body := trackRequestBody(writer, request)
 	gwRequest := gateway.NewGatewayRequest(request)
 	ctx, cancel := gateway.NewGatewayContext(request.Context(), route, gwRequest)
 	defer gateway.ReleaseGatewayContext(ctx)
 	defer cancel()
 	defer gwRequest.BodyReader.Close() //nolint:errcheck
+	defer body.release()
 	if err := h.doWithRecover(ctx); err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			// The gateway abandons the body when the route times out, but on its
+			// own goroutine, which may not have run yet, and a timeout may also
+			// come from a filter. net/http would read what is left of the body
+			// before it writes the response.
+			body.Abandon()
+		} else {
+			body.giveUpAfter(unreadBodyGrace)
+		}
+		closeAfterAbandonedBody(writer, request, body)
 		h.errHandler.Handle(ctx, err, writer)
 		if ctx.Response != nil && ctx.Response.BodyReader != nil {
 			_ = ctx.Response.BodyReader.Close()
 		}
 		return
 	}
+	// The timeout may have fired while the gateway was returning its response.
+	closeAfterAbandonedBody(writer, request, body)
+	if ctx.Route.Streaming {
+		// The read side of what writeResponse does with the write deadline.
+		body.renewReadDeadline(ctx.Route.Timeout)
+	} else {
+		// The backend answered without waiting for the end of the body.
+		body.giveUpAfter(unreadBodyGrace)
+	}
 	h.writeResponse(writer, ctx)
+}
+
+// closeAfterAbandonedBody makes the server close the connection after the response when
+// the body of the request was abandoned, and stops it from being abandoned later on: see
+// requestBody.settle for why the connection cannot be kept. It must be called before the
+// response is written.
+//
+// Only HTTP/1 needs it. An HTTP/2 stream has no connection of its own to spoil, and
+// there the header would shut down the connection of every other stream.
+func closeAfterAbandonedBody(writer http.ResponseWriter, request *http.Request, body *requestBody) {
+	if body.settle() && request.ProtoMajor == 1 {
+		writer.Header().Set("Connection", "close")
+	}
 }
 
 // doWithRecover runs the gateway pipeline converting panics into errors: filters are a
