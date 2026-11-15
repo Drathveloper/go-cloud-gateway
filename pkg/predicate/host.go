@@ -3,7 +3,6 @@ package predicate
 import (
 	"fmt"
 	"net/http"
-	"regexp"
 
 	"github.com/drathveloper/go-cloud-gateway/internal/pkg/shared"
 	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
@@ -14,28 +13,26 @@ const HostPredicateName = "Host"
 
 // Host is a predicate that checks if a host matches a given pattern.
 type Host struct {
-	patterns      []string
-	compiledRegex []*regexp.Regexp
+	patterns []shared.HostPattern
 }
 
 // NewHostPredicate creates a new host predicate.
+//
+// A pattern can contain '*' (one or more characters within a label), '**' (one or more
+// characters across labels) and '?' (exactly one character); everything else is literal.
+// Matching is case-insensitive and ignores the port of the request host, unless the
+// pattern has a port itself.
 func NewHostPredicate(patterns ...string) (*Host, error) {
-	compiled := make([]*regexp.Regexp, 0, len(patterns))
+	compiled := make([]shared.HostPattern, 0, len(patterns))
 	for _, pattern := range patterns {
-		if pattern == "**" {
-			compiled = append(compiled, nil)
-			continue
-		}
-		r := shared.ConvertPatternToRegex(pattern)
-		re, err := regexp.Compile(r)
+		hostPattern, err := shared.CompileHostPattern(pattern)
 		if err != nil {
 			return nil, fmt.Errorf("invalid host pattern %q: %w", pattern, err)
 		}
-		compiled = append(compiled, re)
+		compiled = append(compiled, hostPattern)
 	}
 	return &Host{
-		patterns:      patterns,
-		compiledRegex: compiled,
+		patterns: compiled,
 	}, nil
 }
 
@@ -55,8 +52,8 @@ func NewHostPredicateBuilder() gateway.PredicateBuilderFunc {
 // If the host does not match any pattern, the predicate will return false.
 // If the host matches at least one pattern, the predicate will return true. .
 func (p *Host) Test(request *http.Request) bool {
-	for _, pattern := range p.compiledRegex {
-		if shared.HostMatcher(pattern, request.Host) {
+	for i := range p.patterns {
+		if p.patterns[i].Match(request.Host) {
 			return true
 		}
 	}

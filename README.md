@@ -100,6 +100,21 @@ adds more header names to that list:
           - X-Internal-Token
 ```
 
+### Path and Host patterns
+
+The `Path` predicate matches the request path segment by segment:
+
+* `**` matches any number of segments, including none: `/api/**/users/*` matches
+  `/api/users/7` and `/api/v1/tenants/users/7`.
+* `*` matches any number of characters within a segment and `?` exactly one.
+
+The `Host` predicate matches the `Host` header, case-insensitively:
+
+* `*` matches one or more characters within a label, `**` across labels and `?` exactly one
+  character. Everything else is literal.
+* The port is ignored unless the pattern has one: `example.org` matches
+  `example.org:8080`, while `example.org:8080` only matches that port.
+
 ### Timeouts and streaming routes
 
 Every route has a timeout: its own `timeout`, else `global-timeout`, else 10 seconds. It
