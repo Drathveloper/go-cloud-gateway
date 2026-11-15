@@ -15,16 +15,17 @@ import (
 
 const initializeErrMsg = "gateway initialization failed: %w"
 
-// writeTimeoutGrace is the margin the server write timeout keeps over the longest route
-// timeout, so that the response to a timed out route can still be written.
-const writeTimeoutGrace = 5 * time.Second
+// routeTimeoutGrace is the margin the server read and write timeouts keep over the
+// longest route timeout, so that the route timeout is the one that expires first and its
+// response can still be written.
+const routeTimeoutGrace = 5 * time.Second
 
 // Initialize initializes the gateway.
 //
 // The gateway is initialized with the given options.
 //
-// The server write timeout is raised when it does not cover the longest route timeout:
-// see ServerOpts.WriteTimeout.
+// The server read and write timeouts are raised when they do not cover the longest route
+// timeout: see ServerOpts.ReadTimeout and ServerOpts.WriteTimeout.
 func Initialize(opts *Options) (*http.Server, error) {
 	for _, customPredicate := range opts.CustomPredicates {
 		predicate.BuilderRegistry.Register(customPredicate.Name, customPredicate.Builder)
@@ -52,28 +53,50 @@ func Initialize(opts *Options) (*http.Server, error) {
 	}
 	mux.Handle("/", gatewayHandler)
 
-	return &http.Server{
+	server := &http.Server{
 		Handler:           mux,
 		Addr:              fmt.Sprintf(":%d", opts.ServerOptions.Port),
 		ReadHeaderTimeout: opts.ServerOptions.ReadHeaderTimeout,
 		IdleTimeout:       opts.ServerOptions.IdleTimeout,
-		WriteTimeout:      serverWriteTimeout(opts.ServerOptions.WriteTimeout, routes),
+		WriteTimeout:      coverRouteTimeouts(opts.ServerOptions.WriteTimeout, routes),
 		ReadTimeout:       opts.ServerOptions.ReadTimeout,
 		MaxHeaderBytes:    opts.ServerOptions.MaxHeaderBytes,
-	}, nil
+	}
+	raiseReadTimeout(server, routes)
+	return server, nil
 }
 
-// serverWriteTimeout returns the write timeout the server must run with. The server
-// write timeout starts counting before the route timeout does, so when it is not the
-// longer of the two the connection is closed before the gateway can answer 504 Gateway
-// Timeout, and the route timeout is never reached. A non-positive value means no write
-// timeout and is left untouched.
-func serverWriteTimeout(configured time.Duration, routes gateway.Routes) time.Duration {
+// coverRouteTimeouts returns the read or write timeout the server must run with. Both
+// are deadlines for a whole request or response and start counting before the route
+// timeout does, so when one of them is not the longer of the two the route timeout is
+// never reached: an expired read timeout cuts the request body the gateway is still
+// streaming to the backend, and an expired write timeout closes the connection before
+// the gateway can answer 504 Gateway Timeout. A non-positive value means no timeout and
+// is left untouched.
+func coverRouteTimeouts(configured time.Duration, routes gateway.Routes) time.Duration {
 	if configured <= 0 {
 		return configured
 	}
 	for i := range routes {
-		configured = max(configured, routes[i].Timeout+writeTimeoutGrace)
+		configured = max(configured, routes[i].Timeout+routeTimeoutGrace)
 	}
 	return configured
+}
+
+// raiseReadTimeout makes the read timeout of the server cover the route timeouts.
+// net/http falls back to the read timeout for a header or idle timeout left at zero:
+// those are pinned to the configured read timeout, so that giving request bodies more
+// time does not also give it to slow headers and idle connections.
+func raiseReadTimeout(server *http.Server, routes gateway.Routes) {
+	configured := server.ReadTimeout
+	server.ReadTimeout = coverRouteTimeouts(configured, routes)
+	if server.ReadTimeout == configured {
+		return
+	}
+	if server.ReadHeaderTimeout == 0 {
+		server.ReadHeaderTimeout = configured
+	}
+	if server.IdleTimeout == 0 {
+		server.IdleTimeout = configured
+	}
 }
