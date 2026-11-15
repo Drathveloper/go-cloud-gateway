@@ -26,6 +26,17 @@ import (
 // Default ReadyToTrip returns true when the number of consecutive failures is more than 5.
 //
 // OnStateChange is called whenever the state of the CircuitBreaker changes.
+// It is called without the lock of the CircuitBreaker held, one call at a time and in the
+// order of the state changes. The goroutine whose call changed the state makes the call
+// before it returns, unless another goroutine is inside the callback: the state change
+// is then queued, and that other goroutine delivers it once the callback returns.
+// So while a callback has not returned, the CircuitBreaker keeps serving requests, the
+// state changes are reported late, State may already be past the reported one, and the
+// goroutine inside the callback stays until every queued state change is delivered.
+// The queue holds 16 state changes: when a callback takes so long that it fills up, the
+// oldest queued ones are dropped and never reported.
+// The callback may call the CircuitBreaker. A state change it causes is delivered after
+// it returns.
 //
 // IsSuccessful is called with the error returned from a request.
 // If IsSuccessful returns true, the error is counted as a success.

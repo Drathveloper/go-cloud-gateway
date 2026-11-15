@@ -20,19 +20,28 @@ var ErrHalfOpenRequestExceeded = errors.New("too many requests while circuit bre
 var ErrOpenState = errors.New("circuit breaker is open")
 
 // CircuitBreaker is a state machine to prevent sending requests that are likely to fail.
+//
+// The mutex guards the state, the counters and the delivery of the state changes
+// (pending and notifying). It is never held while user code that may block runs: see
+// Settings.OnStateChange for how the callback is called.
 type CircuitBreaker[T any] struct {
 	expiry        time.Time
 	readyToTrip   func(counts Counts) bool
 	isSuccessful  func(err error) bool
 	onStateChange func(name string, from State, to State)
 	name          string
-	interval      time.Duration
-	timeout       time.Duration
-	state         State
-	generation    uint64
-	counts        Counts
-	mutex         sync.Mutex
-	maxRequests   uint32
+	// pending holds the state changes OnStateChange has not been called for yet.
+	pending     pendingChanges
+	interval    time.Duration
+	timeout     time.Duration
+	state       State
+	generation  uint64
+	counts      Counts
+	mutex       sync.Mutex
+	maxRequests uint32
+	// notifying is true while a goroutine is calling OnStateChange for the pending
+	// state changes. It makes that goroutine the only one that calls it.
+	notifying bool
 }
 
 // NewCircuitBreaker returns a new CircuitBreaker configured with the given Settings.
@@ -92,7 +101,7 @@ func (cb *CircuitBreaker[T]) Name() string {
 // State returns the current state of the CircuitBreaker.
 func (cb *CircuitBreaker[T]) State() State {
 	cb.mutex.Lock()
-	defer cb.mutex.Unlock()
+	defer cb.unlockAndNotify()
 
 	now := time.Now()
 	state, _ := cb.currentState(now)
@@ -136,7 +145,7 @@ func (cb *CircuitBreaker[T]) Execute(req func() (T, error)) (T, error) {
 
 func (cb *CircuitBreaker[T]) beforeRequest() (uint64, error) {
 	cb.mutex.Lock()
-	defer cb.mutex.Unlock()
+	defer cb.unlockAndNotify()
 
 	now := time.Now()
 	state, generation := cb.currentState(now)
@@ -153,7 +162,7 @@ func (cb *CircuitBreaker[T]) beforeRequest() (uint64, error) {
 
 func (cb *CircuitBreaker[T]) afterRequest(before uint64, success bool) {
 	cb.mutex.Lock()
-	defer cb.mutex.Unlock()
+	defer cb.unlockAndNotify()
 
 	now := time.Now()
 	state, generation := cb.currentState(now)
@@ -223,8 +232,68 @@ func (cb *CircuitBreaker[T]) setState(state State, now time.Time) {
 	cb.toNewGeneration(now)
 
 	if cb.onStateChange != nil {
-		cb.onStateChange(cb.name, prev, state)
+		// The callback is not called here, where the mutex is held: the change is queued
+		// and unlockAndNotify delivers it once the mutex is released.
+		cb.pending.push(pendingChange{from: prev, to: state})
 	}
+}
+
+// unlockAndNotify releases the mutex, which the caller must hold, and then calls
+// OnStateChange for the state changes queued while it was held.
+//
+// The callback runs without the mutex so that a slow one only delays the goroutine that
+// delivers it, not every request of the breaker, and so that it can call back into the
+// breaker. Delivery is still serialized: the goroutine that finds pending changes and
+// nobody delivering them takes the role, and whoever changes the state meanwhile leaves
+// its change in the queue for that goroutine. The changes therefore reach the callback
+// one at a time and in the order they happened, without a goroutine of their own.
+func (cb *CircuitBreaker[T]) unlockAndNotify() {
+	deliver := !cb.notifying && !cb.pending.empty()
+	if deliver {
+		cb.notifying = true
+	}
+	cb.mutex.Unlock()
+	if deliver {
+		cb.notifyStateChanges()
+	}
+}
+
+// notifyStateChanges calls OnStateChange for the pending state changes until none is
+// left, including the ones queued while it runs. The caller must have set notifying.
+func (cb *CircuitBreaker[T]) notifyStateChanges() {
+	drained := false
+	defer func() {
+		if drained {
+			return
+		}
+		// The callback panicked. The role is given up, or no state change would be
+		// delivered again: the next call into the breaker resumes with what is queued.
+		cb.mutex.Lock()
+		cb.notifying = false
+		cb.mutex.Unlock()
+	}()
+	for {
+		change, ok := cb.nextStateChange()
+		if !ok {
+			drained = true
+			return
+		}
+		cb.onStateChange(cb.name, change.from, change.to)
+	}
+}
+
+// nextStateChange returns the oldest pending state change. When there is none it ends
+// the delivery under the same lock, so that a change queued right after is delivered by
+// the goroutine that queued it instead of being left behind.
+func (cb *CircuitBreaker[T]) nextStateChange() (pendingChange, bool) {
+	cb.mutex.Lock()
+	defer cb.mutex.Unlock()
+
+	change, ok := cb.pending.pop()
+	if !ok {
+		cb.notifying = false
+	}
+	return change, ok
 }
 
 func (cb *CircuitBreaker[T]) toNewGeneration(now time.Time) {

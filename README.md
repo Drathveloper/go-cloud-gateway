@@ -108,6 +108,40 @@ func main() {
 [`examples/minimal-gateway`](examples/minimal-gateway) is a runnable gateway. The server listens on port 8000
 unless [the bootstrap options](#bootstrap-options) say otherwise.
 
+### Configuration built in code
+
+A program that reads no file can build the `config.Config` itself. The field names are the configuration keys
+in camel case, and a duration is a `config.Duration`, which wraps a `time.Duration`:
+
+```go
+cfg := &config.Config{
+    Gateway: config.Gateway{
+        GlobalTimeout: config.Duration{Duration: 30 * time.Second},
+        Routes: []config.Route{
+            {
+                ID:  "example-route",
+                URI: "http://localhost:8080",
+                Predicates: []config.ParameterizedItem{
+                    {Name: "Path", Args: map[string]any{"patterns": []any{"/api/v1/*"}}},
+                },
+            },
+        },
+    },
+}
+server, err := bootstrap.Initialize(bootstrap.NewOptionsBuilder(cfg).Build())
+```
+
+`bootstrap.Initialize` validates the configuration with `config.Validate` and returns an error when it is not
+valid, with one line per broken rule. The rules are the ones the readers apply, which makes everything this
+document says about a required key or a range true for the matching field. `config.Validate(cfg)` can also be
+called on its own. Some rules are easy to miss in code, where a field that is left out is a zero:
+
+* `Gateway.Routes` needs at least one route, and each route an `ID` and a `URI`.
+* When `HTTPClient.Pool` is set, its five durations are pointers that cannot be nil, although they can point
+  to a zero duration, and its three counters cannot be zero. Leave `Pool` nil to get the defaults.
+* When `HTTPClient.MTLS` is set, `Enabled` is a pointer that cannot be nil.
+* When `CircuitBreaker.Enabled` is `true`, no other field of the circuit breaker can be zero.
+
 ## Configuration
 
 The gateway can be configured using either YAML or JSON files. A basic YAML configuration example:
@@ -401,14 +435,15 @@ request cancelled by the client is not a failure. A `5xx` response is still sent
 |-------------------------------|------------------------------------------------------------------------------------|
 | `enabled`                     | `true` to give the route a circuit breaker. Defaults to `false`.                   |
 | `interval`                    | While the breaker is closed, its counters are reset every `interval`.              |
-| `min-requests-threshold`      | Requests the breaker must have counted before it can open.                         |
+| `min-requests-threshold`      | Requests the breaker must have counted before it can open, from 1 to 4294967295.   |
 | `failure-rate-threshold`      | Percentage of failed requests at which the breaker opens, from 1 to 100.           |
 | `wait-duration-in-open-state` | Time the breaker stays open before it lets requests through again (half-open).     |
-| `num-allowed-half-open-calls` | Requests let through while half-open. The breaker closes when that many succeed in a row and opens again on the first failure. |
+| `num-allowed-half-open-calls` | Requests let through while half-open, from 1 to 4294967295. The breaker closes when that many succeed in a row and opens again on the first failure. |
 
-All the settings are required when `enabled` is `true`, and none can be zero. While the breaker is open, and
-for the requests over the allowed ones while it is half-open, the gateway answers `503 Service Unavailable`
-without calling the backend.
+All the settings are required when `enabled` is `true`, and none can be zero. A negative duration and a
+number out of its range are rejected when the gateway starts, also when `enabled` is `false`. While the
+breaker is open, and for the requests over the allowed ones while it is half-open, the gateway answers
+`503 Service Unavailable` without calling the backend.
 
 ```yaml
 gateway:
@@ -560,13 +595,18 @@ none.
 * The error handler logs every error it answers: `429` and `499` at `warn` level, the rest at `error` level.
 * A circuit breaker logs each state change as `circuit breaker state changed`, with the attributes `breaker`
   (the route id), `from` and `to` (`closed`, `open` or `half-open`). Opening is logged at `warn` level, the
-  other changes at `info` level.
+  other changes at `info` level. The line is written by the request that caused the change, without holding
+  up the breaker: a slow log handler delays that request, not the other requests of the route. The lines of
+  a breaker are written one at a time and in the order of the changes. While one is being written the next
+  lines wait for it, up to 16 of them: beyond that the oldest waiting ones are dropped.
 * A panic in a filter is logged with its stack and answered with `500`.
 
 ## Bootstrap options
 
 `bootstrap.NewOptionsBuilder(cfg)` returns a builder with the defaults. `Build` returns the options that
-`bootstrap.Initialize` takes. `Initialize` returns the `*http.Server`, not started.
+`bootstrap.Initialize` takes. `Initialize` returns the `*http.Server`, not started, or an error when the
+configuration is not valid or the gateway cannot be built from it. The configuration is validated with
+`config.Validate` whether it was read from a file or [built in code](#configuration-built-in-code).
 
 | Method                 | Default                             | Description                                                |
 |------------------------|-------------------------------------|------------------------------------------------------------|
