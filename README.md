@@ -276,6 +276,7 @@ Arguments of `RequestResponseLogger`:
 | `log-bodies`     | `true`  | Whether the bodies are logged. With `false` no body is buffered or copied.           |
 | `max-body-bytes` | `65536` | Most body bytes logged per request and per response. A negative value means no limit. |
 | `redact-headers` | none    | List of header names whose values are redacted, besides the ones that always are.    |
+| `redact-query-params` | none | List of query parameter names whose values are redacted in the logged URL, besides the ones that always are. |
 
 The request body is buffered in memory to be logged, up to `max-body-bytes`: a bigger request body is
 forwarded untouched and logged without its content. The response body is not held back: it streams to the
@@ -285,6 +286,31 @@ size of the body, once the body has been sent.
 `RequestResponseLogger` logs the values of `Authorization`, `Proxy-Authorization`,
 `Cookie`, `Set-Cookie` and `X-Api-Key` as `[REDACTED]`. Its `redact-headers` argument
 adds more header names to that list.
+
+The URL of the request is logged with the credentials it carries replaced the same way:
+
+* The values of the query parameters `access_token`, `id_token`, `refresh_token`, `token`, `api_key`,
+  `apikey`, `password`, `secret`, `client_secret` and `signature`. The `redact-query-params` argument adds
+  more names to that list. `GET /callback?state=xyz&access_token=abc` is logged as
+  `GET /callback?state=xyz&access_token=[REDACTED]`.
+* The user info, which a request only has when its request line holds an absolute URL:
+  `http://user:password@example.org/path` is logged as `http://[REDACTED]@example.org/path`.
+
+How the query string is redacted:
+
+* Only the log line changes. The backend receives the query string as the client sent it.
+* A name matches whatever the case of its ASCII letters, and it is compared decoded: `Access_Token=abc` and
+  `access%5Ftoken=abc` are both redacted. The names of `redact-query-params` are written decoded: `api key`,
+  not `api%20key` or `api+key`.
+* The whole name has to match: `token_type` and `mytoken` are logged as they are.
+* Every value of a repeated parameter is redacted, and so is a parameter that follows a `;` instead of a `&`
+  (`?a=1;token=abc`).
+* The rest of the URL is logged as it was received: the name of the redacted parameter, the order of the
+  parameters, their encoding and the ones that are malformed. A sensitive parameter with no value or with an
+  empty one (`?token`, `?token=`) is also logged as it is.
+* The path and the bodies are not redacted: a credential sent in either of them is logged.
+
+In code, `WithRedactedHeaders` and `WithRedactedQueryParams` return a copy of the filter with more names.
 
 ```yaml
 gateway:
@@ -296,6 +322,8 @@ gateway:
         max-body-bytes: 4096
         redact-headers:
           - X-Internal-Token
+        redact-query-params:
+          - session_id
   routes:
     - id: users
       uri: http://localhost:8080

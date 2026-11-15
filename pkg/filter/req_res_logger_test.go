@@ -125,6 +125,35 @@ func TestNewRequestResponseLoggerFilterBuilder(t *testing.T) {
 			expectedErr: errors.New("failed to convert 'redact-headers' attribute: value is expected to be a valid string slice: " +
 				"value is required to be a valid slice: element at index 1 is not of expected type"),
 		},
+		{
+			name: "build should succeed when redact-query-params is present and is a list of names",
+			args: map[string]any{
+				"redact-query-params": []any{"session_id", "Sig"},
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "build should succeed when redact-query-params is null",
+			args: map[string]any{
+				"redact-query-params": nil,
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "build should fail when redact-query-params is present and is not a list",
+			args: map[string]any{
+				"redact-query-params": "session_id",
+			},
+			expectedErr: errors.New("failed to convert 'redact-query-params' attribute: value is required to be a valid slice"),
+		},
+		{
+			name: "build should fail when redact-query-params is present and holds something other than names",
+			args: map[string]any{
+				"redact-query-params": []any{"session_id", 42},
+			},
+			expectedErr: errors.New("failed to convert 'redact-query-params' attribute: value is expected to be a valid string slice: " +
+				"value is required to be a valid slice: element at index 1 is not of expected type"),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -679,7 +708,7 @@ func TestRequestResponseLogger_DisabledLevelDoesNoWork(t *testing.T) {
 		Logger: newSilentLogger(),
 		Request: &gateway.Request{
 			Method:     http.MethodPost,
-			URL:        mustParseURL("https://example.org/test"),
+			URL:        mustParseURL("https://user:pass@example.org/test?access_token=secret&page=1"),
 			Headers:    headers,
 			BodyReader: gateway.NewReplayableBody(io.NopCloser(bytes.NewReader(body)), int64(len(body))),
 		},
@@ -691,7 +720,8 @@ func TestRequestResponseLogger_DisabledLevelDoesNoWork(t *testing.T) {
 	}
 	f := filter.NewRequestResponseLoggerFilter(slog.LevelInfo, filter.DefaultMaxLoggedBodyBytes, true)
 
-	// Redacting copies the header map, so any work done before the level check allocates.
+	// Redacting copies the header map and builds another URL, so any work done before the
+	// level check allocates.
 	allocs := testing.AllocsPerRun(100, func() {
 		_ = f.PreProcess(ctx)
 		_ = f.PostProcess(ctx)
