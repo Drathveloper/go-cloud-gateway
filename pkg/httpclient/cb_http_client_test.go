@@ -249,3 +249,41 @@ func TestCircuitBreakerHTTPClient_Do_AppliesThroughWrappedContext(t *testing.T) 
 		t.Error("expected the circuit breaker to be applied through the wrapped context")
 	}
 }
+
+// The timeout of a streaming route may come back from the http client as a
+// context.Canceled, which the breaker would take for a client that went away.
+func TestCircuitBreakerHTTPClient_Do_CountsAStreamingTimeoutReportedAsCanceled(t *testing.T) {
+	tests := []struct {
+		cause        error
+		name         string
+		wantDeadline bool
+	}{
+		{name: "cancelled by the route timeout", cause: context.DeadlineExceeded, wantDeadline: true},
+		{name: "cancelled because the client went away", cause: context.Canceled, wantDeadline: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			routeCtx, cancel := context.WithCancelCause(t.Context())
+			cancel(tt.cause)
+			breaker := &MockCircuitBreaker[*http.Response]{}
+			gwCtx := &gateway.Context{
+				Route:   &gateway.Route{ID: "someId", CircuitBreaker: breaker},
+				Context: routeCtx,
+			}
+			req := (&http.Request{}).WithContext(gwCtx)
+			client := &MockHTTPClient{ExpectedError: fmt.Errorf("http2: %w", context.Canceled)}
+
+			_, err := httpclient.NewCircuitBreakerHTTPClient(client).Do(req) //nolint:bodyclose
+
+			if got := errors.Is(breaker.ObservedError, context.DeadlineExceeded); got != tt.wantDeadline {
+				t.Errorf("breaker saw DeadlineExceeded = %v, want %v (%v)", got, tt.wantDeadline, breaker.ObservedError)
+			}
+			if got := errors.Is(breaker.ObservedError, context.Canceled); got == tt.wantDeadline {
+				t.Errorf("breaker saw Canceled = %v, want %v (%v)", got, !tt.wantDeadline, breaker.ObservedError)
+			}
+			if got := errors.Is(err, context.DeadlineExceeded); got != tt.wantDeadline {
+				t.Errorf("caller got DeadlineExceeded = %v, want %v (%v)", got, tt.wantDeadline, err)
+			}
+		})
+	}
+}

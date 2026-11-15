@@ -42,19 +42,23 @@ func NewGateway(client HTTPClient) *Gateway {
 //
 // On a streaming route the route timeout stops running once Do returns successfully,
 // so the response body can be streamed for as long as it lasts.
+//
+// A context.Canceled that the timeout of a streaming route caused, from a filter or from
+// the http client, is reported as the context.DeadlineExceeded of a regular route: see
+// shared.AsRouteTimeout.
 func (g *Gateway) Do(ctx *Context) error {
 	if err := ctx.Route.Filters.PreProcessAll(ctx); err != nil {
-		return fmt.Errorf(gatewayErrMsg, ctx.Route.ID, err)
+		return fmt.Errorf(gatewayErrMsg, ctx.Route.ID, shared.AsRouteTimeout(ctx, err))
 	}
 	backendReq := g.buildProxyRequest(ctx)
 	backendRes, err := g.httpClient.Do(backendReq) //nolint:bodyclose
 	if err != nil {
-		return g.handleBackendError(ctx, err)
+		return g.handleBackendError(ctx, shared.AsRouteTimeout(ctx, err))
 	}
 	ctx.Response = NewGatewayResponse(backendRes)
 	if err = ctx.Route.Filters.PostProcessAll(ctx); err != nil {
 		_ = ctx.Response.BodyReader.Close()
-		return fmt.Errorf(gatewayErrMsg, ctx.Route.ID, err)
+		return fmt.Errorf(gatewayErrMsg, ctx.Route.ID, shared.AsRouteTimeout(ctx, err))
 	}
 	if !ctx.disarmTimeout() {
 		// The timeout of a streaming route fired while the post-process filters

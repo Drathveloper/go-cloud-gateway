@@ -235,6 +235,9 @@ func TestGateway_Do(t *testing.T) {
 			},
 			route: &gateway.Route{
 				ID: "r1",
+				// Not expired: a cancellation is only the client going away while
+				// the route timeout has not fired.
+				Timeout: time.Minute,
 				URI: url.URL{
 					Scheme: "https",
 					Host:   "example.org",
