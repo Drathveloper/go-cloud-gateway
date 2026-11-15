@@ -40,8 +40,9 @@ type Options struct {
 // body while it is still being sent to the backend, and a write timeout that expires
 // before it closes the connection before the gateway can answer.
 //
-// The write timeout does not apply to streaming routes. The read timeout does: the
-// request body of a streaming route is still bounded by it.
+// The write timeout does not apply to streaming routes. The read timeout applies to them
+// until their response starts, which the route timeout makes happen first: after that
+// each read of what is left of the request body has the route timeout as its deadline.
 //
 // ReadHeaderTimeout and IdleTimeout fall back to ReadTimeout when they are zero. The
 // fallback is the configured ReadTimeout, not the raised one.

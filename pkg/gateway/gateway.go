@@ -42,7 +42,16 @@ func NewGateway(client HTTPClient) *Gateway {
 //
 // On a streaming route the route timeout stops running once Do returns successfully,
 // so the response body can be streamed for as long as it lasts.
+//
+// A request body that is still arriving when the route times out is abandoned, when its
+// source allows it, so that the timeout is reported then and not when the client is done.
 func (g *Gateway) Do(ctx *Context) error {
+	if ctx.Request != nil {
+		// Not ctx itself: what this registers may still be running once Do has
+		// returned, when the gateway context, which is pooled, may be released.
+		stopAbandon := ctx.Request.BodyReader.abandonOnTimeout(ctx.Context)
+		defer stopAbandon()
+	}
 	if err := ctx.Route.Filters.PreProcessAll(ctx); err != nil {
 		return fmt.Errorf(gatewayErrMsg, ctx.Route.ID, err)
 	}

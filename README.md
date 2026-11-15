@@ -435,6 +435,14 @@ Every route has a timeout: its own `timeout`, else `global-timeout`, else 10 sec
 bounds the **whole exchange**, response body included, and the gateway answers
 `504 Gateway Timeout` when the backend does not reply in time.
 
+The `504` is sent when the timeout expires, also to a client that is still sending the
+request body. The gateway stops reading that body, so the connection cannot be reused: the
+response carries `Connection: close` and the connection is closed after it. A request whose
+body was read to the end keeps its connection, and on HTTP/2 only the stream of the request
+ends. As with any response sent before the request is complete, a client has to read while
+it writes to see it: one that only reads once it has sent everything keeps writing to a
+connection that is closed half a second later, and may get a connection reset instead.
+
 That is the wrong shape for long-lived responses such as Server-Sent Events, which would
 be cut when the timeout expires. Mark those routes as streaming:
 
@@ -451,10 +459,29 @@ On a streaming route the timeout only bounds:
 
 * the time until the response is ready to be sent (pre-process filters, backend response
   headers and post-process filters): past it the gateway still answers `504`;
-* each individual write to the client, so a client that stops reading is dropped.
+* each individual write to the client, so a client that stops reading is dropped;
+* each individual read of the request body once the response has started, so a client
+  that stops sending is dropped.
 
 Once the response starts, the stream lasts as long as the backend keeps it open or until
 the client disconnects. Every write is flushed immediately.
+
+The request body of a streaming route is long-lived in one case only: when the backend
+starts to answer while the client is still sending, as in a bidirectional stream.
+
+* **The backend answers once it has the whole body**, as most upload endpoints do. The
+  response is not ready until the upload ends, so the upload has to fit in the route
+  timeout, as on a regular route, and the gateway answers `504` when it does not.
+  `streaming: true` does not give a slow upload more time: a longer `timeout` does.
+* **The backend answers while the body is arriving.** From then on the body keeps flowing
+  to the backend for as long as the client keeps sending, with the route timeout as the
+  deadline of every read. A client that sends nothing for longer than that is dropped: the
+  status is already on the wire, so the exchange is cut instead of answered.
+
+In the second case HTTP/1.1 needs the client to read the response while it is still
+sending the request, which is what the gateway asks of the connection
+(`http.ResponseController.EnableFullDuplex`). On HTTP/2 the deadline of a read is a timer of
+the stream: it also expires when the backend stops taking the body for that long.
 
 The server `ReadTimeout` and `WriteTimeout` (`bootstrap.ServerOpts`) are also deadlines,
 for the whole request and for the whole response, and start counting before the route
@@ -462,8 +489,9 @@ timeout. `bootstrap.Initialize` raises each of them to the longest route timeout
 seconds when it is shorter than that. Otherwise an expired read timeout would cut a request
 body that is still being sent to the backend, and an expired write timeout would close the
 connection before the gateway can answer `504`. A zero or negative value, which disables
-the timeout, is kept. Streaming routes are not subject to the write timeout, but their
-request body is still bound by the read timeout.
+the timeout, is kept. Streaming routes are not subject to the write timeout, nor to the
+read timeout once their response has started: until then it is the route timeout that
+bounds the request body, as it expires first.
 
 ### HTTP client
 
@@ -545,7 +573,7 @@ in these cases. Apart from `404`, the body carries no message:
 | `500 Internal Server Error` | A filter returned an error or panicked, or any other unexpected error.           |
 | `502 Bad Gateway`           | The request to the backend failed, for instance because the connection was refused. |
 | `503 Service Unavailable`   | The circuit breaker of the route rejected the request.                           |
-| `504 Gateway Timeout`       | The route timeout expired.                                                       |
+| `504 Gateway Timeout`       | The route timeout expired. See [Timeouts and streaming routes](#timeouts-and-streaming-routes). |
 
 All but `404` come from the error handler, which `WithErrorHandler` replaces. `404` comes from the not found
 handler, which `WithNotFoundHandler` replaces. See [Bootstrap options](#bootstrap-options).

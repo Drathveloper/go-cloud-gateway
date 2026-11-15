@@ -68,7 +68,7 @@ func (rb *ReplayableBody) ObserveStream(onChunk func(chunk []byte), onDone func(
 	}
 	// The source has already been closed without being drained: report truncation
 	// rather than leaving onDone forever pending.
-	if rb.closed {
+	if rb.closed.Load() {
 		fireSync(onDone, 0, ErrStreamTruncated)
 		return
 	}

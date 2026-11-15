@@ -1,6 +1,7 @@
 package gatewayhandler
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -81,17 +82,30 @@ func (h *GatewayHandler) ServeHTTP(writer http.ResponseWriter, request *http.Req
 		return
 	}
 	shared.SetXForwardedHeaders(request)
+	body := trackRequestBody(writer, request)
 	gwRequest := gateway.NewGatewayRequest(request)
 	ctx, cancel := gateway.NewGatewayContext(request.Context(), route, gwRequest)
 	defer gateway.ReleaseGatewayContext(ctx)
 	defer cancel()
 	defer gwRequest.BodyReader.Close() //nolint:errcheck
+	defer body.release()
 	if err := h.doWithRecover(ctx); err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			// The gateway abandons the body when the route times out, but on its
+			// own goroutine, which may not have run yet, and a timeout may also
+			// come from a filter. net/http would read what is left of the body
+			// before it writes the response.
+			body.Abandon()
+		}
 		h.errHandler.Handle(ctx, err, writer)
 		if ctx.Response != nil && ctx.Response.BodyReader != nil {
 			_ = ctx.Response.BodyReader.Close()
 		}
 		return
+	}
+	if ctx.Route.Streaming {
+		// The read side of what writeResponse does with the write deadline.
+		body.renewReadDeadline(ctx.Route.Timeout)
 	}
 	h.writeResponse(writer, ctx)
 }
