@@ -131,22 +131,16 @@ func (h *GatewayHandler) writeResponse(writer http.ResponseWriter, ctx *gateway.
 	}
 	writer.WriteHeader(response.Status)
 	dst := io.Writer(writer)
-	switch {
-	case ctx.Route.Streaming:
-		// The server write timeout is a deadline for the whole response and would
-		// cut the stream: it is replaced by a deadline renewed on every write, which
-		// still drops clients that stop reading. net/http clears the connection
-		// write deadline once the handler returns, so it does not leak into the
-		// next request of a kept-alive connection.
-		dst = &immediateFlushWriter{
-			dst:          writer,
-			controller:   http.NewResponseController(writer),
-			writeTimeout: ctx.Route.Timeout,
+	stream := newStreamWriter(writer, ctx)
+	if stream != nil {
+		dst = stream
+		// The headers of a stream are sent before its first event, which may take a
+		// while, as the net/http/httputil reverse proxy does: clients such as
+		// EventSource report the stream as open when they get them.
+		if err := stream.flush(); err != nil {
+			ctx.Logger.Warn("sending response headers to client failed", "error", err)
+			panic(http.ErrAbortHandler)
 		}
-	case isStreamingResponse(response):
-		// Without per-write flushing, streamed events would sit in the server
-		// output buffer until it fills.
-		dst = &immediateFlushWriter{dst: writer, controller: http.NewResponseController(writer)}
 	}
 	if _, err := io.Copy(dst, response.BodyReader); err != nil {
 		ctx.Logger.Warn("copying backend response to client failed", "error", err)
@@ -154,6 +148,31 @@ func (h *GatewayHandler) writeResponse(writer http.ResponseWriter, ctx *gateway.
 		// connection so the client sees the truncation instead of a chunked
 		// response that terminates cleanly and looks complete.
 		panic(http.ErrAbortHandler)
+	}
+	if stream != nil {
+		stream.finish()
+	}
+}
+
+// newStreamWriter returns the writer of a response that must reach the client as it is
+// produced, or nil when the response can be buffered by the server as usual.
+func newStreamWriter(writer http.ResponseWriter, ctx *gateway.Context) *immediateFlushWriter {
+	switch {
+	case ctx.Route.Streaming:
+		// The server write timeout is a deadline for the whole response and would
+		// cut the stream: it is replaced by a deadline of its own for every write,
+		// which still drops clients that stop reading.
+		return &immediateFlushWriter{
+			dst:          writer,
+			controller:   http.NewResponseController(writer),
+			writeTimeout: ctx.Route.Timeout,
+		}
+	case isStreamingResponse(ctx.Response):
+		// Without per-write flushing, streamed events would sit in the server
+		// output buffer until it fills.
+		return &immediateFlushWriter{dst: writer, controller: http.NewResponseController(writer)}
+	default:
+		return nil
 	}
 }
 
@@ -171,6 +190,12 @@ func isStreamingResponse(response *gateway.Response) bool {
 // immediateFlushWriter flushes the response writer after every write so streamed
 // data is put on the wire as it is produced. A positive writeTimeout additionally
 // gives every write, flush included, its own deadline.
+//
+// The deadline only stands while a write is in progress. It is cleared once the write
+// is done, because a write deadline is not the same thing on every protocol: on HTTP/1
+// it only matters to the writes that happen before it, but on HTTP/2 it is a timer
+// that resets the stream when it fires, whether or not anything is being written. Left
+// in place, it would cut a stream that stays quiet for longer than the timeout.
 type immediateFlushWriter struct {
 	dst          io.Writer
 	controller   *http.ResponseController
@@ -178,11 +203,8 @@ type immediateFlushWriter struct {
 }
 
 func (w *immediateFlushWriter) Write(output []byte) (int, error) {
-	if w.writeTimeout > 0 {
-		// Not every response writer supports deadlines: without one the write is
-		// only bounded by the server write timeout, as before.
-		_ = w.controller.SetWriteDeadline(time.Now().Add(w.writeTimeout))
-	}
+	w.setWriteDeadline()
+	defer w.clearWriteDeadline()
 	written, err := w.dst.Write(output)
 	if err != nil {
 		return written, err //nolint:wrapcheck
@@ -191,4 +213,42 @@ func (w *immediateFlushWriter) Write(output []byte) (int, error) {
 		return written, err //nolint:wrapcheck
 	}
 	return written, nil
+}
+
+// flush puts on the wire what has been written so far, the response headers included,
+// under a deadline of its own.
+func (w *immediateFlushWriter) flush() error {
+	w.setWriteDeadline()
+	defer w.clearWriteDeadline()
+	if err := w.controller.Flush(); err != nil && !errors.Is(err, http.ErrNotSupported) {
+		return err //nolint:wrapcheck
+	}
+	return nil
+}
+
+// finish gives a deadline to what the server still writes once the handler returns: the
+// end of the response, which is the last chunk on HTTP/1 and the end of the stream on
+// HTTP/2. The server would otherwise write it without any deadline, or, were the deadline
+// of the last write left in place, under one that expired if the response ended more than
+// a timeout after that write, which makes the client see a truncated response.
+//
+// net/http clears the write deadline of the connection once the handler has returned
+// and the response is finished, and an HTTP/2 stream stops its timer when it closes, so
+// the deadline does not outlive the response.
+func (w *immediateFlushWriter) finish() {
+	w.setWriteDeadline()
+}
+
+func (w *immediateFlushWriter) setWriteDeadline() {
+	if w.writeTimeout > 0 {
+		// Not every response writer supports deadlines: without one the write is
+		// only bounded by the server write timeout, as before.
+		_ = w.controller.SetWriteDeadline(time.Now().Add(w.writeTimeout))
+	}
+}
+
+func (w *immediateFlushWriter) clearWriteDeadline() {
+	if w.writeTimeout > 0 {
+		_ = w.controller.SetWriteDeadline(time.Time{})
+	}
 }

@@ -48,6 +48,22 @@ func newServer(cfg *config.Config) (*http.Server, error) {
 	return server, err
 }
 `,
+	// Configuration built in code: statements that build the configuration themselves.
+	"cfg := &config.Config{": `package snippet
+
+import (
+	"net/http"
+	"time"
+
+	"github.com/drathveloper/go-cloud-gateway/pkg/bootstrap"
+	"github.com/drathveloper/go-cloud-gateway/pkg/config"
+)
+
+func newServer() (*http.Server, error) {
+	// README SNIPPET
+	return server, err
+}
+`,
 	// Extending the gateway: declarations.
 	"type stampFilter struct {": `package snippet
 
