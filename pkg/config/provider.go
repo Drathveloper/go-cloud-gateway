@@ -11,8 +11,6 @@ import (
 	"net/http"
 	"time"
 
-	"golang.org/x/net/http2"
-
 	"github.com/drathveloper/go-cloud-gateway/pkg/circuitbreaker"
 	"github.com/drathveloper/go-cloud-gateway/pkg/filter"
 	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
@@ -69,10 +67,7 @@ func buildHTTPClient(cfg *Config) (gateway.HTTPClient, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to build TLS config: %w", err)
 	}
-	transport, err := buildTransport(httpClientConfig(cfg), tlsConfig)
-	if err != nil {
-		return nil, err
-	}
+	transport := buildTransport(httpClientConfig(cfg), tlsConfig)
 	// No client-wide timeout exists: it would cap the whole exchange including the body
 	// copy, cutting long downloads and streams. Each request is bounded by the per-route
 	// context deadline instead; pool.timeout only bounds dialing.
@@ -186,7 +181,7 @@ func durationOrDefault(value *Duration, defaultValue time.Duration) time.Duratio
 
 // buildTransport is the only place where the transport is assembled, so that a client
 // setting cannot be honored with a pool section and silently dropped without one.
-func buildTransport(clientCfg HTTPClient, tlsConfig *tls.Config) (*http.Transport, error) {
+func buildTransport(clientCfg HTTPClient, tlsConfig *tls.Config) *http.Transport {
 	pool := newPoolSettings(clientCfg.Pool)
 	transport := &http.Transport{
 		Proxy:           http.ProxyFromEnvironment,
@@ -205,11 +200,15 @@ func buildTransport(clientCfg HTTPClient, tlsConfig *tls.Config) (*http.Transpor
 		DisableCompression:    clientCfg.DisableCompression,
 	}
 	if clientCfg.EnableHTTP2 {
-		if err := http2.ConfigureTransport(transport); err != nil {
-			return nil, fmt.Errorf("failed to configure http2 transport: %w", err)
-		}
+		// HTTP/2 has to be asked for: net/http leaves it off on a transport that brings
+		// its own TLS config and dialer. Without it Protocols stays nil, which keeps the
+		// transport on HTTP/1. Cleartext HTTP/2 (h2c) is not enabled either way.
+		protocols := new(http.Protocols)
+		protocols.SetHTTP1(true)
+		protocols.SetHTTP2(true)
+		transport.Protocols = protocols
 	}
-	return transport, nil
+	return transport
 }
 
 //nolint:bodyclose
