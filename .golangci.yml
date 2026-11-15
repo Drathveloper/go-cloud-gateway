@@ -17,7 +17,6 @@ linters:
             - github.com/stretchr/testify/assert
             - github.com/stretchr/testify/require
             - github.com/go-playground/validator/v10
-            - golang.org/x/net/http2
             - gopkg.in/yaml.v3
             - io
             - maps

@@ -19,9 +19,6 @@ var ErrRequiredIntValue = errors.New("value is required to be a valid int")
 // ErrRequiredSliceValue is returned when a value is required to be a slice but is not.
 var ErrRequiredSliceValue = errors.New("value is required to be a valid slice")
 
-// ErrRequiredDurationValue is returned when a value is required to be a duration but is not.
-var ErrRequiredDurationValue = errors.New("value is required to be a valid duration")
-
 // ErrRequiredBoolValue is returned when a value is required to be a bool but is not.
 var ErrRequiredBoolValue = errors.New("value is required to be a valid bool")
 
@@ -141,23 +138,4 @@ func ConvertToInt(val any) (int, error) {
 		return 0, ErrRequiredIntValue
 	}
 	return valInt, nil
-}
-
-// ConvertToDuration converts the given value to a time.Duration.
-//
-// The value must be a string. The string value is expected to be a valid duration.
-// The function returns an error if the value is not a string or time.Duration.
-func ConvertToDuration(val any) (time.Duration, error) {
-	if val == nil {
-		return 0, ErrRequiredValue
-	}
-	valStr, ok := val.(string)
-	if !ok {
-		return 0, ErrRequiredStringValue
-	}
-	duration, err := time.ParseDuration(valStr)
-	if err != nil {
-		return 0, ErrRequiredDurationValue
-	}
-	return duration, nil
 }

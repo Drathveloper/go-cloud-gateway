@@ -1222,6 +1222,61 @@ func TestNewHTTPClient_EnableHTTP2(t *testing.T) {
 	}
 }
 
+func TestNewHTTPClient_EnableHTTP2KeepsCleartextBackendsOnHTTP1(t *testing.T) {
+	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	// The backend accepts cleartext HTTP/2 (h2c), so a client that offered it would get it.
+	server.Config.Protocols = new(http.Protocols)
+	server.Config.Protocols.SetHTTP1(true)
+	server.Config.Protocols.SetUnencryptedHTTP2(true)
+	server.Start()
+	defer server.Close()
+
+	tests := []struct {
+		name        string
+		enableHTTP2 bool
+	}{
+		{
+			name:        "http2 enabled should talk http1 to a cleartext backend",
+			enableHTTP2: true,
+		},
+		{
+			name:        "http2 disabled should talk http1 to a cleartext backend",
+			enableHTTP2: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &config.Config{
+				Gateway: config.Gateway{
+					HTTPClient: &config.HTTPClient{
+						EnableHTTP2: tt.enableHTTP2,
+					},
+				},
+			}
+			client, err := config.NewHTTPClient(cfg)
+			if err != nil {
+				t.Fatalf("NewHTTPClient() error = %v", err)
+			}
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, server.URL, nil)
+			if err != nil {
+				t.Fatalf("failed to build request: %v", err)
+			}
+
+			res, err := client.Do(req)
+			if err != nil {
+				t.Fatalf("request failed: %v", err)
+			}
+			defer res.Body.Close() //nolint:errcheck
+
+			if res.ProtoMajor != 1 {
+				t.Errorf("expected http major version %v actual %v", 1, res.ProtoMajor)
+			}
+		})
+	}
+}
+
 func TestNewHTTPClient_DoesNotFollowRedirects(t *testing.T) {
 	followed := false
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
