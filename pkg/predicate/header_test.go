@@ -24,6 +24,21 @@ func TestNewHeaderPredicateBuilder(t *testing.T) {
 			expectedErr: nil,
 		},
 		{
+			name: "build should succeed when header regexp argument is not present",
+			args: map[string]any{
+				"name": "First",
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "build should succeed when header regexp argument is null",
+			args: map[string]any{
+				"name":   "First",
+				"regexp": nil,
+			},
+			expectedErr: nil,
+		},
+		{
 			name: "build should fail when header name argument is not valid",
 			args: map[string]any{
 				"regexp": "any1",
@@ -31,11 +46,20 @@ func TestNewHeaderPredicateBuilder(t *testing.T) {
 			expectedErr: errors.New("failed to convert 'name' attribute: value is required"),
 		},
 		{
-			name: "build should fail when header regexp argument is not valid",
+			name: "build should fail when header regexp argument is not a string",
 			args: map[string]any{
-				"name": "First",
+				"name":   "First",
+				"regexp": 1234,
 			},
-			expectedErr: errors.New("failed to convert 'regexp' attribute: value is required"),
+			expectedErr: errors.New("failed to convert 'regexp' attribute: value is required to be a valid string"),
+		},
+		{
+			name: "build should fail when header regexp argument is not a valid regexp",
+			args: map[string]any{
+				"name":   "First",
+				"regexp": "[",
+			},
+			expectedErr: errors.New("invalid regexp: error parsing regexp: missing closing ]: `[`"),
 		},
 	}
 	for _, tt := range tests {
@@ -47,6 +71,40 @@ func TestNewHeaderPredicateBuilder(t *testing.T) {
 			}
 			if err == nil && actual == nil {
 				t.Errorf("expected %v to be present", actual)
+			}
+		})
+	}
+}
+
+func TestNewHeaderPredicateBuilder_WithoutRegexp(t *testing.T) {
+	tests := []struct {
+		header   http.Header
+		name     string
+		expected bool
+	}{
+		{
+			name:     "built predicate should match when header is present",
+			header:   http.Header{"X-Test-Id": {"666"}},
+			expected: true,
+		},
+		{
+			name:     "built predicate shouldn't match when header is not present",
+			header:   http.Header{"X-Test-Other": {"666"}},
+			expected: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p, err := predicate.NewHeaderPredicateBuilder().Build(map[string]any{"name": "X-Test-Id"})
+			if err != nil {
+				t.Fatalf("expected err %v actual %v", nil, err)
+			}
+			req, _ := http.NewRequestWithContext(t.Context(), http.MethodPost, "/server/test", nil)
+			req.Header = tt.header
+
+			actual := p.Test(req)
+			if tt.expected != actual {
+				t.Errorf("expected %t actual %t", tt.expected, actual)
 			}
 		})
 	}
@@ -82,11 +140,74 @@ func TestHeaderPredicate_Test(t *testing.T) {
 			expected:    true,
 		},
 		{
-			name:        "test shouldn't match when header is present and value doesn't match",
+			name:        "test shouldn't match when header is not present and regex",
 			headerName:  "X-Test-Id",
 			headerValue: "1234",
 			header:      http.Header{"X-Test-Other": {"5678"}},
 			expected:    false,
+		},
+		{
+			name:        "test shouldn't match when header is present and value doesn't match",
+			headerName:  "X-Test-Id",
+			headerValue: "1234",
+			header:      http.Header{"X-Test-Id": {"5678"}},
+			expected:    false,
+		},
+		{
+			name:        "test should match when header is present with empty value and no regex",
+			headerName:  "X-Test-Id",
+			headerValue: "",
+			header:      http.Header{"X-Test-Id": {""}},
+			expected:    true,
+		},
+		{
+			name:        "test should match when header is present with empty value and regex matches empty value",
+			headerName:  "X-Test-Id",
+			headerValue: "^$",
+			header:      http.Header{"X-Test-Id": {""}},
+			expected:    true,
+		},
+		{
+			name:        "test shouldn't match when header is present with empty value and regex doesn't match empty value",
+			headerName:  "X-Test-Id",
+			headerValue: "1234",
+			header:      http.Header{"X-Test-Id": {""}},
+			expected:    false,
+		},
+		{
+			name:        "test shouldn't match when header has no values and no regex",
+			headerName:  "X-Test-Id",
+			headerValue: "",
+			header:      http.Header{"X-Test-Id": {}},
+			expected:    false,
+		},
+		{
+			name:        "test should match when header has several values and no regex",
+			headerName:  "X-Test-Id",
+			headerValue: "",
+			header:      http.Header{"X-Test-Id": {"5678", "1234"}},
+			expected:    true,
+		},
+		{
+			name:        "test should match when header has several values and only the last one matches",
+			headerName:  "X-Test-Id",
+			headerValue: "1234",
+			header:      http.Header{"X-Test-Id": {"5678", "", "1234"}},
+			expected:    true,
+		},
+		{
+			name:        "test shouldn't match when header has several values and none matches",
+			headerName:  "X-Test-Id",
+			headerValue: "1234",
+			header:      http.Header{"X-Test-Id": {"5678", "9012"}},
+			expected:    false,
+		},
+		{
+			name:        "test should match when header name is not configured in canonical form",
+			headerName:  "x-test-ID",
+			headerValue: "1234",
+			header:      http.Header{"X-Test-Id": {"1234"}},
+			expected:    true,
 		},
 	}
 	for _, tt := range tests {
