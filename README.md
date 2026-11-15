@@ -160,7 +160,8 @@ A request goes to the first route, in configuration order, whose predicates all 
 predicates matches every request. A request that matches no route is answered with `404 Not Found`.
 
 Only the scheme and the host of `uri` are used. The path and the query string sent to the backend are the ones
-of the request (after any `RewritePath` filter), so a path written in `uri` is ignored.
+of the request (after any `RewritePath` filter). A `uri` with a path, a query string, a fragment or user
+info is rejected when the gateway starts; use a `RewritePath` filter to add a prefix to the path.
 
 Durations are strings with a unit, such as `30s`, `1m30s` or `250ms`. A bare number like
 `30` is rejected when the configuration is read.
@@ -171,7 +172,7 @@ Durations are strings with a unit, such as `30s`, `1m30s` or `250ms`. A bare num
 |-----------|------------------------------|--------------------------------------------------------------------------|
 | `Path`    | `patterns` (list)            | The request path matches at least one pattern.                           |
 | `Host`    | `patterns` (list)            | The `Host` header matches at least one pattern.                          |
-| `Method`  | `methods` (list)             | The request method is in the list. The comparison is exact: write the methods in upper case. |
+| `Method`  | `methods` (list)             | The request method is in the list. The methods can be written in any case. |
 | `Header`  | `name`, `regexp` (optional)  | The request has the header and, with `regexp`, one of its values matches it. |
 | `Query`   | `name`, `regexp` (optional)  | The request has the query parameter and, with `regexp`, one of its values matches it. |
 | `Cookie`  | `name`, `regexp` (optional)  | The request has the cookie and, with `regexp`, one of its values matches it. |
@@ -271,7 +272,7 @@ Arguments of `RequestResponseLogger`:
 
 | Argument         | Default | Description                                                                          |
 |------------------|---------|--------------------------------------------------------------------------------------|
-| `level`          | `info`  | Level of the log lines: `debug`, `info`, `warn` or `error`. Any other value means `info`. |
+| `level`          | `info`  | Level of the log lines: `debug`, `info`, `warn` or `error`, in any case. Any other value is rejected when the gateway starts. |
 | `log-bodies`     | `true`  | Whether the bodies are logged. With `false` no body is buffered or copied.           |
 | `max-body-bytes` | `65536` | Most body bytes logged per request and per response. A negative value means no limit. |
 | `redact-headers` | none    | List of header names whose values are redacted, besides the ones that always are.    |
@@ -353,7 +354,8 @@ finds the bucket empty is answered with `429 Too Many Requests`.
   the bucket of the key has a token again.
 * `X-Forwarded-For` and `X-Real-Ip` are set by the client unless a trusted proxy in front of the gateway
   overwrites them, so without such a proxy a client can choose its own `ip` key.
-* The requests that lack the header or the query parameter of a `header` or `query` key share one bucket.
+* The requests that lack the header or the query parameter of a `header` or `query` key all get the same
+  (empty) key, so they share one bucket and are limited together, whichever client sends them.
 
 ```yaml
 gateway:
@@ -400,7 +402,7 @@ request cancelled by the client is not a failure. A `5xx` response is still sent
 | `enabled`                     | `true` to give the route a circuit breaker. Defaults to `false`.                   |
 | `interval`                    | While the breaker is closed, its counters are reset every `interval`.              |
 | `min-requests-threshold`      | Requests the breaker must have counted before it can open.                         |
-| `failure-rate-threshold`      | Percentage of failed requests at which the breaker opens.                          |
+| `failure-rate-threshold`      | Percentage of failed requests at which the breaker opens, from 1 to 100.           |
 | `wait-duration-in-open-state` | Time the breaker stays open before it lets requests through again (half-open).     |
 | `num-allowed-half-open-calls` | Requests let through while half-open. The breaker closes when that many succeed in a row and opens again on the first failure. |
 
@@ -577,7 +579,9 @@ none.
 | `WithCustomPredicates` | none                                | Predicates added to the built-in ones.                     |
 
 Fields of `bootstrap.ServerOpts`. `WithServerOptions` only takes the fields that are not zero, the others
-keep their default:
+keep their default. A zero or negative timeout means no timeout, but zero cannot be set through
+`WithServerOptions` for that reason: pass a negative value to disable a timeout. `ServerOpts` also has a
+`CustomHandlers` field, which is the same as calling `WithCustomHandlers`:
 
 | Field               | Default   | Description                                                              |
 |---------------------|-----------|--------------------------------------------------------------------------|

@@ -107,6 +107,9 @@ func NewPathAndMethodKeyFunc() KeyFunc {
 }
 
 // NewQueryKeyFunc returns the value of the query parameter with the given name as the key.
+//
+// A request without the parameter gets the empty key, so all such requests share one
+// bucket and are limited together.
 func NewQueryKeyFunc(queryName string) KeyFunc {
 	return func(ctx *gateway.Context) string {
 		return ctx.Request.URL.Query().Get(queryName)
@@ -114,6 +117,9 @@ func NewQueryKeyFunc(queryName string) KeyFunc {
 }
 
 // NewHeaderKeyFunc returns the value of the header with the given name as the key.
+//
+// A request without the header gets the empty key, so all such requests share one bucket
+// and are limited together.
 func NewHeaderKeyFunc(headerName string) KeyFunc {
 	return func(ctx *gateway.Context) string {
 		return ctx.Request.Headers.Get(headerName)

@@ -13,7 +13,8 @@ import (
 	"github.com/drathveloper/go-cloud-gateway/pkg/circuitbreaker"
 )
 
-// ErrInvalidRouteURI is returned when the route uri is not an http or https url with a host.
+// ErrInvalidRouteURI is returned when the route uri is not an http or https url with a
+// host, or when it carries more than that.
 var ErrInvalidRouteURI = errors.New("invalid route uri")
 
 // CircuitBreaker is a circuit breaker.
@@ -47,7 +48,8 @@ type Route struct {
 
 // NewRoute creates a new route.
 //
-// The uri must be an http or https url with a host, such as http://localhost:8080.
+// The uri must be an http or https url with a host and nothing else, such as
+// http://localhost:8080: a path, query, fragment or user info would not be used.
 // Anything else returns an error wrapping ErrInvalidRouteURI.
 //
 // The route filters are the global filters followed by the route filters. They are
@@ -61,16 +63,9 @@ func NewRoute(
 	timeout time.Duration,
 	circuitBreaker CircuitBreaker[*http.Response],
 	logger *slog.Logger) (*Route, error) {
-	routeURI, err := url.Parse(uri)
+	routeURI, err := parseRouteURI(uri)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrInvalidRouteURI, err)
-	}
-	// url.Parse also accepts host:port, a bare name or a path. Those build a route that
-	// can never reach a backend, so they are rejected here instead of failing every
-	// request once the gateway is running.
-	if (routeURI.Scheme != "http" && routeURI.Scheme != "https") || routeURI.Host == "" {
-		return nil, fmt.Errorf(
-			"%w %q: expected an http or https url with a host, such as http://localhost:8080", ErrInvalidRouteURI, uri)
+		return nil, err
 	}
 	// Not append(globalFilters, routeFilters...): when globalFilters has spare capacity
 	// that writes the route filters into its backing array, and every route built from
@@ -85,6 +80,37 @@ func NewRoute(
 		CircuitBreaker: circuitBreaker,
 		Logger:         logger,
 	}, nil
+}
+
+// parseRouteURI parses the uri of a route and rejects the ones a route cannot work with.
+func parseRouteURI(uri string) (*url.URL, error) {
+	routeURI, err := url.Parse(uri)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrInvalidRouteURI, err)
+	}
+	// url.Parse also accepts host:port, a bare name or a path. Those build a route that
+	// can never reach a backend, so they are rejected here instead of failing every
+	// request once the gateway is running.
+	if (routeURI.Scheme != "http" && routeURI.Scheme != "https") || routeURI.Host == "" {
+		return nil, fmt.Errorf(
+			"%w %q: expected an http or https url with a host, such as http://localhost:8080", ErrInvalidRouteURI, uri)
+	}
+	// Only the scheme and the host reach the backend: the path and the query are the ones
+	// of the request. Anything else written in the uri would be dropped without notice,
+	// and a route that looks like it adds a prefix or sends credentials would not.
+	if hasMoreThanSchemeAndHost(routeURI) {
+		return nil, fmt.Errorf(
+			"%w %q: only the scheme and the host are used, so a path, query, fragment or user info is not allowed; "+
+				"use a RewritePath filter to change the path", ErrInvalidRouteURI, uri)
+	}
+	return routeURI, nil
+}
+
+// hasMoreThanSchemeAndHost reports whether the uri carries anything GetDestinationURL does
+// not use. A lone trailing slash is not counted: it is the same backend.
+func hasMoreThanSchemeAndHost(uri *url.URL) bool {
+	hasPath := uri.Path != "" && uri.Path != "/"
+	return hasPath || uri.RawQuery != "" || uri.Fragment != "" || uri.User != nil
 }
 
 // GetDestinationURL returns the destination url for the given request url combining scheme and host from the route

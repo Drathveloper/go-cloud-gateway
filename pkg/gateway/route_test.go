@@ -11,6 +11,9 @@ import (
 	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
 )
 
+const unusedURIPartsMsg = "only the scheme and the host are used, so a path, query, fragment or user info " +
+	"is not allowed; use a RewritePath filter to change the path"
+
 func TestNewRoute(t *testing.T) {
 	tests := []struct {
 		expectedErr error
@@ -33,6 +36,35 @@ func TestNewRoute(t *testing.T) {
 			name:        "new route should succeed when uri scheme is upper case",
 			uri:         "HTTP://example.org",
 			expectedURI: "http://example.org",
+		},
+		{
+			name:        "new route should succeed when uri ends with a slash",
+			uri:         "http://localhost:8080/",
+			expectedURI: "http://localhost:8080/",
+		},
+		{
+			name:        "new route should return error when uri has a path",
+			uri:         "http://localhost:8080/v2/internal",
+			expectedErr: gateway.ErrInvalidRouteURI,
+			expectedMsg: "invalid route uri \"http://localhost:8080/v2/internal\": " + unusedURIPartsMsg,
+		},
+		{
+			name:        "new route should return error when uri has a query",
+			uri:         "http://localhost:8080?tenant=a",
+			expectedErr: gateway.ErrInvalidRouteURI,
+			expectedMsg: "invalid route uri \"http://localhost:8080?tenant=a\": " + unusedURIPartsMsg,
+		},
+		{
+			name:        "new route should return error when uri has a fragment",
+			uri:         "http://localhost:8080#top",
+			expectedErr: gateway.ErrInvalidRouteURI,
+			expectedMsg: "invalid route uri \"http://localhost:8080#top\": " + unusedURIPartsMsg,
+		},
+		{
+			name:        "new route should return error when uri has user info",
+			uri:         "http://user@localhost:8080",
+			expectedErr: gateway.ErrInvalidRouteURI,
+			expectedMsg: "invalid route uri \"http://user@localhost:8080\": " + unusedURIPartsMsg,
 		},
 		{
 			name:        "new route should return error when uri is host and port without scheme",

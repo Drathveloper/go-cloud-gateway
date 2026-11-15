@@ -67,6 +67,24 @@ func TestMethod_Test(t *testing.T) {
 			PredicateMethods: []string{http.MethodPost},
 			Expected:         false,
 		},
+		{
+			Name:             "Method should match when the predicate method is lower case",
+			ReqMethod:        http.MethodGet,
+			PredicateMethods: []string{"get"},
+			Expected:         true,
+		},
+		{
+			Name:             "Method should match when the predicate method is mixed case",
+			ReqMethod:        http.MethodPost,
+			PredicateMethods: []string{"get", "Post"},
+			Expected:         true,
+		},
+		{
+			Name:             "Method should not match a lower case request method",
+			ReqMethod:        "get",
+			PredicateMethods: []string{http.MethodGet},
+			Expected:         false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {

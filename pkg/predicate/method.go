@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"strings"
 
 	"github.com/drathveloper/go-cloud-gateway/internal/pkg/shared"
 	"github.com/drathveloper/go-cloud-gateway/pkg/gateway"
@@ -18,9 +19,17 @@ type Method struct {
 }
 
 // NewMethodPredicate creates a new method predicate.
+//
+// The methods can be written in any case. Requests carry their method in upper case and
+// the comparison is exact, so a method configured as "get" would otherwise build a
+// predicate that never matches, without any error.
 func NewMethodPredicate(methods ...string) *Method {
+	upperMethods := make([]string, 0, len(methods))
+	for _, method := range methods {
+		upperMethods = append(upperMethods, strings.ToUpper(method))
+	}
 	return &Method{
-		methods: methods,
+		methods: upperMethods,
 	}
 }
 

@@ -439,3 +439,60 @@ func assertServerOpts(t *testing.T, expectedOpts bootstrap.ServerOpts, actualOpt
 		t.Errorf("expected %+v actual %+v", expectedOpts, actualOpts)
 	}
 }
+
+func TestOptionsBuilder_WithServerOptions_CustomHandlers(t *testing.T) {
+	health := bootstrap.CustomHandler{Handler: http.NotFoundHandler(), Method: http.MethodGet, Path: "/health"}
+	ready := bootstrap.CustomHandler{Handler: http.NotFoundHandler(), Method: http.MethodGet, Path: "/ready"}
+	tests := []struct {
+		configure     func(builder *bootstrap.OptionsBuilder)
+		name          string
+		expectedPaths []string
+	}{
+		{
+			name: "server options custom handlers should be taken",
+			configure: func(builder *bootstrap.OptionsBuilder) {
+				builder.WithServerOptions(bootstrap.ServerOpts{CustomHandlers: []bootstrap.CustomHandler{health}})
+			},
+			expectedPaths: []string{"/health"},
+		},
+		{
+			name: "server options without custom handlers should keep the ones already set",
+			configure: func(builder *bootstrap.OptionsBuilder) {
+				builder.WithCustomHandlers(health).WithServerOptions(bootstrap.ServerOpts{Port: 9000})
+			},
+			expectedPaths: []string{"/health"},
+		},
+		{
+			name: "server options custom handlers should replace the ones already set",
+			configure: func(builder *bootstrap.OptionsBuilder) {
+				builder.WithCustomHandlers(health).
+					WithServerOptions(bootstrap.ServerOpts{CustomHandlers: []bootstrap.CustomHandler{ready}})
+			},
+			expectedPaths: []string{"/ready"},
+		},
+		{
+			name: "custom handlers should replace the ones of the server options",
+			configure: func(builder *bootstrap.OptionsBuilder) {
+				builder.WithServerOptions(bootstrap.ServerOpts{CustomHandlers: []bootstrap.CustomHandler{health}}).
+					WithCustomHandlers(ready)
+			},
+			expectedPaths: []string{"/ready"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			builder := bootstrap.NewOptionsBuilder(&config.Config{})
+
+			tt.configure(builder)
+
+			handlers := builder.Build().ServerOptions.CustomHandlers
+			paths := make([]string, 0, len(handlers))
+			for _, handler := range handlers {
+				paths = append(paths, handler.Path)
+			}
+			if !reflect.DeepEqual(tt.expectedPaths, paths) {
+				t.Errorf("expected custom handler paths %v actual %v", tt.expectedPaths, paths)
+			}
+		})
+	}
+}

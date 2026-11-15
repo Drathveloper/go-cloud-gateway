@@ -1,6 +1,7 @@
 package filter
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"maps"
@@ -18,6 +19,9 @@ const RequestResponseLoggerFilterName = "RequestResponseLogger"
 // DefaultMaxLoggedBodyBytes is the default maximum number of body bytes the filter buffers
 // and logs. Bigger bodies are forwarded untouched and logged without their content.
 const DefaultMaxLoggedBodyBytes int64 = 64 * 1024
+
+// ErrInvalidLogLevel is returned when the 'level' argument of the filter names no log level.
+var ErrInvalidLogLevel = errors.New("invalid log level")
 
 // redactedHeaderValue is what the filter logs in place of each value of a redacted header.
 const redactedHeaderValue = "[REDACTED]"
@@ -61,7 +65,8 @@ func NewHeadersOnlyRequestResponseLoggerFilter(level slog.Level) *RequestRespons
 
 // NewRequestResponseLoggerBuilder creates a new RequestResponseLoggerBuilder.
 //
-// The "level" argument selects the log level (debug, info, warn or error; default info).
+// The "level" argument selects the log level (debug, info, warn or error, in any case;
+// default info). Any other value is an error.
 // The "max-body-bytes" argument caps how many body bytes are buffered in memory and logged
 // per request and response (default DefaultMaxLoggedBodyBytes; negative means unlimited).
 // The "log-bodies" argument selects whether bodies are logged at all (default true).
@@ -94,8 +99,11 @@ func NewRequestResponseLoggerBuilder() gateway.FilterBuilderFunc {
 			}
 			redactHeaders = names
 		}
-		levelStr, _ := shared.ConvertToString(args["level"])
-		filter := NewRequestResponseLoggerFilter(parseLogLevel(levelStr), maxBodyBytes, logBodies)
+		level, err := logLevelArg(args)
+		if err != nil {
+			return nil, err
+		}
+		filter := NewRequestResponseLoggerFilter(level, maxBodyBytes, logBodies)
 		return filter.WithRedactedHeaders(redactHeaders...), nil
 	}
 }
@@ -248,17 +256,28 @@ func (f *RequestResponseLogger) isRedacted(name string) bool {
 	return redacted
 }
 
-// parseLogLevel returns the level named by level, in any case, or info when it names none.
-func parseLogLevel(level string) slog.Level {
-	switch strings.ToLower(level) {
+// logLevelArg reads the 'level' argument. A missing level means info. Any other value has
+// to name a level: a typo such as "warning" used to be read as info without any notice,
+// which logs at a level nobody asked for.
+func logLevelArg(args map[string]any) (slog.Level, error) {
+	if args["level"] == nil {
+		return slog.LevelInfo, nil
+	}
+	name, err := shared.ConvertToString(args["level"])
+	if err != nil {
+		return slog.LevelInfo, fmt.Errorf("failed to convert 'level' attribute: %w", err)
+	}
+	switch strings.ToLower(name) {
 	case "debug":
-		return slog.LevelDebug
+		return slog.LevelDebug, nil
+	case "info":
+		return slog.LevelInfo, nil
 	case "warn":
-		return slog.LevelWarn
+		return slog.LevelWarn, nil
 	case "error":
-		return slog.LevelError
+		return slog.LevelError, nil
 	default:
-		return slog.LevelInfo
+		return slog.LevelInfo, fmt.Errorf("%w %q: expected debug, info, warn or error", ErrInvalidLogLevel, name)
 	}
 }
 
