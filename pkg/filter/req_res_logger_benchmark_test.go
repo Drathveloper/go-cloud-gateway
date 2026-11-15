@@ -82,6 +82,50 @@ func BenchmarkRequestResponseLogger_PreProcess_WithRealLogger(b *testing.B) {
 	}
 }
 
+// benchmarkPreProcessWithQuery measures the request side for a URL with a query string.
+// Bodies are left out so that the URL is most of what is measured.
+func benchmarkPreProcessWithQuery(b *testing.B, logger *slog.Logger, buf *bytes.Buffer, rawURL string) {
+	b.Helper()
+	f := filter.NewHeadersOnlyRequestResponseLoggerFilter(slog.LevelInfo)
+	ctx := &gateway.Context{
+		Logger: logger,
+		Request: &gateway.Request{
+			Method:  "GET",
+			URL:     mustParseURL(rawURL),
+			Headers: map[string][]string{"X-Test": {"true"}},
+		},
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		buf.Reset()
+		_ = f.PreProcess(ctx)
+	}
+}
+
+const (
+	// benchmarkPlainQuery holds no sensitive parameter: the URL is logged without a copy.
+	benchmarkPlainQuery = "/search?q=gateway&page=3&size=50&sort=name,asc&filter%5Bstatus%5D=active&lang=en"
+	// benchmarkSensitiveQuery has the same length and two sensitive parameters.
+	benchmarkSensitiveQuery = "/search?q=gateway&page=3&access_token=eyJhbGciOiJIUzI1NiJ9&lang=en&signature=3a7bd3e2360a3d"
+)
+
+func BenchmarkRequestResponseLogger_SilentPreProcess_WithSensitiveQuery(b *testing.B) {
+	var buf bytes.Buffer
+	benchmarkPreProcessWithQuery(b, newSilentLogger(), &buf, benchmarkSensitiveQuery)
+}
+
+func BenchmarkRequestResponseLogger_PreProcess_WithPlainQuery(b *testing.B) {
+	var buf bytes.Buffer
+	benchmarkPreProcessWithQuery(b, newBufferedLogger(&buf), &buf, benchmarkPlainQuery)
+}
+
+func BenchmarkRequestResponseLogger_PreProcess_WithSensitiveQuery(b *testing.B) {
+	var buf bytes.Buffer
+	benchmarkPreProcessWithQuery(b, newBufferedLogger(&buf), &buf, benchmarkSensitiveQuery)
+}
+
 func BenchmarkRequestResponseLogger_PostProcess_WithRealLogger(b *testing.B) {
 	f := filter.NewRequestResponseLoggerFilter(slog.LevelInfo, filter.DefaultMaxLoggedBodyBytes, true)
 	var buf bytes.Buffer
