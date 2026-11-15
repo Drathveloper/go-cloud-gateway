@@ -372,10 +372,10 @@ func TestInitialize_RouteTimeoutIsAnsweredWhileTheRequestBodyIsSent(t *testing.T
 	}
 }
 
-// pacedBody is a request body that hands out one byte per interval and then, when it
+// stalledUploadBody is a request body that hands out one byte per interval and then, when it
 // stalls, blocks until it is closed or the request is cancelled: the http transport of
 // the client does not return before the read of the body it is waiting on does.
-type pacedBody struct {
+type stalledUploadBody struct {
 	cancelled <-chan struct{}
 	closed    chan struct{}
 	sent      atomic.Int64
@@ -385,8 +385,8 @@ type pacedBody struct {
 	stalls    bool
 }
 
-func newPacedBody(ctx context.Context, size int64, interval time.Duration, stalls bool) *pacedBody {
-	return &pacedBody{
+func newStalledUploadBody(ctx context.Context, size int64, interval time.Duration, stalls bool) *stalledUploadBody {
+	return &stalledUploadBody{
 		cancelled: ctx.Done(),
 		closed:    make(chan struct{}),
 		size:      size,
@@ -395,7 +395,7 @@ func newPacedBody(ctx context.Context, size int64, interval time.Duration, stall
 	}
 }
 
-func (b *pacedBody) Read(output []byte) (int, error) {
+func (b *stalledUploadBody) Read(output []byte) (int, error) {
 	wait := time.After(b.interval)
 	if b.sent.Load() == b.size {
 		if !b.stalls {
@@ -415,12 +415,12 @@ func (b *pacedBody) Read(output []byte) (int, error) {
 	return 1, nil
 }
 
-func (b *pacedBody) Close() error {
+func (b *stalledUploadBody) Close() error {
 	b.once.Do(func() { close(b.closed) })
 	return nil
 }
 
-func (b *pacedBody) isClosed() bool {
+func (b *stalledUploadBody) isClosed() bool {
 	select {
 	case <-b.closed:
 		return true
@@ -455,7 +455,7 @@ func TestInitialize_RouteTimeoutIsAnsweredToAGoClientThatIsStillSending(t *testi
 			}.start(t)
 			ctx, cancel := context.WithTimeout(t.Context(), bodyTestWait)
 			defer cancel()
-			body := newPacedBody(ctx, tt.size, 20*time.Millisecond, tt.stalls)
+			body := newStalledUploadBody(ctx, tt.size, 20*time.Millisecond, tt.stalls)
 			request, err := http.NewRequestWithContext(ctx, http.MethodPost, gatewayURL+"/upload", body)
 			require.NoError(t, err)
 			if tt.knownLength {
