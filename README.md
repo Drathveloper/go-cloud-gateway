@@ -88,6 +88,18 @@ gateway:
 Durations are strings with a unit, such as `30s`, `1m30s` or `250ms`. A bare number like
 `30` is rejected when the configuration is read.
 
+`RequestResponseLogger` logs the values of `Authorization`, `Proxy-Authorization`,
+`Cookie`, `Set-Cookie` and `X-Api-Key` as `[REDACTED]`. Its `redact-headers` argument
+adds more header names to that list:
+
+```yaml
+  global-filters:
+    - name: RequestResponseLogger
+      args:
+        redact-headers:
+          - X-Internal-Token
+```
+
 ### Timeouts and streaming routes
 
 Every route has a timeout: its own `timeout`, else `global-timeout`, else 10 seconds. It

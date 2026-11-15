@@ -1,6 +1,8 @@
 package ratelimit_test
 
 import (
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -82,5 +84,46 @@ func TestTokenBucket_Allow(t *testing.T) {
 				t.Errorf("expected %t actual %t", tt.expectedAllow, allow)
 			}
 		})
+	}
+}
+
+func TestTokenBucket_Allow_DoesNotAllocate(t *testing.T) {
+	bucket := ratelimit.NewTokenBucket(&MockTimeProvider{WantedTime: time.Now(), Increment: 1}, 1, 2)
+
+	allocs := testing.AllocsPerRun(100, func() {
+		_, _ = bucket.Allow()
+	})
+
+	if allocs != 0 {
+		t.Errorf("expected %v actual %v", 0, allocs)
+	}
+}
+
+func TestTokenBucket_Allow_Concurrent(t *testing.T) {
+	const (
+		goroutines = 8
+		calls      = 500
+		burst      = 100
+	)
+	// The clock is frozen, so the bucket never refills: exactly its burst must be allowed,
+	// however the calls interleave. The bucket reads the clock under its mutex, so the
+	// mock needs no locking of its own.
+	bucket := ratelimit.NewTokenBucket(&MockTimeProvider{WantedTime: time.Now(), Increment: 0}, 1, burst)
+	var allowed atomic.Int64
+	var wg sync.WaitGroup
+
+	for range goroutines {
+		wg.Go(func() {
+			for range calls {
+				if ok, _ := bucket.Allow(); ok {
+					allowed.Add(1)
+				}
+			}
+		})
+	}
+	wg.Wait()
+
+	if allowed.Load() != burst {
+		t.Errorf("expected %d actual %d", burst, allowed.Load())
 	}
 }
